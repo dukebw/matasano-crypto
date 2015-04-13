@@ -53,6 +53,7 @@ char IntegerToBase64(int Value)
     }
 }
 
+// NOTE(brendan): INPUT: hex character. OUTPUT: integer value of hex character
 int Base16ToInteger(char Value)
 {
     Value = tolower(Value);
@@ -67,6 +68,7 @@ int Base16ToInteger(char Value)
     }
 }
 
+// NOTE(brendan): INPUT: base and exponent. OUTPUT: base^exponent
 int IntegerPower(int Base, int Exponent)
 {
     int Result = 1;
