@@ -4,9 +4,9 @@ LDFLAGS=
 
 CC=g++
 
-SOURCES=hex_to_base64.cpp
+SOURCES=fixed_xor.cpp helper.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
-EXECUTABLE=hex_to_base64
+EXECUTABLE=fixed_xor
 # Build directory
 BUILD = ../build/
 
@@ -35,4 +35,5 @@ clean:
 spotless:
 	rm -f *.o *~ .*~ $(BUILD)$(EXECUTABLE)
 
-hex_to_base64.o:stopif.h
+fixed_xor.o:helper.h stopif.h
+helper.cpp: stopif.h

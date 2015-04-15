@@ -8,10 +8,10 @@
 
 /** Set this to \c 's' to stop the program on an error.
     Otherwise, functcions return a value on failure. */
-char error_mode = 's';
+static char error_mode = 's';
 
 /** To where should I write errors? If this is \c NULL, write to \c stderr. */
-FILE *error_log = 0;
+static FILE *error_log = 0;
 
 // NOTE(brendan): can make a debug switch to turn this off in release builds
 #define Stopif(assertion, error_action, ...)                      \

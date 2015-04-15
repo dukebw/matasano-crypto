@@ -6,33 +6,13 @@
    Notice: (C) Copyright 2015 by BRD Inc. All Rights Reserved.
    ======================================================================== */
 
-#include "stopif.h"
-#include <stdio.h>
-#include <ctype.h>
-#include <math.h>
-#include <string.h>
+#include "helper.h"
 
 #define MAXLINE 512
 
-// NOTE(brendan): swap the characters s and t (xor trick)
-void Swap(char *s, char *t) {
-    *s ^= *t;
-    *t ^= *s;
-    *s ^= *t;
-}
-
-// NOTE(brendan): reverses string s and returns pointer to start of s;
-// side-effects
-char *ReverseString(char *s) {
-    int StringLength = strlen(s);
-    for (int i = 0; i < StringLength/2; ++i) {
-        Swap(s + i, s + (StringLength - 1) - i);
-    }
-    return s;
-}
-
 // NOTE(brendan): INPUT: integer between 0 and 63 OUTPUT: base64 digit
-char IntegerToBase64(int Value)
+internal char
+IntegerToBase64(int Value)
 {
     Stopif((Value > 63) || (Value < 0), return -1,
            "Bad value passed to IntegerToBase64");
@@ -53,23 +33,8 @@ char IntegerToBase64(int Value)
     }
 }
 
-// NOTE(brendan): INPUT: hex character. OUTPUT: integer value of hex character
-int Base16ToInteger(char Value)
-{
-    Value = tolower(Value);
-    if ((Value >= 'a') && (Value <= 'f')) {
-        return 10 + Value - 'a';
-    }
-    else if ((Value >= '0') && (Value <= '9')) {
-        return Value - '0';
-    }
-    else {
-        Stopif(true, return -1, "Bad char passed to Base16ToInteger");
-    }
-}
-
 // NOTE(brendan): INPUT: base and exponent. OUTPUT: base^exponent
-int IntegerPower(int Base, int Exponent)
+internal int IntegerPower(int Base, int Exponent)
 {
     int Result = 1;
     while (Exponent) {
