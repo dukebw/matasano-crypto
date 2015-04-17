@@ -12,6 +12,8 @@
 #define local_persist static
 #define global_variable static
 
+#define ArrayLength(array) sizeof(array)/sizeof((array)[0])
+
 typedef uint8_t uint8;
 typedef uint16_t uint16;
 typedef uint32_t uint32;
@@ -35,5 +37,20 @@ int Base16ToInteger(char Value);
 // NOTE(brendan): reverses string s and returns pointer to start of s;
 // side-effects
 char *ReverseString(char *s);
+
+// NOTE(brendan): INPUT: output char array, two input hex char arrays, all of
+// same length. OUTPUT: output char array gets the result of XORing the
+// two input char arrays
+void XORStrings(char *Result, char *StringA, char *StringB, uint32 Length);
+
+// NOTE(brendan): INPUT: output string, hex-encoded string. OUTPUT: string
+// of characters
+void DecodeHexString(char *Result, char *HexString, uint32 Length);
+
+// NOTE(brendan): INPUT: Ciphertext, length of ciphertext.
+// OUTPUT: string with max score based on frequency analysis, and from trying
+// all byte ciphers
+void ByteCipherDecodeString(char *DecodedString, char *Ciphertext,
+                            uint32 CipherLength);
 
 #endif /* HELPER_H */

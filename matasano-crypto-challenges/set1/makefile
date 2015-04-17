@@ -4,9 +4,9 @@ LDFLAGS=
 
 CC=g++
 
-SOURCES=fixed_xor.cpp helper.cpp
+SOURCES=byte_xor_cipher.cpp helper.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
-EXECUTABLE=fixed_xor
+EXECUTABLE=byte_xor_cipher
 # Build directory
 BUILD = ../build/
 
@@ -35,5 +35,5 @@ clean:
 spotless:
 	rm -f *.o *~ .*~ $(BUILD)$(EXECUTABLE)
 
-fixed_xor.o:helper.h stopif.h
+byte_xor_cipher.o:helper.h stopif.h
 helper.cpp: stopif.h
