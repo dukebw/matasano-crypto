@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 
@@ -50,7 +51,10 @@ void DecodeHexString(char *Result, char *HexString, uint32 Length);
 // NOTE(brendan): INPUT: Ciphertext, length of ciphertext.
 // OUTPUT: string with max score based on frequency analysis, and from trying
 // all byte ciphers
-void ByteCipherDecodeString(char *DecodedString, char *Ciphertext,
-                            uint32 CipherLength);
+real32 ByteCipherDecodeString(char *DecodedString, char *Ciphertext,
+                              uint32 CipherLength);
+
+// NOTE(brendan): read a line into s; return length
+int GetLine(char OutString[], int Limit);
 
 #endif /* HELPER_H */

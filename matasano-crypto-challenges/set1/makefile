@@ -1,16 +1,17 @@
-CFLAGS=-c -Wall -std=c++11 -g #-O3
+CFLAGS=-c -Wall -Wextra -std=c++11 -g #-O3
 INCLUDE_FLAGS=
 LDFLAGS=
 
 CC=g++
 
-SOURCES=byte_xor_cipher.cpp helper.cpp
+SOURCES=detect_single_char_xor.cpp helper.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
-EXECUTABLE=byte_xor_cipher
+EXECUTABLE=detect_single_char_xor
 # Build directory
 BUILD = ../build/
 
 all: directories $(SOURCES) $(BUILD)$(EXECUTABLE)
+	ctags -R .
 
 $(BUILD)$(EXECUTABLE): $(OBJECTS)
 	$(CC) -o $@ $(OBJECTS) $(LDFLAGS)
@@ -35,5 +36,5 @@ clean:
 spotless:
 	rm -f *.o *~ .*~ $(BUILD)$(EXECUTABLE)
 
-byte_xor_cipher.o:helper.h stopif.h
+detect_single_char_xor.o:helper.h stopif.h
 helper.cpp: stopif.h

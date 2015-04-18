@@ -14,27 +14,37 @@
 
 // NOTE(brendan): INPUT: string OUTPUT: score of string, based on frequencies
 // of letters (score is sum of percentages of appearance)
-internal uint32
+internal real32
 ScoreString(char *DecodedString, uint32 Length)
 {
-    local_persist real32 Frequency[] = {
+#define ENGLISH_LETTER_COUNT 26
+    local_persist real32 ExpectedFrequency[] = {
         8.12, 1.49, 2.71, 4.32, 12.02, 2.30, 2.03, 5.92, 7.31, 0.10, 0.69,
         3.98, 2.61, 6.95, 7.68, 1.82, 0.11, 6.02, 6.28, 9.10, 2.88, 1.11,
         2.09, 0.17, 2.11, 0.07
     };
+    uint32 LetterCount[ENGLISH_LETTER_COUNT] = {0};
     real32 ResultScore = 0.0f;
     for (uint32 CharIndex = 0; CharIndex < Length; ++CharIndex) {
         char UpperChar = toupper(DecodedString[CharIndex]);
         if (('A' <= UpperChar) && (UpperChar <= 'Z')) {
-            ResultScore += Frequency[UpperChar - 'A'];
-        }
-        else if (UpperChar == ' ') {
-            ResultScore += 16.67f;
+            ++LetterCount[UpperChar - 'A'];
+        } else if (!isspace(UpperChar)) { // TODO(brendan): punctuation?
+            ResultScore += 100.0f;
         }
     }
+    for (uint32 LetterIndex = 0;
+         LetterIndex < ENGLISH_LETTER_COUNT;
+         ++LetterIndex) {
+        ResultScore += fabs(ExpectedFrequency[LetterIndex] -
+                            (real32)LetterCount[LetterIndex]/(real32)Length);
+    }
     return ResultScore;
+#undef ENGLISH_LETTER_COUNT
 }
 
+// NOTE(brendan): INPUT: a byte-cipher and a length for the key.
+// OUTPUT: A key with the byte-cipher repeated across its length
 internal void
 CreateKey(char *Key, uint32 ByteCipher, uint32 Length)
 {
@@ -60,11 +70,9 @@ int Base16ToInteger(char Value)
     Value = tolower(Value);
     if ((Value >= 'a') && (Value <= 'f')) {
         return 10 + Value - 'a';
-    }
-    else if ((Value >= '0') && (Value <= '9')) {
+    } else if ((Value >= '0') && (Value <= '9')) {
         return Value - '0';
-    }
-    else {
+    } else {
         Stopif(true, return -1, "Bad char passed to Base16ToInteger");
     }
 }
@@ -114,26 +122,46 @@ void DecodeHexString(char *Result, char *HexString, uint32 Length)
 // NOTE(brendan): INPUT: Ciphertext, length of ciphertext.
 // OUTPUT: string with max score based on frequency analysis, and from trying
 // all byte ciphers
-void ByteCipherDecodeString(char *DecodedString, char *Ciphertext,
-                            uint32 CipherLength)
+real32 ByteCipherDecodeString(char *DecodedString, char *Ciphertext,
+                              uint32 CipherLength)
 {
     uint32 DecodedStringLength = CipherLength/2 + 1;
     char Key[CipherLength + 1];
     // NOTE(brendan): decrypt
-    real32 MaxScore = 0.0f;
-    uint32 MaxCipher = 0;
+    real32 MinScore = INFINITY;
+    uint32 MinCipher = 0;
     char XORResult[CipherLength + 1];
+    // TODO(brendan): calculate frequencies and subtract from expected
+    // frequencies; maximize that value
     for (uint32 ByteCipher = 0; ByteCipher < 256; ++ByteCipher) {
         CreateKey(Key, ByteCipher, CipherLength);
         XORStrings(XORResult, Key, Ciphertext, CipherLength);
         DecodeHexString(DecodedString, XORResult, CipherLength);
         real32 Score = ScoreString(DecodedString, DecodedStringLength - 1);
-        if (Score > MaxScore) {
-            MaxScore = Score;
-            MaxCipher = ByteCipher;
+        if (Score < MinScore) {
+            MinScore = Score;
+            MinCipher = ByteCipher;
         }
     }
-    CreateKey(Key, MaxCipher, CipherLength);
+    CreateKey(Key, MinCipher, CipherLength);
     XORStrings(XORResult, Key, Ciphertext, CipherLength);
     DecodeHexString(DecodedString, XORResult, CipherLength);
+    return MinScore;
 }
+
+// NOTE(brendan): read a line into s; return length
+int GetLine(char OutString[], int Limit) {
+    int NextChar;
+
+    char *Start = OutString;
+    while ((Limit-- > 0) && ((NextChar = getchar()) != EOF) &&
+          (NextChar != '\n')) {
+        *OutString++ = NextChar;
+    }
+    if (NextChar == '\n') {
+        *OutString++ = NextChar;
+    }
+    *OutString = '\0';
+    return (OutString - Start);
+}
+
