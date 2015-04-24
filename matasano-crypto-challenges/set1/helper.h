@@ -42,7 +42,7 @@ char *ReverseString(char *s);
 // NOTE(brendan): INPUT: output char array, two input hex char arrays, all of
 // same length. OUTPUT: output char array gets the result of XORing the
 // two input char arrays
-void XORStrings(char *Result, char *StringA, char *StringB, uint32 Length);
+void XORStrings(char *Result, char *StringA, char *StringB);
 
 // NOTE(brendan): INPUT: output string, hex-encoded string. OUTPUT: string
 // of characters

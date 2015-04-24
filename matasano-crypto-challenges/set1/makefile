@@ -4,9 +4,9 @@ LDFLAGS=
 
 CC=g++
 
-SOURCES=detect_single_char_xor.cpp helper.cpp
+SOURCES=repeating_key_xor.cpp helper.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
-EXECUTABLE=detect_single_char_xor
+EXECUTABLE=repeating_key_xor
 # Build directory
 BUILD = ../build/
 
@@ -36,5 +36,5 @@ clean:
 spotless:
 	rm -f *.o *~ .*~ $(BUILD)$(EXECUTABLE)
 
-detect_single_char_xor.o:helper.h stopif.h
+repeating_key_xor.o:helper.h stopif.h
 helper.cpp: stopif.h

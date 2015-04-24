@@ -90,7 +90,7 @@ char *ReverseString(char *s) {
 // NOTE(brendan): INPUT: output char array, two input hex char arrays, all of
 // same length. OUTPUT: output char array gets the result of XORing the
 // two input char arrays
-void XORStrings(char *Result, char *StringA, char *StringB, uint32 Length)
+void XORStrings(char *Result, char *StringA, char *StringB)
 {
     char TempString[2];
     while (*StringA !='\0') {
@@ -135,7 +135,7 @@ real32 ByteCipherDecodeString(char *DecodedString, char *Ciphertext,
     // frequencies; maximize that value
     for (uint32 ByteCipher = 0; ByteCipher < 256; ++ByteCipher) {
         CreateKey(Key, ByteCipher, CipherLength);
-        XORStrings(XORResult, Key, Ciphertext, CipherLength);
+        XORStrings(XORResult, Key, Ciphertext);
         DecodeHexString(DecodedString, XORResult, CipherLength);
         real32 Score = ScoreString(DecodedString, DecodedStringLength - 1);
         if (Score < MinScore) {
@@ -144,7 +144,7 @@ real32 ByteCipherDecodeString(char *DecodedString, char *Ciphertext,
         }
     }
     CreateKey(Key, MinCipher, CipherLength);
-    XORStrings(XORResult, Key, Ciphertext, CipherLength);
+    XORStrings(XORResult, Key, Ciphertext);
     DecodeHexString(DecodedString, XORResult, CipherLength);
     return MinScore;
 }
