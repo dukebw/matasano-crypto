@@ -1,0 +1,10 @@
+This is a repository full of cryptography-related programs I've written as I
+work through "Introduction to Modern Cryptography by Katz and Lindell".
+
+The cipher programs require you to set a MESSAGE environment variable (the
+message to be encrypted), and a KEY environment variable (the key used to
+encrypt the message). The attack programs require you to set a CIPHER
+environment variable (the cipher to be decrypted).
+
+Make by setting the P environment variable to the program and typing make.
+E.g. P=vigenere_attack make
