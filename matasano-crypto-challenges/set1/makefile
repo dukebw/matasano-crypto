@@ -1,29 +1,29 @@
-CFLAGS=-c -Wall -Wextra -std=c++11 -g #-O3
-INCLUDE_FLAGS=
-LDFLAGS=
+CPPFLAGS=-c `pkg-config --cflags glib-2.0` -I$(HOME)/tech/root/include/ -g\
+		-std=c++14 -Wall -Wextra -Werror -O0
+LDLIBS=`pkg-config --libs glib-2.0` -lm
 
-CC=g++
+CC=clang
 
-SOURCES=repeating_key_xor.cpp helper.cpp
+SOURCES=break_repeating_key_xor.cpp helper.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
-EXECUTABLE=repeating_key_xor
+EXECUTABLE=break_repeating_key_xor
 # Build directory
-BUILD = ../build/
+BUILD=../build/
 
 all: directories $(SOURCES) $(BUILD)$(EXECUTABLE)
 	ctags -R .
 
 $(BUILD)$(EXECUTABLE): $(OBJECTS)
-	$(CC) -o $@ $(OBJECTS) $(LDFLAGS)
+	$(CC) -o $@ $(OBJECTS) $(LDLIBS)
 
 .cpp.o:
-	$(CC) $(CFLAGS) $< $(INCLUDE_FLAGS) -o $@
+	$(CC) $(CPPFLAGS) $< -o $@
 
-MKDIR_P = mkdir -p
+MKDIR_P=mkdir -p
 
 .PHONY: directories OUT_DIR clean spotless
 
-OUT_DIR = ../build/
+OUT_DIR=../build/
 
 directories: OUT_DIR
 
@@ -36,5 +36,5 @@ clean:
 spotless:
 	rm -f *.o *~ .*~ $(BUILD)$(EXECUTABLE)
 
-repeating_key_xor.o:helper.h stopif.h
+break_repeating_key_xor.o:helper.h stopif.h
 helper.cpp: stopif.h

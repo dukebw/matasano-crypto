@@ -18,7 +18,7 @@ int main()
     char MinScoreString[MAXLEN];
     char ResultString[MAXLEN];
     while ((CipherLength = GetLine(Ciphertext, MAXLEN))) {
-        real32 Score = ByteCipherDecodeString(ResultString, Ciphertext,
+        real32 Score = ByteCipherInHexDecode(ResultString, Ciphertext,
                                               CipherLength);
         if (Score < MinScore) {
             strncpy(MinScoreString, ResultString, CipherLength/2 + 1);

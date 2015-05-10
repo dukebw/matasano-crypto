@@ -39,10 +39,16 @@ int Base16ToInteger(char Value);
 // side-effects
 char *ReverseString(char *s);
 
-// NOTE(brendan): INPUT: output char array, two input hex char arrays, all of
+// NOTE(brendan): INPUT: output char array, two input ASCII char arrays, all of
 // same length. OUTPUT: output char array gets the result of XORing the
 // two input char arrays
-void XORStrings(char *Result, char *StringA, char *StringB);
+inline void
+XORAsciiStrings(char *Result, char *StringA, char *StringB, uint32 Length);
+
+// NOTE(brendan): INPUT: output char array, two input hex char arrays, all of
+// same length, which is passed as Length. OUTPUT: output char array gets the
+// result of XORing the two input char arrays
+void XORStrings(char *Result, char *StringA, char *StringB, uint32 Length);
 
 // NOTE(brendan): INPUT: output string, hex-encoded string. OUTPUT: string
 // of characters
@@ -51,10 +57,21 @@ void DecodeHexString(char *Result, char *HexString, uint32 Length);
 // NOTE(brendan): INPUT: Ciphertext, length of ciphertext.
 // OUTPUT: string with max score based on frequency analysis, and from trying
 // all byte ciphers
-real32 ByteCipherDecodeString(char *DecodedString, char *Ciphertext,
-                              uint32 CipherLength);
+real32 ByteCipherInHexDecode(char *DecodedString, char *Ciphertext,
+                             uint32 CipherLength);
+
+// NOTE(brendan): INPUT: Ciphertext in ASCII-256, length of ciphertext.
+// OUTPUT: string with max score based on frequency analysis, and from trying
+// all byte ciphers
+// Returns the MinCipher
+uint8 ByteCipherAsciiDecode(char *DecodedString, char *Ciphertext,
+                            uint32 CipherLength);
 
 // NOTE(brendan): read a line into s; return length
 int GetLine(char OutString[], int Limit);
+
+// NOTE(brendan): OUTPUT: OutHex[] array of hex values corresponding to input
+// string.  INPUT: String[], Length of String
+void StringToHex(char OutHex[], char String[], uint32 Length);
 
 #endif /* HELPER_H */

@@ -15,6 +15,6 @@ int main(int argc, char **argv)
     uint32 CipherLength = strlen(Ciphertext);
     uint32 ResultStringLength = CipherLength/2 + 1;
     char ResultString[ResultStringLength];
-    ByteCipherDecodeString(ResultString, Ciphertext, CipherLength);
+    ByteCipherInHexDecode(ResultString, Ciphertext, CipherLength);
     printf("%s\n", ResultString);
 }

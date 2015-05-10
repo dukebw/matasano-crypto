@@ -53,6 +53,16 @@ CreateKey(char *Key, uint32 ByteCipher, uint32 Length)
     }
 }
 
+// NOTE(brendan): INPUT: a byte-cipher and a length for the key.
+// OUTPUT: A key with the byte-cipher repeated across its length
+inline void
+CreateAsciiKey(char *Key, uint32 ByteCipher, uint32 Length)
+{
+    for (uint32 KeyIndex = 0; KeyIndex < Length; ++KeyIndex) {
+        Key[KeyIndex] = ByteCipher;
+    }
+}
+
 // ----------------------------------------------------------------------------
 // Access functions
 // ----------------------------------------------------------------------------
@@ -87,24 +97,34 @@ char *ReverseString(char *s) {
     return s;
 }
 
+// NOTE(brendan): INPUT: output char array, two input ASCII char arrays, all of
+// same length. OUTPUT: output char array gets the result of XORing the
+// two input char arrays
+inline void
+XORAsciiStrings(char *Result, char *StringA, char *StringB, uint32 Length)
+{
+    for (uint32 StringIndex = 0; StringIndex < Length; ++StringIndex) {
+        Result[StringIndex] = StringA[StringIndex] ^ StringB[StringIndex];
+    }
+}
+
 // NOTE(brendan): INPUT: output char array, two input hex char arrays, all of
 // same length. OUTPUT: output char array gets the result of XORing the
 // two input char arrays
-void XORStrings(char *Result, char *StringA, char *StringB)
+void XORStrings(char *Result, char *StringA, char *StringB, uint32 Length)
 {
+    // NOTE(brendan): null-terminate the string
+    *(Result + Length) = 0;
     char TempString[2];
-    while (*StringA !='\0') {
-        uint32 HexDigitA = Base16ToInteger(*(StringA++));
-        uint32 HexDigitB = Base16ToInteger(*(StringB++));
+    for (uint32 StringIndex = 0; StringIndex < Length; ++StringIndex) {
+        uint32 HexDigitA = Base16ToInteger(*(StringA + StringIndex));
+        uint32 HexDigitB = Base16ToInteger(*(StringB + StringIndex));
         uint32 DigitsXORed = (HexDigitA ^ HexDigitB);
         sprintf(TempString, "%.1x", DigitsXORed);
-        *Result++ = TempString[0];
+        *(Result + StringIndex) = TempString[0];
     }
-    // NOTE(brendan): null-terminate the string
-    *Result = 0;
 }
 
-// TODO(brendan): write own integer -> hex function? To avoid sprintf entirely
 // NOTE(brendan): INPUT: output string, hex-encoded string. OUTPUT: string
 // of characters
 void DecodeHexString(char *Result, char *HexString, uint32 Length)
@@ -119,11 +139,44 @@ void DecodeHexString(char *Result, char *HexString, uint32 Length)
     *Result = 0;
 }
 
-// NOTE(brendan): INPUT: Ciphertext, length of ciphertext.
+// NOTE(brendan): INPUT: Ciphertext in ASCII-256, length of ciphertext.
 // OUTPUT: string with max score based on frequency analysis, and from trying
 // all byte ciphers
-real32 ByteCipherDecodeString(char *DecodedString, char *Ciphertext,
-                              uint32 CipherLength)
+uint8 ByteCipherAsciiDecode(char *DecodedString, char *Ciphertext,
+                            uint32 CipherLength)
+{
+    char Key[CipherLength + 1];
+    Key[CipherLength] = 0;
+    // NOTE(brendan): decrypt
+    real32 MinScore = INFINITY;
+    uint32 MinCipher = 0;
+    // TODO(brendan): calculate frequencies and subtract from expected
+    // frequencies; maximize that value
+    for (uint32 ByteCipher = 0; ByteCipher < 256; ++ByteCipher) {
+        CreateAsciiKey(Key, ByteCipher, CipherLength);
+        XORAsciiStrings(DecodedString, Key, Ciphertext, CipherLength);
+        for (uint32 CipherIndex = 0;
+             CipherIndex < CipherLength;
+             ++CipherIndex) {
+            DecodedString[CipherIndex] = Key[CipherIndex] ^
+                                         Ciphertext[CipherIndex];
+        }
+        real32 Score = ScoreString(DecodedString, CipherLength);
+        if (Score < MinScore) {
+            MinScore = Score;
+            MinCipher = ByteCipher;
+        }
+    }
+    CreateAsciiKey(Key, MinCipher, CipherLength);
+    XORAsciiStrings(DecodedString, Key, Ciphertext, CipherLength);
+    return MinCipher;
+}
+
+// NOTE(brendan): INPUT: Ciphertext in hex, length of ciphertext.
+// OUTPUT: string with max score based on frequency analysis, and from trying
+// all byte ciphers
+real32 ByteCipherInHexDecode(char *DecodedString, char *Ciphertext,
+                             uint32 CipherLength)
 {
     uint32 DecodedStringLength = CipherLength/2 + 1;
     char Key[CipherLength + 1];
@@ -135,7 +188,7 @@ real32 ByteCipherDecodeString(char *DecodedString, char *Ciphertext,
     // frequencies; maximize that value
     for (uint32 ByteCipher = 0; ByteCipher < 256; ++ByteCipher) {
         CreateKey(Key, ByteCipher, CipherLength);
-        XORStrings(XORResult, Key, Ciphertext);
+        XORStrings(XORResult, Key, Ciphertext, CipherLength);
         DecodeHexString(DecodedString, XORResult, CipherLength);
         real32 Score = ScoreString(DecodedString, DecodedStringLength - 1);
         if (Score < MinScore) {
@@ -144,7 +197,7 @@ real32 ByteCipherDecodeString(char *DecodedString, char *Ciphertext,
         }
     }
     CreateKey(Key, MinCipher, CipherLength);
-    XORStrings(XORResult, Key, Ciphertext);
+    XORStrings(XORResult, Key, Ciphertext, CipherLength);
     DecodeHexString(DecodedString, XORResult, CipherLength);
     return MinScore;
 }
@@ -165,3 +218,11 @@ int GetLine(char OutString[], int Limit) {
     return (OutString - Start);
 }
 
+// NOTE(brendan): OUTPUT: OutHex[] array of hex values corresponding to input
+// string.  INPUT: String[], Length of String
+void StringToHex(char OutHex[], char String[], uint32 StringLength)
+{
+    for (uint32 StringIndex = 0; StringIndex < StringLength; ++StringIndex) {
+        sprintf(OutHex + 2*StringIndex, "%.2x", *(String + StringIndex));
+    }
+}
