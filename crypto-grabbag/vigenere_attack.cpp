@@ -10,7 +10,6 @@
 
 #define MAX_KEY_LENGTH 64
 
-// TODO(brendan): Keep working on this attack.
 // BestKeyLength should be the SMALLEST KeyLength such that the sum (q_i)^2
 // is sufficiently close to 0.065
 int main()
