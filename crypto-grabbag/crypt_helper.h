@@ -16,10 +16,15 @@ global_variable real32 LetterFrequencies[] = {
 
 // NOTE(brendan): INPUT: character to shift mod 26, shift amount (assumed to be
 // in [0, 25]. OUTPUT: corresponding lower-case character, shifted mod 26
-internal char
-ShiftChar(char ToShiftChar, uint32 ShiftAmount)
+internal uint32
+ShiftChar(uint32 ToShiftChar, uint32 ShiftAmount)
 {
-    char Result;
+    // TODO(brendan): more checking
+    Stopif(!(((ToShiftChar <= 'Z') && (ToShiftChar >= 'A')) ||
+             ((ToShiftChar <= 'z') && (ToShiftChar >= 'a'))),
+           return -1,
+           "Bad input char");
+    uint32 Result;
     uint32 PreModChar = tolower(ToShiftChar) + ShiftAmount;
     if (PreModChar <= 'z') {
         Result = PreModChar;
