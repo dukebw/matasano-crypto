@@ -11,6 +11,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <ctype.h>
+#include <stdbool.h>
 
 #define internal static
 #define local_persist static
