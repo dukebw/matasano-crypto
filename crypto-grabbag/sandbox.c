@@ -2,6 +2,7 @@
 #include "aes.h"
 
 #define MAX_MSG_LENGTH 65536
+#define BLOCK_LEN 16
 
 int main()
 {
@@ -14,14 +15,26 @@ int main()
     uint32 CipherIndex;
     for (CipherIndex = 0;
          (CipherBase64[CipherIndex] = fgetc(InputFile)) != (uint8)EOF;
-         ++CipherIndex) {}
+         ++CipherIndex)
+    {
+    }
 
     // TODO(brendan): decrypt!
     uint8 Cipher[MAX_MSG_LENGTH];
-    Base64ToAscii(Cipher, CipherBase64, CipherIndex);
+    uint32 CipherLength = Base64ToAscii(Cipher, CipherBase64, CipherIndex);
+    uint8 CipherHex[MAX_MSG_LENGTH];
+    StringToHex(CipherHex, Cipher, CipherLength);
 
     uint8 Key[] = "YELLOW SUBMARINE";
-    printf("%s\n", Cipher);
-    printf("%s\n", Key);
+    uint32 KeyLength = 16;
+    uint8 KeyHex[2*KeyLength + 1];
+    StringToHex(KeyHex, Key, KeyLength);
+    aes_decrypt_ctx Context[1];
+    aes_decrypt_key(KeyHex, KeyLength, Context);
+
+    uint8 MessageHex[MAX_MSG_LENGTH];
+    aes_decrypt(CipherHex, MessageHex, Context);
+    printf("%s\n", MessageHex);
+
     fclose(InputFile);
 }
