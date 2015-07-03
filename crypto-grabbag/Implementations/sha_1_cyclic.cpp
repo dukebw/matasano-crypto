@@ -39,14 +39,6 @@ RotateLeft(uint32 Word, uint32 ShiftAmount)
     return Result;
 }
 
-inline uint32
-ByteSwap32(uint32 Word)
-{
-    uint32 Result = (Word << 24) | ((Word & 0xff00) << 8) |
-                    ((Word & 0xff0000) >> 8) | (Word >> 24);
-    return Result;
-}
-
 // NOTE(brendan): SHA-1: INPUT: Message M such that |M| <= 2^64
 // OUTPUT: A 160-bit hash (message digest) of the message
 int main()

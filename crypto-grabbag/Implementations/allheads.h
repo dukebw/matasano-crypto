@@ -2,6 +2,7 @@
 #define ALLHEADS_H
 
 #include "stopif.h"
+#include <stdbool.h>
 #include <math.h>
 #include <time.h>
 #include <stdio.h>
