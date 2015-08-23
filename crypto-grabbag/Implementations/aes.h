@@ -6,19 +6,16 @@
 #define STATE_ARRAY_ROW_COUNT 4
 #define NUMBER_OF_ROUNDS 10
 
-global_variable uint32 StateArray[STATE_ARRAY_ROW_COUNT][BLOCK_SIZE];
+global_variable uint8 StateArray[STATE_ARRAY_ROW_COUNT][BLOCK_SIZE];
 
+// NOTE(brendan): INPUT: Sequences of 128 bits. OUTPUT: Same.
 internal void
 AesEncrypt(uint8 *Cipher, uint8 *Message, uint32 MessageLength)
 {
-    Stopif(MessageLength != sizeof(StateArray[0])*STATE_ARRAY_ROW_COUNT*BLOCK_SIZE,
-           return,
-           "Bad Length");
-
     for (uint32 MessageIndex = 0;
          MessageIndex < MessageLength;
          ++MessageIndex)
     {
-        StateArray[MessageIndex/BLOCK_SIZE][] = ;
+        StateArray[MessageIndex / BLOCK_SIZE][MessageIndex % 4] = Message[MessageIndex];
     }
 }
