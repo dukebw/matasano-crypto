@@ -17,16 +17,16 @@ global_variable real32 LetterFrequencies[] =
 
 // NOTE(brendan): INPUT: character to shift mod 26, shift amount (assumed to be
 // in [0, 25]. OUTPUT: corresponding lower-case character, shifted mod 26
-internal uint32
-ShiftChar(uint32 ToShiftChar, uint32 ShiftAmount)
+internal u32
+ShiftChar(u32 ToShiftChar, u32 ShiftAmount)
 {
     // TODO(brendan): more checking
     Stopif(!(((ToShiftChar <= 'Z') && (ToShiftChar >= 'A')) ||
              ((ToShiftChar <= 'z') && (ToShiftChar >= 'a'))),
            return -1,
            "Bad input char");
-    uint32 Result;
-    uint32 PreModChar = tolower(ToShiftChar) + ShiftAmount;
+    u32 Result;
+    u32 PreModChar = tolower(ToShiftChar) + ShiftAmount;
     if (PreModChar <= 'z')
     {
         Result = PreModChar;
@@ -41,24 +41,24 @@ ShiftChar(uint32 ToShiftChar, uint32 ShiftAmount)
 // NOTE(brendan): INPUT: Cipher, its length and the length of the key.
 // OUTPUT: the best shift amount (the shift amount that makes the Cipher
 // closest to english-language letter frequency)
-internal uint32
-GetBestShiftAmount(char *Cipher, uint32 CipherLength, uint32 KeyLength)
+internal u32
+GetBestShiftAmount(char *Cipher, u32 CipherLength, u32 KeyLength)
 {
-    uint32 CharCounts[ALPHABET_SIZE] = {};
-    uint32 Result = 0;
+    u32 CharCounts[ALPHABET_SIZE] = {};
+    u32 Result = 0;
     real32 BestShiftDelta = INFINITY;
  
-    for (uint32 ShiftAmount = 0; ShiftAmount < ALPHABET_SIZE; ++ShiftAmount)
+    for (u32 ShiftAmount = 0; ShiftAmount < ALPHABET_SIZE; ++ShiftAmount)
     {
-        for (uint32 CipherIndex = 0;
+        for (u32 CipherIndex = 0;
              CipherIndex < CipherLength;
              CipherIndex += KeyLength)
         {
-            uint32 AlphabetOffset = ShiftChar(Cipher[CipherIndex], ShiftAmount) - 'a';
+            u32 AlphabetOffset = ShiftChar(Cipher[CipherIndex], ShiftAmount) - 'a';
             ++CharCounts[AlphabetOffset];
         }
         real32 ShiftFrequencySum = 0.0f;
-        for (uint32 CharIndex = 0; CharIndex < ALPHABET_SIZE; ++CharIndex)
+        for (u32 CharIndex = 0; CharIndex < ALPHABET_SIZE; ++CharIndex)
         {
             real32 KeyLetterFreq =
                 (real32)CharCounts[CharIndex]/(real32)CipherLength;
@@ -77,9 +77,9 @@ GetBestShiftAmount(char *Cipher, uint32 CipherLength, uint32 KeyLength)
 }
 
 // NOTE(brendan): INPUT: digit in base 64. OUTPUT: that digit translated to
-// a uint32, or -1 if the given char was not a valid base 64 digit.
-internal uint32
-Base64ToUInt(uint8 Base64Digit)
+// a u32, or -1 if the given char was not a valid base 64 digit.
+internal u32
+Base64ToUInt(u8 Base64Digit)
 {
     if ((Base64Digit >= 'A') && (Base64Digit <= 'Z'))
     {
@@ -105,8 +105,8 @@ Base64ToUInt(uint8 Base64Digit)
 }
 
 // NOTE(brendan): INPUT: OUTPUT:
-internal uint32
-Base64ToAscii(uint8 *AsciiString, uint8 *Base64String, uint32 Base64StringLength)
+internal u32
+Base64ToAscii(u8 *AsciiString, u8 *Base64String, u32 Base64StringLength)
 {
     // NOTE(brendan): Note that here we force the Base64String to be byte-aligned,
     // i.e. the number of base64 characters is a multiple of 4. Otherwise we
@@ -118,7 +118,7 @@ Base64ToAscii(uint8 *AsciiString, uint8 *Base64String, uint32 Base64StringLength
 
     // NOTE(brendan): length needed to store AsciiString corresponding to
     // Base64String. Last element should be 0
-    uint32 AsciiStringLength = (Base64StringLength/4)*3;
+    u32 AsciiStringLength = (Base64StringLength/4)*3;
     if (Base64String[Base64StringLength - 1] == '=')
     {
         if (Base64String[Base64StringLength - 2] == '=')
@@ -132,7 +132,7 @@ Base64ToAscii(uint8 *AsciiString, uint8 *Base64String, uint32 Base64StringLength
     }
     AsciiString[AsciiStringLength] = 0;
     // NOTE(brendan): translate CIPHER from base64 to base256 (ASCII)
-    for (uint32 Base64StringIndex = 0, ByteIndex = 0;
+    for (u32 Base64StringIndex = 0, ByteIndex = 0;
          Base64StringIndex < Base64StringLength;
          ++Base64StringIndex)
     {
@@ -142,8 +142,8 @@ Base64ToAscii(uint8 *AsciiString, uint8 *Base64String, uint32 Base64StringLength
         {
             break;
         }
-        // NOTE(brendan): uint8 used so that we shift out bits we don't want
-        uint8 Base64Digit = Base64ToUInt(Base64String[Base64StringIndex]);
+        // NOTE(brendan): u8 used so that we shift out bits we don't want
+        u8 Base64Digit = Base64ToUInt(Base64String[Base64StringIndex]);
         switch (Base64StringIndex % 4)
         {
             case 0:
@@ -179,9 +179,9 @@ Base64ToAscii(uint8 *AsciiString, uint8 *Base64String, uint32 Base64StringLength
 // NOTE(brendan): OUTPUT: OutHex[] array of hex values corresponding to input
 // string.  INPUT: String[], Length of String
 internal void
-StringToHex(uint8 OutHex[], uint8 String[], uint32 StringLength)
+StringToHex(u8 OutHex[], u8 String[], u32 StringLength)
 {
-    for (uint32 StringIndex = 0;
+    for (u32 StringIndex = 0;
          StringIndex < StringLength;
          ++StringIndex)
     {
@@ -191,7 +191,7 @@ StringToHex(uint8 OutHex[], uint8 String[], uint32 StringLength)
 
 // NOTE(brendan): swap the characters S and T (xor trick)
 internal void
-Swap(uint8 *S, uint8 *T)
+Swap(u8 *S, u8 *T)
 {
     *S ^= *T;
     *T ^= *S;
@@ -200,11 +200,11 @@ Swap(uint8 *S, uint8 *T)
 
 // NOTE(brendan): reverses string String and returns pointer to start of String;
 // side-effects
-internal uint8 *
-ReverseString(uint8 *String)
+internal u8 *
+ReverseString(u8 *String)
 {
-    uint32 StringLength = strlen((char *)String);
-    for (uint32 StringIndex = 0;
+    u32 StringLength = strlen((char *)String);
+    for (u32 StringIndex = 0;
          StringIndex < StringLength/2;
          ++StringIndex)
     {
@@ -213,10 +213,10 @@ ReverseString(uint8 *String)
     return String;
 }
 
-inline uint32
-ByteSwap32(uint32 Word)
+inline u32
+ByteSwap32(u32 Word)
 {
-    uint32 Result = (Word << 24) | ((Word & 0xff00) << 8) |
+    u32 Result = (Word << 24) | ((Word & 0xff00) << 8) |
                     ((Word & 0xff0000) >> 8) | (Word >> 24);
     return Result;
 }

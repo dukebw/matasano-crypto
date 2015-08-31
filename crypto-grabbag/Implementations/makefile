@@ -8,3 +8,5 @@ CC=gcc
 CXX=g++
 
 $(P):$(OBJECTS)
+
+aes_test:aes.h
