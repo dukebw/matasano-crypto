@@ -1,7 +1,6 @@
 #ifndef ALLHEADS_H
 #define ALLHEADS_H
 
-#include "stopif.h"
 #include <stdbool.h>
 #include <math.h>
 #include <time.h>
@@ -11,6 +10,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <ctype.h>
+#include "stopif.h"
 
 #define internal static
 #define local_persist static
@@ -27,7 +27,7 @@ typedef int8_t i8;
 typedef int16_t i16;
 typedef int32_t i32;
 typedef int64_t i64;
-typedef i32 bool32;
+typedef i32 b32;
 
 typedef float real32;
 typedef double real64;

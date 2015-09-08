@@ -9,4 +9,4 @@ CXX=g++
 
 $(P):$(OBJECTS)
 
-aes_test:aes.h
+aes_test:aes.h min_unit.h aes_vector.h
