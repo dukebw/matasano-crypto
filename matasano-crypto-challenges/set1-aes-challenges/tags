@@ -1,0 +1,21 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.8	//
+BLOCK_LEN	aes_ecb_mode.c	4;"	d	file:
+CC	Makefile	/^CC=gcc$/;"	m
+CFLAGS	Makefile	/^CFLAGS=`pkg-config --cflags glib-2.0` -ggdb3 -std=$(STD_FLAGS) -Wall -Wextra -Werror -O0 \\$/;"	m
+CRYPTO_IMPL	Makefile	/^CRYPTO_IMPL=..\/..\/crypto-grabbag\/Implementations$/;"	m
+CXX	Makefile	/^CXX=g++$/;"	m
+GlobalInputBuff	detect_aes_ecb.c	/^global_variable char GlobalInputBuff[MAX_LINE_LENGTH];$/;"	v
+LDLIBS	Makefile	/^LDLIBS=`pkg-config --libs glib-2.0` -lm$/;"	m
+MAX_LINE_LENGTH	detect_aes_ecb.c	5;"	d	file:
+MAX_MSG_LENGTH	aes_ecb_mode.c	3;"	d	file:
+MORE_FLAGS	Makefile	/^MORE_FLAGS=#-DSHA1TEST$/;"	m
+OBJECTS	Makefile	/^OBJECTS=$/;"	m
+STD_FLAGS	Makefile	/^STD_FLAGS=gnu11$/;"	m
+__STDC_WANT_LIB_EXT1__	detect_aes_ecb.c	1;"	d	file:
+main	aes_ecb_mode.c	/^int main()$/;"	f
+main	detect_aes_ecb.c	/^int main()$/;"	f
