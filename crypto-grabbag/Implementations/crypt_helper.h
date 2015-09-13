@@ -216,9 +216,47 @@ ReverseString(u8 *String)
 inline u32
 ByteSwap32(u32 Word)
 {
-    u32 Result = (Word << 24) | ((Word & 0xff00) << 8) |
-                    ((Word & 0xff0000) >> 8) | (Word >> 24);
+	u32 Result = ((Word << 24) | ((Word & 0xFF00) << 8) |
+				  ((Word & 0xFF0000) >> 8) | (Word >> 24));
     return Result;
+}
+
+// NOTE(brendan): INPUT: hex character. OUTPUT: integer value of hex character
+internal i32
+Base16ToInteger(i32 Value)
+{
+	i32 Result;
+    Value = tolower(Value);
+    if ((Value >= 'a') && (Value <= 'f'))
+	{
+        Result = (10 + Value - 'a');
+    }
+	else if ((Value >= '0') && (Value <= '9'))
+	{
+        Result = (Value - '0');
+    }
+	else
+	{
+        Stopif(true, return -1, "Bad char passed to Base16ToInteger");
+    }
+	return Result;
+}
+
+// NOTE(brendan): INPUT: output string, hex-encoded string. OUTPUT: string
+// of characters
+internal void
+HexStringToByteArray(u8 *Result, char *HexString, u32 Length)
+{
+    char TempString[2];
+    for (u32 ResultIndex = 0;
+		 ResultIndex < (Length - 1);
+		 ResultIndex += 2)
+	{
+		sprintf(TempString, "%c", (16*Base16ToInteger(HexString[ResultIndex]) +
+								   Base16ToInteger(HexString[ResultIndex + 1])));
+        *Result++ = TempString[0];
+    }
+    *Result = 0;
 }
 
 #endif /* CRYPT_HELPER_H */

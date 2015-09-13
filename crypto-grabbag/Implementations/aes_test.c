@@ -2,22 +2,18 @@
 #include "min_unit.h"
 #include "aes_vector.h"
 
-global_variable u32 GlobalScratch[MAX_MESSAGE_SIZE];
+global_variable u8 GlobalScratch[MAX_MESSAGE_SIZE];
 
 internal b32
-TestAesVector(aes_test_vector *TestVector)
+VectorsEqual(u8 *A, u8 *B, u32 Length)
 {
-	Stopif(TestVector == 0, return false, "Null input to TestVector");
-	Stopif(TestVector->MessageLength > MAX_MESSAGE_SIZE, return false, "Test vector length too large");
-	b32 Result = true;
-	AesEncryptBlock((u8 *)GlobalScratch, (u8 *)TestVector->Message,
-					sizeof(TestVector->Message[0])*TestVector->MessageLength,
-					(u8 *)TestVector->Key, KEY_LENGTH*sizeof(TestVector->Key[0]));
+	Stopif((A == 0) || (B == 0), return false, "Null input to VectorsEqual");
+	u32 Result = true;
 	for (u32 VectorIndex = 0;
-		 VectorIndex < TestVector->MessageLength;
+		 VectorIndex < Length;
 		 ++VectorIndex)
 	{
-		if (GlobalScratch[VectorIndex] != TestVector->Cipher[VectorIndex])
+		if (A[VectorIndex] != B[VectorIndex])
 		{
 			Result = false;
 			break;
@@ -26,17 +22,45 @@ TestAesVector(aes_test_vector *TestVector)
 	return Result;
 }
 
-internal MIN_UNIT_TEST_FUNC(TestAesVector1)
+internal b32
+AesVectorsPass(aes_test_vector *TestVector, u32 VectorCount)
+{
+	Stopif(TestVector == 0, return false, "Null input to TestAesVectors");
+	b32 Result = true;
+	for (u32 TestVecIndex = 0;
+		 TestVecIndex < VectorCount;
+		 ++TestVecIndex, ++TestVector)
+	{
+		Stopif(TestVector->MessageLength > MAX_MESSAGE_SIZE, return false, "Test vector length too large");
+		AesEncryptBlock(GlobalScratch, TestVector->Message, TestVector->MessageLength,
+						TestVector->Key, TestVector->KeyLength);
+		Result = VectorsEqual(GlobalScratch, TestVector->Cipher, TestVector->MessageLength);
+		if (Result == false)
+		{
+			break;
+		}
+		AesDecryptBlock(GlobalScratch, TestVector->Cipher, TestVector->MessageLength,
+						TestVector->Key, TestVector->KeyLength);
+		Result = VectorsEqual(GlobalScratch, TestVector->Message, TestVector->MessageLength);
+		if (Result == false)
+		{
+			break;
+		}
+	}
+	return Result;
+}
+
+internal MIN_UNIT_TEST_FUNC(TestAesVectors)
 {
 	char *Result = 0;
 	Result = MinUnitAssert("Expected/Actual mismatch in TestVector()",
-						   TestAesVector(&AesVector1));
+						   AesVectorsPass(AesVectors, ArrayLength(AesVectors)));
 	return Result;
 }
 
 int main()
 {
-	char *Result = TestAesVector1();
+	char *Result = TestAesVectors();
 	if (Result)
 	{
 		printf("Test failed!\n%s\n", Result);
