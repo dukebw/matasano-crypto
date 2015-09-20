@@ -1,22 +1,10 @@
 #ifndef AES_VECTOR_H
 #define AES_VECTOR_H
 
-#include "allheads.h"
-
-#define MAX_MESSAGE_SIZE (512*4)
-#define MAX_KEY_LENGTH 16
-
-typedef struct
-{
-	u8 Message[MAX_MESSAGE_SIZE];
-	u8 Cipher[MAX_MESSAGE_SIZE];
-	u8 Key[MAX_KEY_LENGTH];
-	u32 MessageLength;
-	u32 KeyLength;
-} aes_test_vector;
+#include "aes_test_vec_common.h"
 
 global_variable aes_test_vector
-AesVectors[] =
+GlobalAesVectors[] =
 {
 	{
 		.Message =

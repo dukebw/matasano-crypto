@@ -15,6 +15,26 @@ global_variable real32 LetterFrequencies[] =
     0.01974, 0.00074
 };
 
+internal b32
+VectorsEqual(void *A, void *B, u32 Length)
+{
+	Stopif((A == 0) || (B == 0), return false, "Null input to VectorsEqual");
+	u32 Result = true;
+	u8 *AByteVec = (u8 *)A;
+	u8 *BByteVec = (u8 *)B;
+	for (u32 VectorIndex = 0;
+		 VectorIndex < Length;
+		 ++VectorIndex)
+	{
+		if (AByteVec[VectorIndex] != BByteVec[VectorIndex])
+		{
+			Result = false;
+			break;
+		}
+	}
+	return Result;
+}
+
 // NOTE(brendan): INPUT: character to shift mod 26, shift amount (assumed to be
 // in [0, 25]. OUTPUT: corresponding lower-case character, shifted mod 26
 internal u32

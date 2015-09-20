@@ -4,13 +4,14 @@
 #include "crypt_helper.h"
 
 // TODO(brendan): 128 bits for now -- add 192 and 256 bit versions
-#define KEY_LENGTH			4 // NOTE(brendan): 32-bit words
-#define COL_COUNT_NB		4
-#define ROW_COUNT_NK		KEY_LENGTH
-#define NUMBER_OF_ROUNDS	10
-#define AES_SUCCESS			0
-#define MIX_COL_COEFFS 0x01010302
-#define INV_MIX_COL_COEFFS 0x090D0B0E
+#define KEY_LENGTH					4 // NOTE(brendan): 32-bit words
+#define COL_COUNT_NB				4
+#define ROW_COUNT_NK				KEY_LENGTH
+#define NUMBER_OF_ROUNDS			10
+#define AES_SUCCESS					0
+#define MIX_COL_COEFFS				0x01010302
+#define INV_MIX_COL_COEFFS			0x090D0B0E
+#define AES_128_BLOCK_LENGTH_BYTES	16
 
 // TODO(brendan): use struct context instead of global state
 global_variable u8 GlobalStateArray[ROW_COUNT_NK*COL_COUNT_NB];
@@ -435,6 +436,29 @@ AesDecryptBlock(u8 *Message, u8 *Cipher, u32 CipherLength, u8 *Key, u32 KeyLengt
 	AddRoundKey(GlobalStateArray, GlobalKeySchedule);
 
 	memcpy(Message, GlobalStateArray, sizeof(GlobalStateArray));
+}
+
+internal void
+Pkcs7Pad(u8 *PaddedMessage, u8 *Message, u32 MessageLength)
+{
+	Stopif((PaddedMessage == 0) || (Message == 0), return, "Null input to Pkcs7Pad()");
+
+	if (PaddedMessage != Message)
+	{
+		memcpy(PaddedMessage, Message, MessageLength);
+	}
+
+	u32 MessageModBlock = MessageLength % AES_128_BLOCK_LENGTH_BYTES;
+	if (MessageModBlock != 0)
+	{
+		u32 ExtraPaddingBytes = AES_128_BLOCK_LENGTH_BYTES - MessageModBlock;
+		for (u32 ExtraPaddingIndex = 0;
+			 ExtraPaddingIndex < ExtraPaddingBytes;
+			 ++ExtraPaddingIndex)
+		{
+			PaddedMessage[MessageLength + ExtraPaddingIndex] = ExtraPaddingBytes;
+		}
+	}
 }
 
 #endif // AES_H
