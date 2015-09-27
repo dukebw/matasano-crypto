@@ -15,16 +15,16 @@ AesVectorsPass(aes_test_vector *TestVector, u32 VectorCount)
 	{
 		Stopif(TestVector->MessageLength > AES_TEST_MAX_MSG_SIZE, return false, "Test vector length too large");
 
-		AesEncryptBlock(GlobalScratch, TestVector->Message, TestVector->MessageLength,
-						TestVector->Key, TestVector->KeyLength);
+		AesEcbEncrypt(GlobalScratch, TestVector->Message, TestVector->MessageLength,
+					  TestVector->Key, TestVector->KeyLength);
 		Result = VectorsEqual(GlobalScratch, TestVector->Cipher, TestVector->MessageLength);
 		if (Result == false)
 		{
 			break;
 		}
 
-		AesDecryptBlock(GlobalScratch, TestVector->Cipher, TestVector->MessageLength,
-						TestVector->Key, TestVector->KeyLength);
+		AesEcbDecrypt(GlobalScratch, TestVector->Cipher, TestVector->MessageLength,
+					  TestVector->Key, TestVector->KeyLength);
 		Result = VectorsEqual(GlobalScratch, TestVector->Message, TestVector->MessageLength);
 		if (Result == false)
 		{

@@ -124,21 +124,17 @@ Base64ToUInt(u8 Base64Digit)
     Stopif(true, return -1, "Bad Base64Digit passed to Base64ToUint");
 }
 
-// NOTE(brendan): INPUT: OUTPUT:
 internal u32
 Base64ToAscii(u8 *AsciiString, u8 *Base64String, u32 Base64StringLength)
 {
-    // NOTE(brendan): Note that here we force the Base64String to be byte-aligned,
-    // i.e. the number of base64 characters is a multiple of 4. Otherwise we
-    // would have to take into account padding characters '=' and '==', or
-    // just read the characters from left to right.
-    Stopif((Base64StringLength % 4) == 1,
-           return 0xffffffff,
-           "Bad Base64StringLength (should be padded)");
+	Stopif((AsciiString == 0) || (Base64String == 0), return 0xFFFFFFFF, "Null input to Base64ToAscii");
+	Stopif((Base64StringLength % 4) == 1, return 0xFFFFFFFF, "Bad Base64StringLength (ends in 6 bits)");
 
+	// 10101010 1010_1010 1010_1010
+	// 101010
     // NOTE(brendan): length needed to store AsciiString corresponding to
     // Base64String. Last element should be 0
-    u32 AsciiStringLength = (Base64StringLength/4)*3;
+	u32 AsciiStringLength = (Base64StringLength/4)*3;
     if (Base64String[Base64StringLength - 1] == '=')
     {
         if (Base64String[Base64StringLength - 2] == '=')
@@ -151,6 +147,7 @@ Base64ToAscii(u8 *AsciiString, u8 *Base64String, u32 Base64StringLength)
         }
     }
     AsciiString[AsciiStringLength] = 0;
+
     // NOTE(brendan): translate CIPHER from base64 to base256 (ASCII)
     for (u32 Base64StringIndex = 0, ByteIndex = 0;
          Base64StringIndex < Base64StringLength;
@@ -277,6 +274,56 @@ HexStringToByteArray(u8 *Result, char *HexString, u32 Length)
         *Result++ = TempString[0];
     }
     *Result = 0;
+}
+
+internal u32
+FileRead(u8 *OutputBuffer, char *FileName, u32 MaxLength)
+{
+	Stopif((OutputBuffer == 0) || (FileName == 0), return 0, "Null inputs to FileReadIgnoreSpace()");
+
+    FILE *InputFile = fopen(FileName, "r");
+    Stopif(!InputFile, return EXIT_FAILURE, "FileRead: No such file");
+
+	u32 ResultSize = fread(OutputBuffer, 1, MaxLength, InputFile);
+
+	fclose(InputFile);
+
+	return ResultSize;
+}
+
+internal u32
+FileReadIgnoreSpace(u8 *OutputBuffer, char *FileName, u32 MaxLength)
+{
+	Stopif((OutputBuffer == 0) || (FileName == 0), return 0, "Null inputs to FileReadIgnoreSpace()");
+    FILE *InputFile = fopen(FileName, "r");
+    Stopif(!InputFile, return EXIT_FAILURE, "FileReadIgnoreSpace: No such file");
+
+    u32 OutBuffIndex = 0;
+    for (u8 InputChar;
+         ((InputChar = fgetc(InputFile)) != (u8)EOF) && (OutBuffIndex < MaxLength);
+         )
+    {
+		if (!isspace(InputChar))
+		{
+			OutputBuffer[OutBuffIndex] = InputChar;
+			++OutBuffIndex;
+		}
+    }
+
+    fclose(InputFile);
+
+	return OutBuffIndex;
+}
+
+internal inline void
+GenRandUnchecked(u32 *RandOut, u32 LengthInWords)
+{
+	for (u32 RandOutIndex = 0;
+		 RandOutIndex < LengthInWords;
+		 ++RandOutIndex)
+	{
+		RandOut[RandOutIndex] = rand();
+	}
 }
 
 #endif /* CRYPT_HELPER_H */

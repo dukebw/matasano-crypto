@@ -2,20 +2,24 @@
 #define AES_H
 
 #include "crypt_helper.h"
+#include "aes_test_vec_common.h"
 
 // TODO(brendan): 128 bits for now -- add 192 and 256 bit versions
-#define KEY_LENGTH					4 // NOTE(brendan): 32-bit words
+#define KEY_LENGTH_WORDS			4 // NOTE(brendan): 32-bit words
+#define KEY_LENGTH_BYTES			(KEY_LENGTH_WORDS*sizeof(u32))
 #define COL_COUNT_NB				4
-#define ROW_COUNT_NK				KEY_LENGTH
+#define ROW_COUNT_NK				KEY_LENGTH_WORDS
 #define NUMBER_OF_ROUNDS			10
 #define AES_SUCCESS					0
 #define MIX_COL_COEFFS				0x01010302
 #define INV_MIX_COL_COEFFS			0x090D0B0E
 #define AES_128_BLOCK_LENGTH_BYTES	16
+#define AES_128_BLOCK_LENGTH_WORDS	(AES_128_BLOCK_LENGTH_BYTES/sizeof(u32))
 
 // TODO(brendan): use struct context instead of global state
 global_variable u8 GlobalStateArray[ROW_COUNT_NK*COL_COUNT_NB];
 global_variable u32 GlobalKeySchedule[(NUMBER_OF_ROUNDS + 1)*COL_COUNT_NB];
+global_variable u8 GlobalAesScratch[AES_128_BLOCK_LENGTH_BYTES];
 
 global_variable u8 SBox[] =
 {
@@ -373,12 +377,12 @@ AesEncryptBlock(u8 *Cipher, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLeng
 {
 	Stopif((Cipher == 0) || (Message == 0) || (Key == 0), return, "Null input to AesEncrypt()");
 	Stopif(MessageLength < COL_COUNT_NB*ROW_COUNT_NK, return, "Bad message block size");
-	Stopif(KeyLength != 4*KEY_LENGTH, return, "Invalid key length");
+	Stopif(KeyLength != KEY_LENGTH_BYTES, return, "Invalid key length");
 
 	// KeyExpansion(byte key[4*Nk], word w[Nb*(Nr + 1)], Nk)
-	CreateKeySchedule(GlobalKeySchedule, sizeof(GlobalKeySchedule), Key, KeyLength);
+	CreateKeySchedule(GlobalKeySchedule, ArrayLength(GlobalKeySchedule), Key, KeyLength);
 
-	memcpy(GlobalStateArray, Message, sizeof(GlobalStateArray));
+	memcpy(GlobalStateArray, Message, ArrayLength(GlobalStateArray));
 
 	// AddRoundKey(state, w[0, Nb - 1])
 	AddRoundKey(GlobalStateArray, GlobalKeySchedule);
@@ -387,18 +391,18 @@ AesEncryptBlock(u8 *Cipher, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLeng
 		 RoundIndex < NUMBER_OF_ROUNDS;
 		 ++RoundIndex)
 	{
-		SubBytes(GlobalStateArray, sizeof(GlobalStateArray));
+		SubBytes(GlobalStateArray, ArrayLength(GlobalStateArray));
 		ShiftRows(GlobalStateArray);
 
 		// MixColumns(state)
 		MixColumns(GlobalStateArray);
 		AddRoundKey(GlobalStateArray, GlobalKeySchedule + RoundIndex*COL_COUNT_NB);
 	}
-	SubBytes(GlobalStateArray, sizeof(GlobalStateArray));
+	SubBytes(GlobalStateArray, ArrayLength(GlobalStateArray));
 	ShiftRows(GlobalStateArray);
 	AddRoundKey(GlobalStateArray, GlobalKeySchedule + NUMBER_OF_ROUNDS*COL_COUNT_NB);
 
-	memcpy(Cipher, GlobalStateArray, sizeof(GlobalStateArray));
+	memcpy(Cipher, GlobalStateArray, ArrayLength(GlobalStateArray));
 }
 
 internal void
@@ -406,12 +410,12 @@ AesDecryptBlock(u8 *Message, u8 *Cipher, u32 CipherLength, u8 *Key, u32 KeyLengt
 {
 	Stopif((Cipher == 0) || (Message == 0) || (Key == 0), return, "Null input to AesDecryptBlock()");
 	Stopif(CipherLength < COL_COUNT_NB*ROW_COUNT_NK, return, "Bad cipher block size");
-	Stopif(KeyLength != 4*KEY_LENGTH, return, "Invalid key length");
+	Stopif(KeyLength != KEY_LENGTH_BYTES, return, "Invalid key length");
 
 	// KeyExpansion(byte key[4*Nk], word w[Nb*(Nr + 1)], Nk)
-	CreateKeySchedule(GlobalKeySchedule, sizeof(GlobalKeySchedule), Key, KeyLength);
+	CreateKeySchedule(GlobalKeySchedule, ArrayLength(GlobalKeySchedule), Key, KeyLength);
 
-	memcpy(GlobalStateArray, Cipher, sizeof(GlobalStateArray));
+	memcpy(GlobalStateArray, Cipher, ArrayLength(GlobalStateArray));
 
 	// AddRoundKey(state, w[Nr*Nb, (Nr + 1)*Nb - 1])
 	AddRoundKey(GlobalStateArray, GlobalKeySchedule + NUMBER_OF_ROUNDS*COL_COUNT_NB);
@@ -421,7 +425,7 @@ AesDecryptBlock(u8 *Message, u8 *Cipher, u32 CipherLength, u8 *Key, u32 KeyLengt
 		 --RoundIndex)
 	{
 		InverseShiftRows(GlobalStateArray);
-		InverseSubBytes(GlobalStateArray, sizeof(GlobalStateArray));
+		InverseSubBytes(GlobalStateArray, ArrayLength(GlobalStateArray));
 
 		// AddRoundKey(state, w[round*Nb, (round+1)*Nb-1])
 		AddRoundKey(GlobalStateArray, GlobalKeySchedule + RoundIndex*COL_COUNT_NB);
@@ -430,12 +434,12 @@ AesDecryptBlock(u8 *Message, u8 *Cipher, u32 CipherLength, u8 *Key, u32 KeyLengt
 		InverseMixColumns(GlobalStateArray);
 	}
 	InverseShiftRows(GlobalStateArray);
-	InverseSubBytes(GlobalStateArray, sizeof(GlobalStateArray));
+	InverseSubBytes(GlobalStateArray, ArrayLength(GlobalStateArray));
 
 	// AddRoundKey(state, w[0, Nb - 1])
 	AddRoundKey(GlobalStateArray, GlobalKeySchedule);
 
-	memcpy(Message, GlobalStateArray, sizeof(GlobalStateArray));
+	memcpy(Message, GlobalStateArray, ArrayLength(GlobalStateArray));
 }
 
 internal void
@@ -458,6 +462,108 @@ Pkcs7Pad(u8 *PaddedMessage, u8 *Message, u32 MessageLength)
 		{
 			PaddedMessage[MessageLength + ExtraPaddingIndex] = ExtraPaddingBytes;
 		}
+	}
+}
+
+internal inline void
+XorVectorsUnchecked(u8 *Dest, u8 *A, u8 *B, u32 Length)
+{
+	for (u32 VectorIndex = 0;
+		 VectorIndex < Length;
+		 ++VectorIndex)
+	{
+		Dest[VectorIndex] = A[VectorIndex] ^ B[VectorIndex];
+	}
+}
+
+internal void
+AesCbcEncrypt(u8 *Cipher, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength, u8 *Iv)
+{
+	Stopif((Message == 0) || (Cipher == 0) || (Key == 0) || (Iv == 0),
+		   return,
+		   "Null inputs to AesCbcEncrypt");
+	Stopif(KeyLength != KEY_LENGTH_BYTES, return, "Only AES-128 is supported");
+	Stopif(MessageLength == 0, return, "AesCbcEncrypt - Message of length 0");
+
+	Pkcs7Pad(Message, Message, MessageLength);
+
+	XorVectorsUnchecked(GlobalAesScratch, Message, Iv, AES_128_BLOCK_LENGTH_BYTES);
+	AesEncryptBlock(Cipher, GlobalAesScratch, MessageLength, Key, KeyLength);
+
+	for (u32 MessageBlockIndex = 1;
+		 MessageBlockIndex < MessageLength/AES_128_BLOCK_LENGTH_BYTES;
+		 ++MessageBlockIndex)
+	{
+		u32 MessageIndexBytes = MessageBlockIndex*AES_128_BLOCK_LENGTH_BYTES;
+		XorVectorsUnchecked(GlobalAesScratch,
+							Message + MessageIndexBytes,
+							Cipher + (MessageBlockIndex - 1)*AES_128_BLOCK_LENGTH_BYTES,
+							AES_128_BLOCK_LENGTH_BYTES);
+		AesEncryptBlock(Cipher + MessageIndexBytes, GlobalAesScratch, AES_128_BLOCK_LENGTH_BYTES,
+						Key, KeyLength);
+	}
+}
+
+internal void
+AesCbcDecrypt(u8 *Message, u8 *Cipher, u32 MessageLength, u8 *Key, u32 KeyLength, u8 *Iv)
+{
+	Stopif((Message == 0) || (Cipher == 0) || (Key == 0) || (Iv == 0),
+		   return,
+		   "Null inputs to AesCbcDecrypt");
+	Stopif(KeyLength != KEY_LENGTH_BYTES, return, "Only AES-128 is supported");
+	Stopif(MessageLength == 0, return, "AesCbcDecrypt - Message of length 0");
+
+	AesDecryptBlock(Message, Cipher, MessageLength, Key, KeyLength);
+	XorVectorsUnchecked(Message, Message, Iv, AES_128_BLOCK_LENGTH_BYTES);
+
+	for (u32 MessageBlockIndex = 1;
+		 MessageBlockIndex < MessageLength/AES_128_BLOCK_LENGTH_BYTES;
+		 ++MessageBlockIndex)
+	{
+		u32 MessageIndexBytes = MessageBlockIndex*AES_128_BLOCK_LENGTH_BYTES;
+		u8 *MsgStartOfBlock = Message + MessageIndexBytes;
+		AesDecryptBlock(MsgStartOfBlock, Cipher + MessageIndexBytes, AES_128_BLOCK_LENGTH_BYTES,
+						Key, KeyLength);
+		XorVectorsUnchecked(MsgStartOfBlock,
+							MsgStartOfBlock,
+							Cipher + (MessageBlockIndex - 1)*AES_128_BLOCK_LENGTH_BYTES,
+							AES_128_BLOCK_LENGTH_BYTES);
+	}
+}
+
+internal void
+AesEcbEncrypt(u8 *Cipher, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength)
+{
+	Stopif((Message == 0) || (Cipher == 0) || (Key == 0), return, "Null inputs to AesCbcEncrypt");
+	Stopif(KeyLength != KEY_LENGTH_BYTES, return, "Only AES-128 is supported");
+	Stopif(MessageLength == 0, return, "AesEcbEncrypt - Message of length 0");
+
+	Pkcs7Pad(Message, Message, MessageLength);
+
+	for (u32 MessageBlockIndex = 0;
+		 MessageBlockIndex < MessageLength/AES_128_BLOCK_LENGTH_BYTES;
+		 ++MessageBlockIndex)
+	{
+		u32 MessageIndexBytes = MessageBlockIndex*AES_128_BLOCK_LENGTH_BYTES;
+		AesEncryptBlock(Cipher + MessageIndexBytes, Message + MessageIndexBytes, AES_128_BLOCK_LENGTH_BYTES,
+						Key, KeyLength);
+	}
+}
+
+internal void
+AesEcbDecrypt(u8 *Message, u8 *Cipher, u32 MessageLength, u8 *Key, u32 KeyLength)
+{
+	Stopif((Message == 0) || (Cipher == 0) || (Key == 0), return, "Null inputs to AesCbcEncrypt");
+	Stopif(KeyLength != KEY_LENGTH_BYTES, return, "Only AES-128 is supported");
+	Stopif(MessageLength == 0, return, "AesEcbDecrypt - Message of length 0");
+
+	for (u32 MessageBlockIndex = 0;
+		 MessageBlockIndex < MessageLength/AES_128_BLOCK_LENGTH_BYTES;
+		 ++MessageBlockIndex)
+	{
+		u32 MessageIndexBytes = MessageBlockIndex*AES_128_BLOCK_LENGTH_BYTES;
+		AesDecryptBlock(Message + MessageIndexBytes, Cipher + MessageIndexBytes, AES_128_BLOCK_LENGTH_BYTES,
+						Key, KeyLength);
 	}
 }
 

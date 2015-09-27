@@ -1,7 +1,8 @@
 #include "min_unit.h"
 #include "aes.h"
+#include "aes_cbc_mode_vector.h"
 
-global_variable u8 GlobalScratch[CBC_TEST_MSG_MAX_SIZE];
+global_variable u8 GlobalAesCbcTestScratch[AES_TEST_MAX_MSG_SIZE];
 
 internal b32
 AesCbcModeVecsPass(aes_cbc_mode_vec *AesCbcTestVec, u32 AesCbcTestVecCount)
@@ -14,19 +15,20 @@ AesCbcModeVecsPass(aes_cbc_mode_vec *AesCbcTestVec, u32 AesCbcTestVecCount)
 		 AesCbcTestVecIndex < AesCbcTestVecCount;
 		 ++AesCbcTestVecIndex, ++AesCbcTestVec)
 	{
-		Stopif(TestVector->MessageLength > AES_TEST_MAX_MSG_SIZE, return false, "Test vector length too large");
+		aes_test_vector *AesTestVec = &AesCbcTestVec->AesVector;
+		Stopif(AesTestVec->MessageLength > AES_TEST_MAX_MSG_SIZE, return false, "Test vector length too large");
 
-		AesCbcEncrypt(GlobalScratch, TestVector->Message, TestVector->MessageLength,
-					  TestVector->Key, TestVector->KeyLength, TestVector->Iv);
-		Result = VectorsEqual(GlobalScratch, TestVector->Cipher, TestVector->MessageLength);
+		AesCbcEncrypt(GlobalAesCbcTestScratch, AesTestVec->Message, AesTestVec->MessageLength,
+					  AesTestVec->Key, AesTestVec->KeyLength, AesCbcTestVec->Iv);
+		Result = VectorsEqual(GlobalAesCbcTestScratch, AesTestVec->Cipher, AesTestVec->MessageLength);
 		if (Result == false)
 		{
 			break;
 		}
 
-		AesCbcDecrypt(GlobalScratch, TestVector->Cipher, TestVector->MessageLength,
-					  TestVector->Key, TestVector->KeyLength, TestVector->Iv);
-		Result = VectorsEqual(GlobalScratch, TestVector->Message, TestVector->MessageLength);
+		AesCbcDecrypt(GlobalAesCbcTestScratch, AesTestVec->Cipher, AesTestVec->MessageLength,
+					  AesTestVec->Key, AesTestVec->KeyLength, AesCbcTestVec->Iv);
+		Result = VectorsEqual(GlobalAesCbcTestScratch, AesTestVec->Message, AesTestVec->MessageLength);
 		if (Result == false)
 		{
 			break;
@@ -39,7 +41,7 @@ internal MIN_UNIT_TEST_FUNC(TestAesCbcVecs)
 {
 	char *Result = 0;
 	Result = MinUnitAssert("Expected/Actual mismatch in AesCbcModeVecsPass()",
-						   AesCbcModeVecsPass(AesCbcModeVecs, ArrayLength(AesCbcModeVecs)));
+						   AesCbcModeVecsPass(GlobalAesCbcVecs, ArrayLength(GlobalAesCbcVecs)));
 	return Result;
 }
 
