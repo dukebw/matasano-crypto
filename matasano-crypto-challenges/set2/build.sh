@@ -1,3 +1,3 @@
 #!/bin/bash
 ctags -R .
-P=pkcs7_padding_test make
+P=byte_at_a_time_ecb_decrypt make

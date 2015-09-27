@@ -13,3 +13,4 @@ $(P):$(OBJECTS)
 
 aes_ecb_mode:$(CRYPTO_IMPL)/aes.h
 pkcs7_padding_test:$(CRYPTO_IMPL)/aes.h
+byte_at_a_time_ecb_decrypt:$(CRYPTO_IMPL)/crypt_helper.h $(CRYPTO_IMPL)/aes.h

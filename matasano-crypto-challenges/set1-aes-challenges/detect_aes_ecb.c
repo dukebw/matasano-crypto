@@ -10,11 +10,11 @@ int main()
 	Stopif(!InputFile, return EXIT_FAILURE, "No such file");
 	u32 MaxEqualBlocksCount = 0;
 	u32 MaxEqualBlocksIndex = 0;
-	for (u32 BlocksEqualCount, CipherIndex = 0;
+	u32 BlocksEqualCount = 0;
+	for (u32 CipherIndex = 0;
 		 (fgets(GlobalInputBuff, sizeof(GlobalInputBuff), InputFile) != 0);
-		++CipherIndex)
+		 ++CipherIndex)
 	{
-		BlocksEqualCount = 0;
 		u32 HexDigitCount = strlen(GlobalInputBuff) - 1;
 
 		Stopif((HexDigitCount + 1) >= MAX_LINE_LENGTH, return EXIT_FAILURE, "Input lines too long");
@@ -46,4 +46,5 @@ int main()
 		}
 	}
 	printf("MaxEqualBlocksIndex: %d\n", MaxEqualBlocksIndex);
+	printf("BlocksEqualCount: %d\n", BlocksEqualCount);
 }

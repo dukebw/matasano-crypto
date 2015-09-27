@@ -2,7 +2,7 @@
 #include "pkcs7_padding_vector.h"
 #include "aes.h"
 
-global_variable u8 GlobalScratch[PKCS7_TEST_MAX_MSG_SIZE];
+global_variable u8 GlobalPkcs7TestScratch[PKCS7_TEST_MAX_MSG_SIZE];
 
 internal b32
 Pkcs7PaddingVecsPass(pkcs7_padding_vec *PaddingTestVec, u32 PaddingVecCount)
@@ -15,8 +15,8 @@ Pkcs7PaddingVecsPass(pkcs7_padding_vec *PaddingTestVec, u32 PaddingVecCount)
 		 PaddingTestVecIndex < PaddingVecCount;
 		 ++PaddingTestVecIndex, ++PaddingTestVec)
 	{
-		Pkcs7Pad(GlobalScratch, PaddingTestVec->Message, PaddingTestVec->MessageLength);
-		Result = VectorsEqual(GlobalScratch, PaddingTestVec->PaddedMessage, PaddingTestVec->PaddedLength);
+		Pkcs7Pad(GlobalPkcs7TestScratch, PaddingTestVec->Message, PaddingTestVec->MessageLength);
+		Result = VectorsEqual(GlobalPkcs7TestScratch, PaddingTestVec->PaddedMessage, PaddingTestVec->PaddedLength);
 		if (Result == false)
 		{
 			break;
