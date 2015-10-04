@@ -2,6 +2,7 @@
 #define CRYPT_HELPER_H
 
 #include "allheads.h"
+#include "aes.h"
 
 #pragma GCC diagnostic ignored "-Wunused-function"
 
@@ -324,6 +325,46 @@ GenRandUnchecked(u32 *RandOut, u32 LengthInWords)
 	{
 		RandOut[RandOutIndex] = rand();
 	}
+}
+
+internal b32
+CipherIsEcbEncryptedBlock(u8 *Cipher, u32 BlockCount)
+{
+	b32 Result = false;
+
+	Stopif(Cipher == 0, return false, "Null input to CipherIsEcbEncrypted");
+
+	for (u32 FirstBlockIndex = 0;
+		 FirstBlockIndex < (BlockCount - 1);
+		 ++FirstBlockIndex)
+	{
+		for (u32 SecondBlockIndex = FirstBlockIndex + 1;
+			 SecondBlockIndex < BlockCount;
+			 ++SecondBlockIndex)
+		{
+			char *FirstBlock = (char *)(Cipher + FirstBlockIndex*AES_128_BLOCK_LENGTH_BYTES);
+			char *SecondBlock = (char *)(Cipher + SecondBlockIndex*AES_128_BLOCK_LENGTH_BYTES);
+			if (memcmp(FirstBlock, SecondBlock, AES_128_BLOCK_LENGTH_BYTES) == 0)
+			{
+				Result = true;
+				break;
+			}
+		}
+	}
+
+	return Result;
+}
+
+internal b32
+CipherIsEcbEncrypted(u8 *Cipher, u32 CipherLength)
+{
+	b32 Result;
+
+	Stopif(Cipher == 0, return false, "Null input to CipherIsEcbEncrypted");
+
+	Result = CipherIsEcbEncryptedBlock(Cipher, CipherLength/AES_128_BLOCK_LENGTH_BYTES);
+
+	return Result;
 }
 
 #endif /* CRYPT_HELPER_H */

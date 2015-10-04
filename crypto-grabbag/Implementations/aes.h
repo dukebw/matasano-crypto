@@ -1,7 +1,6 @@
 #ifndef AES_H
 #define AES_H
 
-#include "crypt_helper.h"
 #include "aes_test_vec_common.h"
 
 // TODO(brendan): 128 bits for now -- add 192 and 256 bit versions
@@ -233,7 +232,9 @@ internal inline void
 ShiftRowsInternal(u8 *StateArray, i32 InverseMultiplier)
 {
 	Stopif(StateArray == 0, return, "Null input to SubBytes()");
-	Stopif((InverseMultiplier != -1) && (InverseMultiplier != 1), return, "Invalid value for InverseMultiplier");
+	Stopif((InverseMultiplier != -1) && (InverseMultiplier != 1),
+		   return,
+		   "Invalid value for InverseMultiplier");
 	// s[r][c] = s[r][c + shift(r, Nb) mod Nb] for 0 < r < 4 and 0 <= c < Nb
 	// where shift(n, 4) == n
 	for (u32 RowIndex = 1;
@@ -376,7 +377,7 @@ internal void
 AesEncryptBlock(u8 *Cipher, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength)
 {
 	Stopif((Cipher == 0) || (Message == 0) || (Key == 0), return, "Null input to AesEncrypt()");
-	Stopif(MessageLength < COL_COUNT_NB*ROW_COUNT_NK, return, "Bad message block size");
+	Stopif(MessageLength != (COL_COUNT_NB*ROW_COUNT_NK), return, "Bad message block size");
 	Stopif(KeyLength != KEY_LENGTH_BYTES, return, "Invalid key length");
 
 	// KeyExpansion(byte key[4*Nk], word w[Nb*(Nr + 1)], Nk)
@@ -442,10 +443,11 @@ AesDecryptBlock(u8 *Message, u8 *Cipher, u32 CipherLength, u8 *Key, u32 KeyLengt
 	memcpy(Message, GlobalStateArray, ArrayLength(GlobalStateArray));
 }
 
-internal void
+internal u32
 Pkcs7Pad(u8 *PaddedMessage, u8 *Message, u32 MessageLength)
 {
-	Stopif((PaddedMessage == 0) || (Message == 0), return, "Null input to Pkcs7Pad()");
+	u32 PaddedLength = MessageLength;
+	Stopif((PaddedMessage == 0) || (Message == 0), return 0xFFFFFFFF, "Null input to Pkcs7Pad()");
 
 	if (PaddedMessage != Message)
 	{
@@ -456,6 +458,7 @@ Pkcs7Pad(u8 *PaddedMessage, u8 *Message, u32 MessageLength)
 	if (MessageModBlock != 0)
 	{
 		u32 ExtraPaddingBytes = AES_128_BLOCK_LENGTH_BYTES - MessageModBlock;
+		PaddedLength += ExtraPaddingBytes;
 		for (u32 ExtraPaddingIndex = 0;
 			 ExtraPaddingIndex < ExtraPaddingBytes;
 			 ++ExtraPaddingIndex)
@@ -463,6 +466,7 @@ Pkcs7Pad(u8 *PaddedMessage, u8 *Message, u32 MessageLength)
 			PaddedMessage[MessageLength + ExtraPaddingIndex] = ExtraPaddingBytes;
 		}
 	}
+	return PaddedLength;
 }
 
 internal inline void
@@ -485,13 +489,13 @@ AesCbcEncrypt(u8 *Cipher, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength
 	Stopif(KeyLength != KEY_LENGTH_BYTES, return, "Only AES-128 is supported");
 	Stopif(MessageLength == 0, return, "AesCbcEncrypt - Message of length 0");
 
-	Pkcs7Pad(Message, Message, MessageLength);
+	u32 PaddedMsgLength = Pkcs7Pad(Message, Message, MessageLength);
 
 	XorVectorsUnchecked(GlobalAesScratch, Message, Iv, AES_128_BLOCK_LENGTH_BYTES);
-	AesEncryptBlock(Cipher, GlobalAesScratch, MessageLength, Key, KeyLength);
+	AesEncryptBlock(Cipher, GlobalAesScratch, AES_128_BLOCK_LENGTH_BYTES, Key, KeyLength);
 
 	for (u32 MessageBlockIndex = 1;
-		 MessageBlockIndex < MessageLength/AES_128_BLOCK_LENGTH_BYTES;
+		 MessageBlockIndex < PaddedMsgLength/AES_128_BLOCK_LENGTH_BYTES;
 		 ++MessageBlockIndex)
 	{
 		u32 MessageIndexBytes = MessageBlockIndex*AES_128_BLOCK_LENGTH_BYTES;
@@ -538,10 +542,10 @@ AesEcbEncrypt(u8 *Cipher, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength
 	Stopif(KeyLength != KEY_LENGTH_BYTES, return, "Only AES-128 is supported");
 	Stopif(MessageLength == 0, return, "AesEcbEncrypt - Message of length 0");
 
-	Pkcs7Pad(Message, Message, MessageLength);
+	u32 PaddedMsgLength = Pkcs7Pad(Message, Message, MessageLength);
 
 	for (u32 MessageBlockIndex = 0;
-		 MessageBlockIndex < MessageLength/AES_128_BLOCK_LENGTH_BYTES;
+		 MessageBlockIndex < PaddedMsgLength/AES_128_BLOCK_LENGTH_BYTES;
 		 ++MessageBlockIndex)
 	{
 		u32 MessageIndexBytes = MessageBlockIndex*AES_128_BLOCK_LENGTH_BYTES;
