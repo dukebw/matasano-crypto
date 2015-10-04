@@ -1,4 +1,4 @@
-#include "aes.h"
+#include "crypt_helper.h"
 
 #define ORACLE_MSG_MAX_WORDS		8192
 #define ORACLE_MSG_MAX_BYTES		(ORACLE_MSG_MAX_WORDS*sizeof(u32))
@@ -56,24 +56,14 @@ int main()
 		PaddedMsgBlockCount = (AppendedMessageLength/AES_128_BLOCK_LENGTH_BYTES + 1);
 	}
 
-	u32 BlocksEqualCount = 0;
-	for (u32 FirstBlockIndex = 0;
-		 FirstBlockIndex < (PaddedMsgBlockCount - 1);
-		 ++FirstBlockIndex)
+	if (CipherIsEcbEncryptedBlock(Cipher, PaddedMsgBlockCount))
 	{
-		for (u32 SecondBlockIndex = FirstBlockIndex + 1;
-			 SecondBlockIndex < PaddedMsgBlockCount;
-			 ++SecondBlockIndex)
-		{
-			char *FirstBlock = (char *)(Cipher + FirstBlockIndex*AES_128_BLOCK_LENGTH_BYTES);
-			char *SecondBlock = (char *)(Cipher + SecondBlockIndex*AES_128_BLOCK_LENGTH_BYTES);
-			if (memcmp(FirstBlock, SecondBlock, AES_128_BLOCK_LENGTH_BYTES) == 0)
-			{
-				++BlocksEqualCount;
-			}
-		}
+		printf("Cipher is ECB encrypted!\n");
+	}
+	else
+	{
+		printf("Cipher is CBC encrypted!\n");
 	}
 
-	printf("BlocksEqualCount: %d\n", BlocksEqualCount);
-	printf("RandomEcbCbc: %d\n", RandomEcbCbc);
+	printf("Actual RandomEcbCbc: %s\n", (RandomEcbCbc == RANDOM_ECB) ? "ECB" : "CBC");
 }
