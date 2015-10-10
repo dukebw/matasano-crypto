@@ -34,6 +34,8 @@ internal void
 ResetPaddedPlaintext(u8 *PaddedPlaintext, u8 *UnpaddedPlaintext, u32 UnpaddedPtLength)
 {
 	Stopif((PaddedPlaintext == 0) || (UnpaddedPlaintext == 0), return, "Null input to ResetPaddedPlaintext");
+	Stopif((UnpaddedPtLength + AES_128_BLOCK_LENGTH_BYTES) >= MAX_BYTE_AT_A_TIME_MSG_LEN,
+		   return, "UnpaddedPtLength too long");
 	u32 KnownPaddingBytes = AES_128_BLOCK_LENGTH_BYTES - 1;
 	memcpy(PaddedPlaintext + KnownPaddingBytes, UnpaddedPlaintext, UnpaddedPtLength);
 	PaddedPlaintext[UnpaddedPtLength + KnownPaddingBytes] = 0;
@@ -42,6 +44,8 @@ ResetPaddedPlaintext(u8 *PaddedPlaintext, u8 *UnpaddedPlaintext, u32 UnpaddedPtL
 
 int main()
 {
+	srand(time(0));
+
 	GenRandUnchecked(GlobalOracleKey, AES_128_BLOCK_LENGTH_WORDS);
 
 	u8 UnpaddedPlaintext[MAX_BYTE_AT_A_TIME_MSG_LEN];
@@ -79,11 +83,15 @@ int main()
 		   return EXIT_FAILURE,
 		   "UnpaddedPlaintext too short");
 
-	u8 PaddedPlaintext[2*sizeof(UnpaddedPlaintext)];
 	u32 KnownPaddingBytes = (AES_128_BLOCK_LENGTH_BYTES - 1);
 	u32 UnpaddedPtLength = Base64ToAscii(UnpaddedPlaintext, Base64Plaintext, sizeof(Base64Plaintext) - 1);
 	UnpaddedPlaintext[UnpaddedPtLength] = 0;
-	ResetPaddedPlaintext(PaddedPlaintext, UnpaddedPlaintext, UnpaddedPtLength);
+
+	u8 PaddedPlaintext[2*sizeof(UnpaddedPlaintext)];
+	u32 RandomPtPrependLength = rand() % MAX_BYTE_AT_A_TIME_MSG_LEN;
+	GenRandUnchecked((u32 *)PaddedPlaintext, RandomPtPrependLength/sizeof(u32));
+
+	ResetPaddedPlaintext(PaddedPlaintext + RandomPtPrependLength, UnpaddedPlaintext, UnpaddedPtLength);
 
 	u8 DictionaryMessage[AES_128_BLOCK_LENGTH_BYTES];
 	memset(DictionaryMessage, 'A', KnownPaddingBytes);
@@ -97,7 +105,7 @@ int main()
 		 CipherIndex < UnpaddedPtLength;
 		 ++CipherIndex)
 	{
-		OracleFunction(Cipher, PaddedPlaintext, UnpaddedPtLength + KnownPaddingBytes);
+		OracleFunction(Cipher, PaddedPlaintext, RandomPtPrependLength + UnpaddedPtLength + KnownPaddingBytes);
 
 		CreateDictionary(OracleByteDictionary, DictionaryMessage);
 
@@ -119,6 +127,7 @@ int main()
 		}
 
 		Stopif(!MatchingVectorFound, return EXIT_FAILURE, "No matching vector found in dictionary");
+
 		if (KnownPaddingBytes > 0)
 		{
 			--KnownPaddingBytes;

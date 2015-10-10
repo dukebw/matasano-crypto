@@ -1,3 +1,3 @@
 #!/bin/bash
 ctags -R .
-P=ecb_cut_and_paste make
+P=byte_at_a_time_ecb_decrypt make
