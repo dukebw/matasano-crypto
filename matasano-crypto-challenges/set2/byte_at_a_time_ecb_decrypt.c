@@ -36,10 +36,6 @@ ResetPaddedPlaintext(u8 *PaddedPlaintext, u8 *UnpaddedPlaintext, u32 UnpaddedPtL
 	Stopif((PaddedPlaintext == 0) || (UnpaddedPlaintext == 0), return, "Null input to ResetPaddedPlaintext");
 	Stopif((UnpaddedPtLength + AES_128_BLOCK_LENGTH_BYTES) >= MAX_BYTE_AT_A_TIME_MSG_LEN,
 		   return, "UnpaddedPtLength too long");
-	u32 KnownPaddingBytes = AES_128_BLOCK_LENGTH_BYTES - 1;
-	memcpy(PaddedPlaintext + KnownPaddingBytes, UnpaddedPlaintext, UnpaddedPtLength);
-	PaddedPlaintext[UnpaddedPtLength + KnownPaddingBytes] = 0;
-	memset(PaddedPlaintext, 'A', KnownPaddingBytes);
 }
 
 int main()
@@ -83,15 +79,20 @@ int main()
 		   return EXIT_FAILURE,
 		   "UnpaddedPlaintext too short");
 
-	u32 KnownPaddingBytes = (AES_128_BLOCK_LENGTH_BYTES - 1);
 	u32 UnpaddedPtLength = Base64ToAscii(UnpaddedPlaintext, Base64Plaintext, sizeof(Base64Plaintext) - 1);
 	UnpaddedPlaintext[UnpaddedPtLength] = 0;
 
 	u8 PaddedPlaintext[2*sizeof(UnpaddedPlaintext)];
-	u32 RandomPtPrependLength = rand() % MAX_BYTE_AT_A_TIME_MSG_LEN;
-	GenRandUnchecked((u32 *)PaddedPlaintext, RandomPtPrependLength/sizeof(u32));
+	u32 RandomPtPrependLengthWords = (rand() % MAX_BYTE_AT_A_TIME_MSG_LEN)/sizeof(u32);
+	u32 RandomPtPrependLengthBytes = RandomPtPrependLengthWords*sizeof(u32);
+	GenRandUnchecked((u32 *)PaddedPlaintext, RandomPtPrependLengthWords);
 
-	ResetPaddedPlaintext(PaddedPlaintext + RandomPtPrependLength, UnpaddedPlaintext, UnpaddedPtLength);
+	u32 KnownPaddingBytes = AES_128_BLOCK_LENGTH_BYTES - 1;
+	memcpy(PaddedPlaintext + KnownPaddingBytes + AES_128_BLOCK_LENGTH_BYTES, UnpaddedPlaintext, UnpaddedPtLength);
+	PaddedPlaintext[UnpaddedPtLength + KnownPaddingBytes] = 0;
+	memset(PaddedPlaintext, 'A', KnownPaddingBytes);
+
+	ResetPaddedPlaintext(PaddedPlaintext + RandomPtPrependLengthBytes, UnpaddedPlaintext, UnpaddedPtLength);
 
 	u8 DictionaryMessage[AES_128_BLOCK_LENGTH_BYTES];
 	memset(DictionaryMessage, 'A', KnownPaddingBytes);
@@ -105,7 +106,7 @@ int main()
 		 CipherIndex < UnpaddedPtLength;
 		 ++CipherIndex)
 	{
-		OracleFunction(Cipher, PaddedPlaintext, RandomPtPrependLength + UnpaddedPtLength + KnownPaddingBytes);
+		OracleFunction(Cipher, PaddedPlaintext, RandomPtPrependLengthBytes + UnpaddedPtLength + KnownPaddingBytes);
 
 		CreateDictionary(OracleByteDictionary, DictionaryMessage);
 
