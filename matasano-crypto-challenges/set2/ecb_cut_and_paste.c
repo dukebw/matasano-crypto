@@ -9,7 +9,8 @@ const char USER_STRING[] = "user";
 const char EMAIL_STRING[] = "email";
 const char UID_STRING[] = "uid";
 const char ROLE_STRING[] = "role";
-const char TEST_EMAIL[] = "foo@bar.com";
+const char TEST_EMAIL[] = "foo123@bar.com";
+const char ADMIN_STRING[] = "admin";
 
 typedef struct
 {
@@ -84,63 +85,85 @@ ProfileFor(char *NewUserProfile, const char *Email, u32 EmailLength)
 	return EncodedProfileLength;
 }
 
-int main()
+internal void
+ParseUserProfile(user_profile *OutUserProfile, char *EncodedProfile, u32 EncodedProfileLength)
 {
-	char TestString[] = "email=foo@bar.com&uid=10&role=user";
-	user_profile TestUserProfile;
-	memset(&TestUserProfile, 0, sizeof(TestUserProfile));
-
+	Stopif((OutUserProfile == 0) || (EncodedProfile == 0), return, "Null inputs to ParseUserProfile");
 	char StringBuffer[MAX_STRING_LENGTH];
-	u32 TestStringLength = strlen(TestString);
 	for (u32 TestStringIndex = 0, StringBufferIndex = 0;
-		 TestStringIndex < TestStringLength;
+		 TestStringIndex < EncodedProfileLength;
 		 ++TestStringIndex)
 	{
-		Stopif(TestString[TestStringIndex] == '&', return EXIT_FAILURE, "Invalid metacharacter &");
-		if (TestString[TestStringIndex] == '=')
+		Stopif(EncodedProfile[TestStringIndex] == '&', return, "Invalid metacharacter &");
+		if (EncodedProfile[TestStringIndex] == '=')
 		{
 			if (memcmp(StringBuffer, EMAIL_STRING, strlen(EMAIL_STRING)) == 0)
 			{
-				FillInMemberString(TestUserProfile.Email, TestString, &TestStringIndex, TestStringLength);
+				FillInMemberString(OutUserProfile->Email, EncodedProfile, &TestStringIndex,
+								   EncodedProfileLength);
 			}
-			else if (memcmp(StringBuffer, ROLE_STRING, strlen(ROLE_STRING)) == 0)
+			else if ((memcmp(StringBuffer, ROLE_STRING, strlen(ROLE_STRING)) == 0) ||
+					 (memcmp(StringBuffer, ADMIN_STRING, strlen(ADMIN_STRING)) == 0))
 			{
-				FillInMemberString(TestUserProfile.Role, TestString, &TestStringIndex, TestStringLength);
+				FillInMemberString(OutUserProfile->Role, EncodedProfile, &TestStringIndex,
+								   EncodedProfileLength);
 			}
 			else if (memcmp(StringBuffer, UID_STRING, strlen(UID_STRING)) == 0)
 			{
 				++TestStringIndex;
 				for (StringBufferIndex = 0;
-					 (TestStringIndex < TestStringLength) && (TestString[TestStringIndex] != '&');
+					 (TestStringIndex < EncodedProfileLength) && (EncodedProfile[TestStringIndex] != '&');
 					 ++StringBufferIndex, ++TestStringIndex)
 				{
-					Stopif(StringBufferIndex >= MAX_STRING_LENGTH,
-						   return EXIT_FAILURE,
-						   "Uid too long for StringBuffer");
-					Stopif(!isdigit((i32)TestString[TestStringIndex]), return EXIT_FAILURE, "Non-digit in uid");
-					StringBuffer[StringBufferIndex] = TestString[TestStringIndex];
+					Stopif(StringBufferIndex >= MAX_STRING_LENGTH, return, "Uid too long for StringBuffer");
+					Stopif(!isdigit((i32)EncodedProfile[TestStringIndex]), return, "Non-digit in uid");
+					StringBuffer[StringBufferIndex] = EncodedProfile[TestStringIndex];
 				}
 				StringBuffer[StringBufferIndex] = 0;
-				sscanf(StringBuffer, "%u", &TestUserProfile.Uid);
+				sscanf(StringBuffer, "%u", &OutUserProfile->Uid);
 			}
 			else
 			{
-				Stopif(true, return EXIT_FAILURE, "Invalid profile member for assignment");
+				Stopif(true, return, "Invalid profile member for assignment");
 			}
 			StringBufferIndex = 0;
 		}
 		else
 		{
-			StringBuffer[StringBufferIndex] = TestString[TestStringIndex];
+			StringBuffer[StringBufferIndex] = EncodedProfile[TestStringIndex];
 			++StringBufferIndex;
 		}
 	}
+}
 
+int main()
+{
 	srand(time(0));
 
 	u32 Key[AES_128_BLOCK_LENGTH_WORDS];
 	GenRandUnchecked(Key, AES_128_BLOCK_LENGTH_WORDS);
-	u32 EncodedProfileLength = ProfileFor(StringBuffer, TEST_EMAIL, strlen(TEST_EMAIL));
+
+	char TestEncodedProfile[MAX_STRING_LENGTH];
+	u32 EncodedProfileLength = ProfileFor(TestEncodedProfile, TEST_EMAIL, strlen(TEST_EMAIL));
+
 	u8 EncryptedProfile[MAX_ENCODED_PROFILE_LENGTH];
-	AesEcbEncrypt(EncryptedProfile, (u8 *)StringBuffer, EncodedProfileLength, (u8 *)Key, sizeof(Key));
+	AesEcbEncrypt(EncryptedProfile, (u8 *)TestEncodedProfile, EncodedProfileLength, (u8 *)Key, sizeof(Key));
+
+	u8 EncryptedAdmin[AES_128_BLOCK_LENGTH_BYTES];
+	u32 EncryptedAdminStringLength = sizeof(ADMIN_STRING);
+	u8 PaddedAdminMessage[AES_128_BLOCK_LENGTH_BYTES];
+	memcpy(PaddedAdminMessage, ADMIN_STRING, EncryptedAdminStringLength);
+	AesEcbEncrypt(EncryptedAdmin, PaddedAdminMessage, EncryptedAdminStringLength, (u8 *)Key, sizeof(Key));
+
+	u32 ProfileLengthNoUser = EncodedProfileLength - sizeof(USER_STRING);
+	memcpy(EncryptedProfile + ProfileLengthNoUser, EncryptedAdmin, AES_128_BLOCK_LENGTH_BYTES);
+
+	EncodedProfileLength = ProfileLengthNoUser + EncryptedAdminStringLength;
+	AesEcbDecrypt((u8 *)TestEncodedProfile, (u8 *)EncryptedProfile, EncodedProfileLength,
+				  (u8 *)Key, sizeof(Key));
+
+	printf("%s\n", TestEncodedProfile);
+
+	user_profile TestUserProfile;
+	ParseUserProfile(&TestUserProfile, TestEncodedProfile, EncodedProfileLength);
 }

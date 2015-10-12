@@ -2,7 +2,7 @@ CPPFLAGS=-c `pkg-config --cflags glib-2.0` -I$(HOME)/tech/root/include/ -g\
 		-std=c++14 -Wall -Wextra -Werror -O0
 LDLIBS=`pkg-config --libs glib-2.0` -lm
 
-CC=clang
+CC=g++
 
 SOURCES=break_repeating_key_xor.cpp helper.cpp
 OBJECTS=$(SOURCES:.cpp=.o)

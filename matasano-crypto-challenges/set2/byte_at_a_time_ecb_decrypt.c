@@ -30,12 +30,13 @@ CreateDictionary(u8 *OracleByteDictionary, u8 *DictionaryMessage)
 	}
 }
 
-internal void
-ResetPaddedPlaintext(u8 *PaddedPlaintext, u8 *UnpaddedPlaintext, u32 UnpaddedPtLength)
+internal inline u32
+GenerateRandomPrepend(u8 *Plaintext)
 {
-	Stopif((PaddedPlaintext == 0) || (UnpaddedPlaintext == 0), return, "Null input to ResetPaddedPlaintext");
-	Stopif((UnpaddedPtLength + AES_128_BLOCK_LENGTH_BYTES) >= MAX_BYTE_AT_A_TIME_MSG_LEN,
-		   return, "UnpaddedPtLength too long");
+	Stopif(Plaintext == 0, return 0, "Null input to GenerateRandomPrepend");
+	u32 RandomPtPrependLengthWords = (rand() % MAX_BYTE_AT_A_TIME_MSG_LEN)/sizeof(u32);
+	GenRandUnchecked((u32 *)Plaintext, RandomPtPrependLengthWords);
+	return RandomPtPrependLengthWords;
 }
 
 int main()
@@ -82,40 +83,63 @@ int main()
 	u32 UnpaddedPtLength = Base64ToAscii(UnpaddedPlaintext, Base64Plaintext, sizeof(Base64Plaintext) - 1);
 	UnpaddedPlaintext[UnpaddedPtLength] = 0;
 
-	u8 PaddedPlaintext[2*sizeof(UnpaddedPlaintext)];
-	u32 RandomPtPrependLengthWords = (rand() % MAX_BYTE_AT_A_TIME_MSG_LEN)/sizeof(u32);
-	u32 RandomPtPrependLengthBytes = RandomPtPrependLengthWords*sizeof(u32);
-	GenRandUnchecked((u32 *)PaddedPlaintext, RandomPtPrependLengthWords);
-
-	u32 KnownPaddingBytes = AES_128_BLOCK_LENGTH_BYTES - 1;
-	memcpy(PaddedPlaintext + KnownPaddingBytes + AES_128_BLOCK_LENGTH_BYTES, UnpaddedPlaintext, UnpaddedPtLength);
-	PaddedPlaintext[UnpaddedPtLength + KnownPaddingBytes] = 0;
-	memset(PaddedPlaintext, 'A', KnownPaddingBytes);
-
-	ResetPaddedPlaintext(PaddedPlaintext + RandomPtPrependLengthBytes, UnpaddedPlaintext, UnpaddedPtLength);
-
 	u8 DictionaryMessage[AES_128_BLOCK_LENGTH_BYTES];
-	memset(DictionaryMessage, 'A', KnownPaddingBytes);
+	memset(DictionaryMessage, 'B', sizeof(DictionaryMessage));
+
+	u8 MarkerCipherBlock[AES_128_BLOCK_LENGTH_BYTES];
+	OracleFunction(MarkerCipherBlock, DictionaryMessage, sizeof(MarkerCipherBlock));
 
 	u8 OracleByteDictionary[POSSIBLE_BYTE_COUNT*AES_128_BLOCK_LENGTH_BYTES];
 
 	// NOTE(bwd): Includes "guess" byte
 	u8 AttackPlaintext[MAX_BYTE_AT_A_TIME_MSG_LEN];
 	u32 CipherBlockIndex = 0;
+	u8 PaddedPlaintext[2*sizeof(UnpaddedPlaintext)];
+	u32 KnownPaddingBytes = AES_128_BLOCK_LENGTH_BYTES - 1;
+	memset(DictionaryMessage, 'A', sizeof(DictionaryMessage));
 	for (u32 CipherIndex = 0;
 		 CipherIndex < UnpaddedPtLength;
 		 ++CipherIndex)
 	{
-		OracleFunction(Cipher, PaddedPlaintext, RandomPtPrependLengthBytes + UnpaddedPtLength + KnownPaddingBytes);
+		b32 MarkerFound = false;
+		u32 CipherTargetStartIndex;
+		while (!MarkerFound)
+		{
+			u32 RandomPtPrependLengthBytes = GenerateRandomPrepend(PaddedPlaintext)*sizeof(u32);
+			u32 TotalPrependedLength = (RandomPtPrependLengthBytes + KnownPaddingBytes +
+										AES_128_BLOCK_LENGTH_BYTES);
+
+			memset(PaddedPlaintext + RandomPtPrependLengthBytes, 'B', AES_128_BLOCK_LENGTH_BYTES);
+			memset(PaddedPlaintext + RandomPtPrependLengthBytes + AES_128_BLOCK_LENGTH_BYTES, 'A',
+				   KnownPaddingBytes);
+			memcpy(PaddedPlaintext + TotalPrependedLength, UnpaddedPlaintext, UnpaddedPtLength);
+			u32 PaddedPtTotalLength = TotalPrependedLength + UnpaddedPtLength;
+			PaddedPlaintext[PaddedPtTotalLength] = 0;
+
+			OracleFunction(Cipher, PaddedPlaintext, PaddedPtTotalLength);
+
+			for (CipherTargetStartIndex = 0;
+				 CipherTargetStartIndex < PaddedPtTotalLength;
+				 CipherTargetStartIndex += AES_128_BLOCK_LENGTH_BYTES)
+			{
+				if (memcmp(Cipher + CipherTargetStartIndex, MarkerCipherBlock, sizeof(MarkerCipherBlock)) == 0)
+				{
+					MarkerFound = true;
+					break;
+				}
+			}
+		}
 
 		CreateDictionary(OracleByteDictionary, DictionaryMessage);
+
+		u8 *CipherTargetBytesStart = Cipher + CipherTargetStartIndex + sizeof(MarkerCipherBlock);
 
 		b32 MatchingVectorFound = false;
 		for (u32 DictionaryIndex = 0;
 			 DictionaryIndex < POSSIBLE_BYTE_COUNT;
 			 ++DictionaryIndex)
 		{
-			if (VectorsEqual(Cipher + CipherBlockIndex*AES_128_BLOCK_LENGTH_BYTES,
+			if (VectorsEqual(CipherTargetBytesStart + CipherBlockIndex*AES_128_BLOCK_LENGTH_BYTES,
 							 OracleByteDictionary + DictionaryIndex*AES_128_BLOCK_LENGTH_BYTES,
 							 AES_128_BLOCK_LENGTH_BYTES))
 			{
@@ -126,24 +150,16 @@ int main()
 				break;
 			}
 		}
-
-		Stopif(!MatchingVectorFound, return EXIT_FAILURE, "No matching vector found in dictionary");
+		Stopif(!MatchingVectorFound, return EXIT_FAILURE, "No matching vector found!");
 
 		if (KnownPaddingBytes > 0)
 		{
 			--KnownPaddingBytes;
-			memcpy(PaddedPlaintext + KnownPaddingBytes,
-				   PaddedPlaintext + (KnownPaddingBytes + 1),
-				   UnpaddedPtLength);
 		}
 		else
 		{
 			++CipherBlockIndex;
 			KnownPaddingBytes = AES_128_BLOCK_LENGTH_BYTES - 1;
-			memcpy(DictionaryMessage,
-				   AttackPlaintext + (CipherBlockIndex - 1)*AES_128_BLOCK_LENGTH_BYTES + 1,
-				   AES_128_BLOCK_LENGTH_BYTES - 1);
-			ResetPaddedPlaintext(PaddedPlaintext, UnpaddedPlaintext, UnpaddedPtLength);
 		}
 	}
 	Stopif(strlen((char *)AttackPlaintext) != strlen((char *)UnpaddedPlaintext),

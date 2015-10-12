@@ -19,17 +19,13 @@ Base64ToUInt(char Base64Digit)
 {
     if ((Base64Digit >= 'A') && (Base64Digit <= 'Z')) {
         return Base64Digit - 'A';
-    }
-    else if ((Base64Digit >= 'a') && (Base64Digit <= 'z')) {
+    } else if ((Base64Digit >= 'a') && (Base64Digit <= 'z')) {
         return Base64Digit - 'a' + 26;
-    }
-    else if ((Base64Digit >= '0') && (Base64Digit <= '9')) {
+    } else if ((Base64Digit >= '0') && (Base64Digit <= '9')) {
         return Base64Digit - '0' + 52;
-    }
-    else if (Base64Digit == '+') {
+    } else if (Base64Digit == '+') {
         return 62;
-    }
-    else if (Base64Digit == '/') {
+    } else if (Base64Digit == '/') {
         return 63;
     }
     Stopif(true, return -1, "Bad Base64Digit passed to Base64ToUint");
@@ -46,8 +42,7 @@ int main()
     // i.e. the number of base64 characters is a multiple of 4. Otherwise we
     // would have to take into account padding characters '=' and '==', or
     // just read the characters from left to right.
-    Stopif(CipherLength%4 == 1, return -2,
-           "Bad CipherLength (should be padded)");
+    Stopif(CipherLength % 4 == 1, return -2, "Bad CipherLength (should be padded)");
 
     // NOTE(brendan): length needed to store ByteCipher corresponding to
     // Base64Cipher. Last element should be 0
