@@ -36,21 +36,12 @@ AesVectorsPass(aes_test_vector *TestVector, u32 VectorCount)
 
 internal MIN_UNIT_TEST_FUNC(TestAesVectors)
 {
-	char *Result = 0;
-	Result = MinUnitAssert("Expected/Actual mismatch in TestVector()",
-						   AesVectorsPass(GlobalAesVectors, ArrayLength(GlobalAesVectors)));
-	return Result;
+	MinUnitAssert("Expected/Actual mismatch in TestVector()",
+				  AesVectorsPass(GlobalAesVectors, ArrayLength(GlobalAesVectors)));
 }
 
 int main()
 {
-	char *Result = TestAesVectors();
-	if (Result)
-	{
-		printf("Test failed!\n%s\n", Result);
-	}
-	else
-	{
-		printf("All tests passed!\n");
-	}
+	TestAesVectors();
+	printf("All tests passed!\n");
 }

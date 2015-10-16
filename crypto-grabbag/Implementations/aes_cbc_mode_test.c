@@ -39,21 +39,12 @@ AesCbcModeVecsPass(aes_cbc_mode_vec *AesCbcTestVec, u32 AesCbcTestVecCount)
 
 internal MIN_UNIT_TEST_FUNC(TestAesCbcVecs)
 {
-	char *Result = 0;
-	Result = MinUnitAssert("Expected/Actual mismatch in AesCbcModeVecsPass()",
-						   AesCbcModeVecsPass(GlobalAesCbcVecs, ArrayLength(GlobalAesCbcVecs)));
-	return Result;
+	MinUnitAssert("Expected/Actual mismatch in AesCbcModeVecsPass()",
+				  AesCbcModeVecsPass(GlobalAesCbcVecs, ArrayLength(GlobalAesCbcVecs)));
 }
 
 int main()
 {
-	char *Result = TestAesCbcVecs();
-	if (Result)
-	{
-		printf("Test failed!\n%s\n", Result);
-	}
-	else
-	{
-		printf("All tests passed!\n");
-	}
+	TestAesCbcVecs();
+	printf("All tests passed!\n");
 }
