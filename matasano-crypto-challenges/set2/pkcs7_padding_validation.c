@@ -40,21 +40,21 @@ internal MIN_UNIT_TEST_FUNC(TestPkcs7ValidPadding)
 	char ValidPkcs7PaddedString[] = "ICE ICE BABY\x04\x04\x04\x04";
 	char ExpectedStrippedString[] = "ICE ICE BABY";
 	char *StrippedString = StripPkcs7Padding(ValidPkcs7PaddedString);
-	MinUnitAssert("Invalid padding returned for valid case!", !!StrippedString);
-	MinUnitAssert("Incorrect string returned for valid case!",
-				  (strcmp(StrippedString, ExpectedStrippedString) == 0));
+	MinUnitAssert(!!StrippedString, "Invalid padding returned for valid case!");
+	MinUnitAssert((strcmp(StrippedString, ExpectedStrippedString) == 0),
+				  "Incorrect string returned for valid case!");
 }
 
 internal MIN_UNIT_TEST_FUNC(TestPkcs7InvalidPadding0)
 {
-	MinUnitAssert("Valid PKCS#7 padding found for invalid case 0!",
-				  StripPkcs7Padding("ICE ICE BABY\x05\x05\x05\x05") == 0);
+	MinUnitAssert(StripPkcs7Padding("ICE ICE BABY\x05\x05\x05\x05") == 0,
+				  "Valid PKCS#7 padding found for invalid case 0!");
 }
 
 internal MIN_UNIT_TEST_FUNC(TestPkcs7InvalidPadding1)
 {
-	MinUnitAssert("Valid PKCS#7 padding found for invalid case 1!",
-				  StripPkcs7Padding("ICE ICE BABY\x01\x02\x03\x04") == 0);
+	MinUnitAssert(StripPkcs7Padding("ICE ICE BABY\x01\x02\x03\x04") == 0,
+				  "Valid PKCS#7 padding found for invalid case 1!");
 }
 
 internal MIN_UNIT_TEST_FUNC(AllTests)
