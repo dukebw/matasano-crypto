@@ -1,5 +1,4 @@
-#include "min_unit.h"
-#include "aes.h"
+#include "crypt_helper.h"
 #include "aes_cbc_mode_vector.h"
 
 global_variable u8 GlobalAesCbcTestScratch[AES_TEST_MAX_MSG_SIZE];
@@ -18,7 +17,9 @@ AesCbcModeVecsPass(aes_cbc_mode_vec *AesCbcTestVec, u32 AesCbcTestVecCount)
 		aes_test_vector *AesTestVec = &AesCbcTestVec->AesVector;
 		Stopif(AesTestVec->MessageLength > AES_TEST_MAX_MSG_SIZE, return false, "Test vector length too large");
 
-		AesCbcEncrypt(GlobalAesCbcTestScratch, AesTestVec->Message, AesTestVec->MessageLength,
+		// NOTE(bwd): test encrypt/decrypt in place
+		memcpy(GlobalAesCbcTestScratch, AesTestVec->Message, AesTestVec->MessageLength);
+		AesCbcEncrypt(GlobalAesCbcTestScratch, GlobalAesCbcTestScratch, AesTestVec->MessageLength,
 					  AesTestVec->Key, AesTestVec->KeyLength, AesCbcTestVec->Iv);
 		Result = VectorsEqual(GlobalAesCbcTestScratch, AesTestVec->Cipher, AesTestVec->MessageLength);
 		if (Result == false)
@@ -26,7 +27,8 @@ AesCbcModeVecsPass(aes_cbc_mode_vec *AesCbcTestVec, u32 AesCbcTestVecCount)
 			break;
 		}
 
-		AesCbcDecrypt(GlobalAesCbcTestScratch, AesTestVec->Cipher, AesTestVec->MessageLength,
+		memcpy(GlobalAesCbcTestScratch, AesTestVec->Cipher, AesTestVec->MessageLength);
+		AesCbcDecrypt(GlobalAesCbcTestScratch, GlobalAesCbcTestScratch, AesTestVec->MessageLength,
 					  AesTestVec->Key, AesTestVec->KeyLength, AesCbcTestVec->Iv);
 		Result = VectorsEqual(GlobalAesCbcTestScratch, AesTestVec->Message, AesTestVec->MessageLength);
 		if (Result == false)
@@ -39,8 +41,8 @@ AesCbcModeVecsPass(aes_cbc_mode_vec *AesCbcTestVec, u32 AesCbcTestVecCount)
 
 internal MIN_UNIT_TEST_FUNC(TestAesCbcVecs)
 {
-	MinUnitAssert("Expected/Actual mismatch in AesCbcModeVecsPass()",
-				  AesCbcModeVecsPass(GlobalAesCbcVecs, ArrayLength(GlobalAesCbcVecs)));
+	MinUnitAssert(AesCbcModeVecsPass(GlobalAesCbcVecs, ArrayLength(GlobalAesCbcVecs)),
+				  "Expected/Actual mismatch in AesCbcModeVecsPass()");
 }
 
 int main()

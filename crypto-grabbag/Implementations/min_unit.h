@@ -9,7 +9,7 @@ global_variable u32 MinUnitGlobalTestsRun;
 typedef MIN_UNIT_TEST_FUNC(min_unit_test_func);
 
 internal void
-MinUnitAssert(char *Message, b32 Test)
+MinUnitAssert(b32 Test, char *Message)
 {
 	if (!Test)
 	{

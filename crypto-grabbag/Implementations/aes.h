@@ -515,6 +515,9 @@ FindPaddedLength(u32 MessageLength)
 	{
 		Result += AES_128_BLOCK_LENGTH_BYTES - MessageModBlock;
 	}
+
+	Stopif((Result % AES_128_BLOCK_LENGTH_BYTES) != 0, return 0, "FindPaddedLength output invalid byte-length");
+
 	return Result;
 }
 
@@ -529,12 +532,12 @@ AesCbcDecrypt(u8 *Message, u8 *Cipher, u32 MessageLength, u8 *Key, u32 KeyLength
 
 	u32 PaddedMsgLength = FindPaddedLength(MessageLength);
 
-	AesDecryptBlock(Message, Cipher, PaddedMsgLength, Key, KeyLength);
-	XorVectorsUnchecked(Message, Message, Iv, AES_128_BLOCK_LENGTH_BYTES);
+	u32 PaddedBlockCount = PaddedMsgLength/AES_128_BLOCK_LENGTH_BYTES;
+	Stopif(PaddedBlockCount < 1, return, "Invalid block count in AesCbcDecrypt");
 
-	for (u32 MessageBlockIndex = 1;
-		 MessageBlockIndex < PaddedMsgLength/AES_128_BLOCK_LENGTH_BYTES;
-		 ++MessageBlockIndex)
+	for (i32 MessageBlockIndex = (PaddedBlockCount - 1);
+		 MessageBlockIndex >= 0;
+		 --MessageBlockIndex)
 	{
 		u32 MessageIndexBytes = MessageBlockIndex*AES_128_BLOCK_LENGTH_BYTES;
 		u8 *MsgStartOfBlock = Message + MessageIndexBytes;
@@ -545,6 +548,9 @@ AesCbcDecrypt(u8 *Message, u8 *Cipher, u32 MessageLength, u8 *Key, u32 KeyLength
 							Cipher + (MessageBlockIndex - 1)*AES_128_BLOCK_LENGTH_BYTES,
 							AES_128_BLOCK_LENGTH_BYTES);
 	}
+
+	AesDecryptBlock(Message, Cipher, PaddedMsgLength, Key, KeyLength);
+	XorVectorsUnchecked(Message, Message, Iv, AES_128_BLOCK_LENGTH_BYTES);
 }
 
 internal void
