@@ -17,7 +17,7 @@
 #define local_persist static
 #define global_variable static
 
-#define ArrayLength(array) sizeof(array)/sizeof((array)[0])
+#define ARRAY_LENGTH(array) sizeof(array)/sizeof((array)[0])
 
 typedef uint8_t uint8;
 typedef uint16_t uint16;

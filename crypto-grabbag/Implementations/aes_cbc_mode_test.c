@@ -41,7 +41,7 @@ AesCbcModeVecsPass(aes_cbc_mode_vec *AesCbcTestVec, u32 AesCbcTestVecCount)
 
 internal MIN_UNIT_TEST_FUNC(TestAesCbcVecs)
 {
-	MinUnitAssert(AesCbcModeVecsPass(GlobalAesCbcVecs, ArrayLength(GlobalAesCbcVecs)),
+	MinUnitAssert(AesCbcModeVecsPass(GlobalAesCbcVecs, ARRAY_LENGTH(GlobalAesCbcVecs)),
 				  "Expected/Actual mismatch in AesCbcModeVecsPass()");
 }
 

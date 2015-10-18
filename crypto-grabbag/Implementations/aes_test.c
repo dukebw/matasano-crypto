@@ -38,7 +38,7 @@ AesVectorsPass(aes_test_vector *TestVector, u32 VectorCount)
 
 internal MIN_UNIT_TEST_FUNC(TestAesVectors)
 {
-	MinUnitAssert(AesVectorsPass(GlobalAesVectors, ArrayLength(GlobalAesVectors)),
+	MinUnitAssert(AesVectorsPass(GlobalAesVectors, ARRAY_LENGTH(GlobalAesVectors)),
 				  "Expected/Actual mismatch in TestVector()");
 }
 

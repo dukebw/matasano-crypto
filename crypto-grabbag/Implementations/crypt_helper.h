@@ -10,6 +10,8 @@ CASSERT(RAND_MAX <= UINT32_MAX, crypt_helper_h);
 
 #pragma GCC diagnostic ignored "-Wunused-function"
 
+#define STR_LEN(String) (ARRAY_LENGTH(String) - 1)
+
 #define ALPHABET_SIZE 26
 
 global_variable real32 LetterFrequencies[] =
@@ -385,6 +387,55 @@ CipherIsEcbEncrypted(u8 *Cipher, u32 CipherLength)
 
 	Result = CipherIsEcbEncryptedBlock(Cipher, CipherLength/AES_128_BLOCK_LENGTH_BYTES);
 
+	return Result;
+}
+
+// NOTE(bwd): StrippedStringLength can be 0
+// TODO(bwd): better API?
+internal u8 *
+StripPkcs7GetStrippedLength(u8 *PaddedString, u32 *StrippedStringLengthOut, u32 PaddedStringLength)
+{
+	u8 *Result = 0;
+	Stopif(PaddedString == 0, "Null input to StripPkcs7Padding");
+	Stopif((PaddedStringLength % AES_128_BLOCK_LENGTH_BYTES) != 0,
+		   "Bad padded length passed to StripPkcs7GetStrippedLength");
+	Stopif(PaddedStringLength == 0, "Invalid zero string length passed to StripPkcs7GetStrippedLength");
+
+	u8 PaddingBytes = PaddedString[PaddedStringLength - 1];
+
+	if ((PaddingBytes > 0) && (PaddingBytes <= AES_128_BLOCK_LENGTH_BYTES))
+	{
+		b32 ValidPadding = true;
+		u8 *PaddedBlock = PaddedString + (PaddedStringLength - AES_128_BLOCK_LENGTH_BYTES);
+		i32 PaddingOffsetInPaddedBlock = (AES_128_BLOCK_LENGTH_BYTES - PaddingBytes);
+		for (i32 PaddedBlockIndex = (AES_128_BLOCK_LENGTH_BYTES - 1);
+			 PaddedBlockIndex >= PaddingOffsetInPaddedBlock;
+			 --PaddedBlockIndex)
+		{
+			if ((u8)PaddedBlock[PaddedBlockIndex] != PaddingBytes)
+			{
+				ValidPadding = false;
+				break;
+			}
+		}
+		if (ValidPadding)
+		{
+			*(PaddedBlock + PaddingOffsetInPaddedBlock) = 0;
+			Result = PaddedString;
+			if (StrippedStringLengthOut)
+			{
+				*StrippedStringLengthOut = (PaddedStringLength - PaddingBytes);
+			}
+		}
+	}
+
+	return Result;
+}
+
+internal u8 *
+StripPkcs7Padding(u8 *PaddedString, u32 PaddedStringLength)
+{
+	u8 *Result = StripPkcs7GetStrippedLength(PaddedString, 0, PaddedStringLength);
 	return Result;
 }
 

@@ -377,9 +377,9 @@ AesEncryptBlock(u8 *Cipher, u8 *Message, u8 *Key, u32 KeyLength)
 	Stopif(KeyLength != KEY_LENGTH_BYTES, "Invalid key length");
 
 	// KeyExpansion(byte key[4*Nk], word w[Nb*(Nr + 1)], Nk)
-	CreateKeySchedule(GlobalKeySchedule, ArrayLength(GlobalKeySchedule), Key, KeyLength);
+	CreateKeySchedule(GlobalKeySchedule, ARRAY_LENGTH(GlobalKeySchedule), Key, KeyLength);
 
-	memcpy(GlobalStateArray, Message, ArrayLength(GlobalStateArray));
+	memcpy(GlobalStateArray, Message, ARRAY_LENGTH(GlobalStateArray));
 
 	// AddRoundKey(state, w[0, Nb - 1])
 	AddRoundKey(GlobalStateArray, GlobalKeySchedule);
@@ -388,18 +388,18 @@ AesEncryptBlock(u8 *Cipher, u8 *Message, u8 *Key, u32 KeyLength)
 		 RoundIndex < NUMBER_OF_ROUNDS;
 		 ++RoundIndex)
 	{
-		SubBytes(GlobalStateArray, ArrayLength(GlobalStateArray));
+		SubBytes(GlobalStateArray, ARRAY_LENGTH(GlobalStateArray));
 		ShiftRows(GlobalStateArray);
 
 		// MixColumns(state)
 		MixColumns(GlobalStateArray);
 		AddRoundKey(GlobalStateArray, GlobalKeySchedule + RoundIndex*COL_COUNT_NB);
 	}
-	SubBytes(GlobalStateArray, ArrayLength(GlobalStateArray));
+	SubBytes(GlobalStateArray, ARRAY_LENGTH(GlobalStateArray));
 	ShiftRows(GlobalStateArray);
 	AddRoundKey(GlobalStateArray, GlobalKeySchedule + NUMBER_OF_ROUNDS*COL_COUNT_NB);
 
-	memcpy(Cipher, GlobalStateArray, ArrayLength(GlobalStateArray));
+	memcpy(Cipher, GlobalStateArray, ARRAY_LENGTH(GlobalStateArray));
 }
 
 internal void
@@ -410,9 +410,9 @@ AesDecryptBlock(u8 *Message, u8 *Cipher, u32 CipherLength, u8 *Key, u32 KeyLengt
 	Stopif(KeyLength != KEY_LENGTH_BYTES, "Invalid key length");
 
 	// KeyExpansion(byte key[4*Nk], word w[Nb*(Nr + 1)], Nk)
-	CreateKeySchedule(GlobalKeySchedule, ArrayLength(GlobalKeySchedule), Key, KeyLength);
+	CreateKeySchedule(GlobalKeySchedule, ARRAY_LENGTH(GlobalKeySchedule), Key, KeyLength);
 
-	memcpy(GlobalStateArray, Cipher, ArrayLength(GlobalStateArray));
+	memcpy(GlobalStateArray, Cipher, ARRAY_LENGTH(GlobalStateArray));
 
 	// AddRoundKey(state, w[Nr*Nb, (Nr + 1)*Nb - 1])
 	AddRoundKey(GlobalStateArray, GlobalKeySchedule + NUMBER_OF_ROUNDS*COL_COUNT_NB);
@@ -422,7 +422,7 @@ AesDecryptBlock(u8 *Message, u8 *Cipher, u32 CipherLength, u8 *Key, u32 KeyLengt
 		 --RoundIndex)
 	{
 		InverseShiftRows(GlobalStateArray);
-		InverseSubBytes(GlobalStateArray, ArrayLength(GlobalStateArray));
+		InverseSubBytes(GlobalStateArray, ARRAY_LENGTH(GlobalStateArray));
 
 		// AddRoundKey(state, w[round*Nb, (round+1)*Nb-1])
 		AddRoundKey(GlobalStateArray, GlobalKeySchedule + RoundIndex*COL_COUNT_NB);
@@ -431,12 +431,12 @@ AesDecryptBlock(u8 *Message, u8 *Cipher, u32 CipherLength, u8 *Key, u32 KeyLengt
 		InverseMixColumns(GlobalStateArray);
 	}
 	InverseShiftRows(GlobalStateArray);
-	InverseSubBytes(GlobalStateArray, ArrayLength(GlobalStateArray));
+	InverseSubBytes(GlobalStateArray, ARRAY_LENGTH(GlobalStateArray));
 
 	// AddRoundKey(state, w[0, Nb - 1])
 	AddRoundKey(GlobalStateArray, GlobalKeySchedule);
 
-	memcpy(Message, GlobalStateArray, ArrayLength(GlobalStateArray));
+	memcpy(Message, GlobalStateArray, ARRAY_LENGTH(GlobalStateArray));
 }
 
 internal u32
@@ -451,16 +451,13 @@ Pkcs7Pad(u8 *PaddedMessage, u8 *Message, u32 MessageLength)
 	}
 
 	u32 MessageModBlock = MessageLength % AES_128_BLOCK_LENGTH_BYTES;
-	if (MessageModBlock != 0)
+	u32 ExtraPaddingBytes = AES_128_BLOCK_LENGTH_BYTES - MessageModBlock;
+	PaddedLength += ExtraPaddingBytes;
+	for (u32 ExtraPaddingIndex = 0;
+		 ExtraPaddingIndex < ExtraPaddingBytes;
+		 ++ExtraPaddingIndex)
 	{
-		u32 ExtraPaddingBytes = AES_128_BLOCK_LENGTH_BYTES - MessageModBlock;
-		PaddedLength += ExtraPaddingBytes;
-		for (u32 ExtraPaddingIndex = 0;
-			 ExtraPaddingIndex < ExtraPaddingBytes;
-			 ++ExtraPaddingIndex)
-		{
-			PaddedMessage[MessageLength + ExtraPaddingIndex] = ExtraPaddingBytes;
-		}
+		PaddedMessage[MessageLength + ExtraPaddingIndex] = ExtraPaddingBytes;
 	}
 	return PaddedLength;
 }
@@ -476,7 +473,7 @@ XorVectorsUnchecked(u8 *Dest, u8 *A, u8 *B, u32 Length)
 	}
 }
 
-internal void
+internal u32
 AesCbcEncrypt(u8 *Cipher, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength, u8 *Iv)
 {
 	Stopif((Message == 0) || (Cipher == 0) || (Key == 0) || (Iv == 0), "Null inputs to AesCbcEncrypt");
@@ -499,6 +496,7 @@ AesCbcEncrypt(u8 *Cipher, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength
 							AES_128_BLOCK_LENGTH_BYTES);
 		AesEncryptBlock(Cipher + MessageIndexBytes, Cipher + MessageIndexBytes, Key, KeyLength);
 	}
+	return PaddedMsgLength;
 }
 
 internal inline u32
