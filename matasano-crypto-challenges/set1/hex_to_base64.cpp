@@ -14,8 +14,7 @@
 internal char
 IntegerToBase64(int Value)
 {
-    Stopif((Value > 63) || (Value < 0), return -1,
-           "Bad value passed to IntegerToBase64");
+    Stopif((Value > 63) || (Value < 0), "Bad value passed to IntegerToBase64");
     if (Value < 26) {
         return 'A' + Value;
     }

@@ -23,7 +23,6 @@ internal void
 FillInMemberString(char *MemberString, char *SourceString, u32 *SourceStringIndex, u32 SourceStringLength)
 {
 	Stopif((MemberString == 0) || (SourceString == 0) || (SourceStringIndex == 0),
-		   return,
 		   "Null input to FillInMemberString");
 	u32 MemberStringIndex;
 	++*SourceStringIndex;
@@ -31,8 +30,8 @@ FillInMemberString(char *MemberString, char *SourceString, u32 *SourceStringInde
 		 (*SourceStringIndex < SourceStringLength) && (SourceString[*SourceStringIndex] != '&');
 		 ++MemberStringIndex, ++*SourceStringIndex)
 	{
-		Stopif(MemberStringIndex >= MAX_STRING_LENGTH, return, "Member string too long");
-		Stopif(SourceString[*SourceStringIndex] == '=', return, "Invalid metacharacter =");
+		Stopif(MemberStringIndex >= MAX_STRING_LENGTH, "Member string too long");
+		Stopif(SourceString[*SourceStringIndex] == '=', "Invalid metacharacter =");
 		MemberString[MemberStringIndex] = SourceString[*SourceStringIndex];
 	}
 	MemberString[MemberStringIndex] = 0;
@@ -42,7 +41,6 @@ internal inline void
 CopyStringAndIncrement(char **DestString, const char *SourceString, u32 Length)
 {
 	Stopif((DestString == 0) || (*DestString == 0) || (SourceString == 0),
-		   return,
 		   "Null input to CopyStringMemberAndIncrement");
 	memcpy(*DestString, SourceString, Length);
 	*DestString += Length;
@@ -54,8 +52,8 @@ ProfileFor(char *NewUserProfile, const char *Email, u32 EmailLength)
 {
 	u32 EncodedProfileLength;
 	char *NewUserProfileStart = NewUserProfile;
-	Stopif((NewUserProfile == 0) || (Email == 0), return 0, "Null input to ProfileFor");
-	Stopif(EmailLength >= MAX_STRING_LENGTH, return 0, "Email length too long in ProfileFor");
+	Stopif((NewUserProfile == 0) || (Email == 0), "Null input to ProfileFor");
+	Stopif(EmailLength >= MAX_STRING_LENGTH, "Email length too long in ProfileFor");
 
 	CopyStringAndIncrement(&NewUserProfile, EMAIL_STRING, strlen(EMAIL_STRING));
 
@@ -64,7 +62,6 @@ ProfileFor(char *NewUserProfile, const char *Email, u32 EmailLength)
 		 ++EmailIndex)
 	{
 		Stopif((Email[EmailIndex] == '=') || (Email[EmailIndex] == '&'),
-			   return 0,
 			   "Meta-character in Email in ProfileFor");
 		*NewUserProfile++ = Email[EmailIndex];
 	}
@@ -73,7 +70,7 @@ ProfileFor(char *NewUserProfile, const char *Email, u32 EmailLength)
 
 	CopyStringAndIncrement(&NewUserProfile, UID_STRING, strlen(UID_STRING));
 	u32 UidStringLength = sprintf(NewUserProfile, "%u", GlobalNextUid++);
-	Stopif(GlobalNextUid == UINT32_MAX, return 0, "Too many Uids!");
+	Stopif(GlobalNextUid == UINT32_MAX, "Too many Uids!");
 	NewUserProfile += UidStringLength;
 
 	*NewUserProfile++ = '&';
@@ -88,13 +85,13 @@ ProfileFor(char *NewUserProfile, const char *Email, u32 EmailLength)
 internal void
 ParseUserProfile(user_profile *OutUserProfile, char *EncodedProfile, u32 EncodedProfileLength)
 {
-	Stopif((OutUserProfile == 0) || (EncodedProfile == 0), return, "Null inputs to ParseUserProfile");
+	Stopif((OutUserProfile == 0) || (EncodedProfile == 0), "Null inputs to ParseUserProfile");
 	char StringBuffer[MAX_STRING_LENGTH];
 	for (u32 TestStringIndex = 0, StringBufferIndex = 0;
 		 TestStringIndex < EncodedProfileLength;
 		 ++TestStringIndex)
 	{
-		Stopif(EncodedProfile[TestStringIndex] == '&', return, "Invalid metacharacter &");
+		Stopif(EncodedProfile[TestStringIndex] == '&', "Invalid metacharacter &");
 		if (EncodedProfile[TestStringIndex] == '=')
 		{
 			if (memcmp(StringBuffer, EMAIL_STRING, strlen(EMAIL_STRING)) == 0)
@@ -115,8 +112,8 @@ ParseUserProfile(user_profile *OutUserProfile, char *EncodedProfile, u32 Encoded
 					 (TestStringIndex < EncodedProfileLength) && (EncodedProfile[TestStringIndex] != '&');
 					 ++StringBufferIndex, ++TestStringIndex)
 				{
-					Stopif(StringBufferIndex >= MAX_STRING_LENGTH, return, "Uid too long for StringBuffer");
-					Stopif(!isdigit((i32)EncodedProfile[TestStringIndex]), return, "Non-digit in uid");
+					Stopif(StringBufferIndex >= MAX_STRING_LENGTH, "Uid too long for StringBuffer");
+					Stopif(!isdigit((i32)EncodedProfile[TestStringIndex]), "Non-digit in uid");
 					StringBuffer[StringBufferIndex] = EncodedProfile[TestStringIndex];
 				}
 				StringBuffer[StringBufferIndex] = 0;
@@ -124,7 +121,7 @@ ParseUserProfile(user_profile *OutUserProfile, char *EncodedProfile, u32 Encoded
 			}
 			else
 			{
-				Stopif(true, return, "Invalid profile member for assignment");
+				Stopif(true, "Invalid profile member for assignment");
 			}
 			StringBufferIndex = 0;
 		}

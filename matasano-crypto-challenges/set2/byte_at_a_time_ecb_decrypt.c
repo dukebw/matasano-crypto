@@ -10,14 +10,14 @@ u32 GlobalOracleKey[AES_128_BLOCK_LENGTH_WORDS];
 internal void
 OracleFunction(u8 *Cipher, u8 *Plaintext, u32 PlaintextLength)
 {
-	Stopif((Plaintext == 0) || (Cipher == 0), return, "Null input to OracleFunction");
+	Stopif((Plaintext == 0) || (Cipher == 0), "Null input to OracleFunction");
 	AesEcbEncrypt(Cipher, Plaintext, PlaintextLength, (u8 *)GlobalOracleKey, sizeof(GlobalOracleKey));
 }
 
 internal void
 CreateDictionary(u8 *OracleByteDictionary, u8 *DictionaryMessage)
 {
-	Stopif((OracleByteDictionary == 0) || (DictionaryMessage == 0), return, "Null inputs to CreateDictionary");
+	Stopif((OracleByteDictionary == 0) || (DictionaryMessage == 0), "Null inputs to CreateDictionary");
 
 	for (u32 DictionaryIndex = 0;
 		 DictionaryIndex < POSSIBLE_BYTE_COUNT;
@@ -33,7 +33,7 @@ CreateDictionary(u8 *OracleByteDictionary, u8 *DictionaryMessage)
 internal inline u32
 GenerateRandomPrepend(u8 *Plaintext)
 {
-	Stopif(Plaintext == 0, return 0, "Null input to GenerateRandomPrepend");
+	Stopif(Plaintext == 0, "Null input to GenerateRandomPrepend");
 	u32 RandomPtPrependLengthWords = (rand() % MAX_BYTE_AT_A_TIME_MSG_LEN)/sizeof(u32);
 	GenRandUnchecked((u32 *)Plaintext, RandomPtPrependLengthWords);
 	return RandomPtPrependLengthWords;
@@ -64,21 +64,15 @@ int main()
 		}
 	}
 
-	Stopif(!BlockSizeFound || (BlockSizeGuess != AES_128_BLOCK_LENGTH_BYTES),
-		   return EXIT_FAILURE,
-		   "Cipher size not determined");
+	Stopif(!BlockSizeFound || (BlockSizeGuess != AES_128_BLOCK_LENGTH_BYTES), "Cipher size not determined");
 
-	Stopif(!CipherIsEcbEncrypted(Cipher, sizeof(UnpaddedPlaintext)),
-		   return EXIT_FAILURE,
-		   "Cipher not ECB encrypted!\n");
+	Stopif(!CipherIsEcbEncrypted(Cipher, sizeof(UnpaddedPlaintext)), "Cipher not ECB encrypted!\n");
 
 	u8 Base64Plaintext[] = "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFp"
 						   "ciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRv"
 						   "IHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK";
 
-	Stopif(sizeof(Base64Plaintext) > MAX_BYTE_AT_A_TIME_MSG_LEN,
-		   return EXIT_FAILURE,
-		   "UnpaddedPlaintext too short");
+	Stopif(sizeof(Base64Plaintext) > MAX_BYTE_AT_A_TIME_MSG_LEN, "UnpaddedPlaintext too short");
 
 	u32 UnpaddedPtLength = Base64ToAscii(UnpaddedPlaintext, Base64Plaintext, sizeof(Base64Plaintext) - 1);
 	UnpaddedPlaintext[UnpaddedPtLength] = 0;
@@ -150,7 +144,7 @@ int main()
 				break;
 			}
 		}
-		Stopif(!MatchingVectorFound, return EXIT_FAILURE, "No matching vector found!");
+		Stopif(!MatchingVectorFound, "No matching vector found!");
 
 		if (KnownPaddingBytes > 0)
 		{
@@ -163,10 +157,8 @@ int main()
 		}
 	}
 	Stopif(strlen((char *)AttackPlaintext) != strlen((char *)UnpaddedPlaintext),
-		   return EXIT_FAILURE,
 		   "AttackPlaintext not equal length to UnpaddedPlaintext");
 	Stopif(!VectorsEqual(AttackPlaintext, UnpaddedPlaintext, strlen((char *)AttackPlaintext)),
-		   return EXIT_FAILURE,
 		   "AttackPlaintext and UnpaddedPlaintext unequal!")
 	printf("%s", AttackPlaintext);
 }

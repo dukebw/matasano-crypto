@@ -28,7 +28,7 @@ Base64ToUInt(char Base64Digit)
     } else if (Base64Digit == '/') {
         return 63;
     }
-    Stopif(true, return -1, "Bad Base64Digit passed to Base64ToUint");
+    Stopif(true, "Bad Base64Digit passed to Base64ToUint");
 }
 
 #if 1
@@ -36,13 +36,13 @@ int main()
 {
     // NOTE(brendan): expecting base 64 cipher
     char *Cipher = getenv("CIPHER");
-    Stopif(!Cipher, return -1, "No CIPHER env variable");
+    Stopif(!Cipher, "No CIPHER env variable");
     uint32 CipherLength = strlen(Cipher);
     // NOTE(brendan): Note that here we force the CIPHER to be byte-aligned,
     // i.e. the number of base64 characters is a multiple of 4. Otherwise we
     // would have to take into account padding characters '=' and '==', or
     // just read the characters from left to right.
-    Stopif(CipherLength % 4 == 1, return -2, "Bad CipherLength (should be padded)");
+    Stopif((CipherLength % 4) == 1, "Bad CipherLength (should be padded)");
 
     // NOTE(brendan): length needed to store ByteCipher corresponding to
     // Base64Cipher. Last element should be 0

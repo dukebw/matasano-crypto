@@ -4,7 +4,7 @@ internal char *
 StripPkcs7Padding(char *PaddedString)
 {
 	char *Result = 0;
-	Stopif(PaddedString == 0, return 0, "Null input to StripPkcs7Padding");
+	Stopif(PaddedString == 0, "Null input to StripPkcs7Padding");
 
 	u32 PaddedStringLength = strlen(PaddedString);
 	if ((PaddedStringLength % AES_128_BLOCK_LENGTH_BYTES) == 0)

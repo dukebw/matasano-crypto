@@ -14,8 +14,7 @@ int main(int argc, char **argv)
         char *Base16StringA = argv[1];
         char *Base16StringB = argv[2];
         uint32 Length = strlen(Base16StringA);
-        Stopif(Length != strlen(Base16StringB), return -1,
-               "Strings not of equal length.\n");
+        Stopif(Length != strlen(Base16StringB), "Strings not of equal length.\n");
         uint32 InputBufferLength = strlen(Base16StringA);
         char FixedXORResult[InputBufferLength + 1];
         XORStrings(FixedXORResult, Base16StringA, Base16StringB, Length);

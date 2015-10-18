@@ -1,3 +1,3 @@
 #!/bin/bash
 ctags -R .
-P=pkcs7_padding_validation make
+P=cbc_bitflipping_attack make

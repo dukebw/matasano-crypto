@@ -83,7 +83,7 @@ int Base16ToInteger(char Value)
     } else if ((Value >= '0') && (Value <= '9')) {
         return Value - '0';
     } else {
-        Stopif(true, return -1, "Bad char passed to Base16ToInteger");
+        Stopif(true, "Bad char passed to Base16ToInteger");
     }
 }
 

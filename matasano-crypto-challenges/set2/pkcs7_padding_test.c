@@ -9,7 +9,7 @@ Pkcs7PaddingVecsPass(pkcs7_padding_vec *PaddingTestVec, u32 PaddingVecCount)
 {
 	b32 Result = true;
 
-	Stopif(PaddingTestVec == 0, return false, "Null input to Pkcs7PaddingVecsPass");
+	Stopif(PaddingTestVec == 0, "Null input to Pkcs7PaddingVecsPass");
 	
 	for (u32 PaddingTestVecIndex = 0;
 		 PaddingTestVecIndex < PaddingVecCount;

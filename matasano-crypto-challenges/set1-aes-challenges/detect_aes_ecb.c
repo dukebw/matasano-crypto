@@ -7,7 +7,7 @@ global_variable char GlobalInputBuff[MAX_LINE_LENGTH];
 int main()
 {
 	FILE *InputFile = fopen("8.txt", "r");
-	Stopif(!InputFile, return EXIT_FAILURE, "No such file");
+	Stopif(!InputFile, "No such file");
 	u32 MaxEqualBlocksCount = 0;
 	u32 MaxEqualBlocksIndex = 0;
 	u32 BlocksEqualCount = 0;
@@ -17,9 +17,8 @@ int main()
 	{
 		u32 HexDigitCount = strlen(GlobalInputBuff) - 1;
 
-		Stopif((HexDigitCount + 1) >= MAX_LINE_LENGTH, return EXIT_FAILURE, "Input lines too long");
+		Stopif((HexDigitCount + 1) >= MAX_LINE_LENGTH, "Input lines too long");
 		Stopif((HexDigitCount % (2*AES_128_BLOCK_LENGTH_BYTES)) != 0,
-			   return EXIT_FAILURE,
 			   "Bad length of input: must be blocks of 16 bytes");
 		for (u32 FirstBlockIndex = 0;
 			 FirstBlockIndex < (HexDigitCount/AES_128_BLOCK_HEX_DIGITS - 1);
