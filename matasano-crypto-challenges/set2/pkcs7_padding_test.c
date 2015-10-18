@@ -31,7 +31,7 @@ internal MIN_UNIT_TEST_FUNC(TestPkcs7PaddingVecs)
 {
 	char *Result = 0;
 	Result = MinUnitAssert("Expected/Actual mismatch in Pkcs7PaddingVecsPass()",
-						   Pkcs7PaddingVecsPass(Pkcs7PaddingVecs, ArrayLength(Pkcs7PaddingVecs)));
+						   Pkcs7PaddingVecsPass(Pkcs7PaddingVecs, ARRAY_LENGTH(Pkcs7PaddingVecs)));
 	return Result;
 }
 

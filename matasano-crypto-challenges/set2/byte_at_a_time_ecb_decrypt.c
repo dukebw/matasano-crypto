@@ -80,7 +80,7 @@ int main()
 	u8 DictionaryMessage[AES_128_BLOCK_LENGTH_BYTES];
 	memset(DictionaryMessage, 'B', sizeof(DictionaryMessage));
 
-	u8 MarkerCipherBlock[AES_128_BLOCK_LENGTH_BYTES];
+	u8 MarkerCipherBlock[2*AES_128_BLOCK_LENGTH_BYTES];
 	OracleFunction(MarkerCipherBlock, DictionaryMessage, sizeof(MarkerCipherBlock));
 
 	u8 OracleByteDictionary[POSSIBLE_BYTE_COUNT*AES_128_BLOCK_LENGTH_BYTES];

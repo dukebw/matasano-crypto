@@ -16,3 +16,4 @@ pkcs7_padding_test:$(CRYPTO_IMPL)/aes.h
 byte_at_a_time_ecb_decrypt:$(CRYPTO_IMPL)/crypt_helper.h $(CRYPTO_IMPL)/aes.h
 ecb_cbc_oracle:$(CRYPTO_IMPL)/aes.h $(CRYPTO_IMPL)/crypt_helper.h
 cbc_bitflipping_attack:$(CRYPTO_IMPL)/aes.h $(CRYPTO_IMPL)/crypt_helper.h
+pkcs7_padding_validation:$(CRYPTO_IMPL)/aes.h $(CRYPTO_IMPL)/crypt_helper.h

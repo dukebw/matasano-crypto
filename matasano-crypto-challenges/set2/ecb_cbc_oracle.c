@@ -47,14 +47,8 @@ int main()
 	}
 
 	u32 PaddedMsgBlockCount;
-	if ((AppendedMessageLength % AES_128_BLOCK_LENGTH_BYTES) == 0)
-	{
-		PaddedMsgBlockCount = (AppendedMessageLength/AES_128_BLOCK_LENGTH_BYTES);
-	}
-	else
-	{
-		PaddedMsgBlockCount = (AppendedMessageLength/AES_128_BLOCK_LENGTH_BYTES + 1);
-	}
+	PaddedMsgBlockCount = (AppendedMessageLength/AES_128_BLOCK_LENGTH_BYTES);
+	PaddedMsgBlockCount = (AppendedMessageLength/AES_128_BLOCK_LENGTH_BYTES + 1);
 
 	if (CipherIsEcbEncryptedBlock(Cipher, PaddedMsgBlockCount))
 	{
