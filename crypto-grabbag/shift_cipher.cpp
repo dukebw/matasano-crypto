@@ -11,10 +11,10 @@
 int main()
 {
     char *Message = getenv("MESSAGE");
-    Stopif(!Message, return -1, "No message env variable");
+    Stopif(!Message, "No message env variable");
     char *ShiftString = getenv("KEY");
-    Stopif(!ShiftString, return -1, "No shift env variable");
-    Stopif(!isalpha(*ShiftString), return -1, "Bad key");
+    Stopif(!ShiftString, "No shift env variable");
+    Stopif(!isalpha(*ShiftString), "Bad key");
 
     uint32 ShiftAmount = tolower(*ShiftString) - 'a';
     uint32 MessageLength = strlen(Message);

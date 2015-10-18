@@ -8,14 +8,14 @@ AesCbcModeVecsPass(aes_cbc_mode_vec *AesCbcTestVec, u32 AesCbcTestVecCount)
 {
 	b32 Result = true;
 
-	Stopif(AesCbcTestVec == 0, return false, "Null input to AesCbcModeVecsPass");
+	Stopif(AesCbcTestVec == 0, "Null input to AesCbcModeVecsPass");
 	
 	for (u32 AesCbcTestVecIndex = 0;
 		 AesCbcTestVecIndex < AesCbcTestVecCount;
 		 ++AesCbcTestVecIndex, ++AesCbcTestVec)
 	{
 		aes_test_vector *AesTestVec = &AesCbcTestVec->AesVector;
-		Stopif(AesTestVec->MessageLength > AES_TEST_MAX_MSG_SIZE, return false, "Test vector length too large");
+		Stopif(AesTestVec->MessageLength > AES_TEST_MAX_MSG_SIZE, "Test vector length too large");
 
 		// NOTE(bwd): test encrypt/decrypt in place
 		memcpy(GlobalAesCbcTestScratch, AesTestVec->Message, AesTestVec->MessageLength);

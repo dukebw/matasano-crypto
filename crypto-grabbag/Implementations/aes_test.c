@@ -6,15 +6,17 @@ global_variable u8 GlobalScratch[AES_TEST_MAX_MSG_SIZE];
 internal b32
 AesVectorsPass(aes_test_vector *TestVector, u32 VectorCount)
 {
-	Stopif(TestVector == 0, return false, "Null input to TestAesVectors");
+	Stopif(TestVector == 0, "Null input to TestAesVectors");
 	b32 Result = true;
 	for (u32 TestVecIndex = 0;
 		 TestVecIndex < VectorCount;
 		 ++TestVecIndex, ++TestVector)
 	{
-		Stopif(TestVector->MessageLength > AES_TEST_MAX_MSG_SIZE, return false, "Test vector length too large");
+		Stopif(TestVector->MessageLength > AES_TEST_MAX_MSG_SIZE, "Test vector length too large");
 
-		AesEcbEncrypt(GlobalScratch, TestVector->Message, TestVector->MessageLength,
+		// NOTE(bwd): Test encrypt/decrypt in place
+		memcpy(GlobalScratch, TestVector->Message, TestVector->MessageLength);
+		AesEcbEncrypt(GlobalScratch, GlobalScratch, TestVector->MessageLength,
 					  TestVector->Key, TestVector->KeyLength);
 		Result = VectorsEqual(GlobalScratch, TestVector->Cipher, TestVector->MessageLength);
 		if (Result == false)
@@ -22,7 +24,8 @@ AesVectorsPass(aes_test_vector *TestVector, u32 VectorCount)
 			break;
 		}
 
-		AesEcbDecrypt(GlobalScratch, TestVector->Cipher, TestVector->MessageLength,
+		memcpy(GlobalScratch, TestVector->Cipher, TestVector->MessageLength);
+		AesEcbDecrypt(GlobalScratch, GlobalScratch, TestVector->MessageLength,
 					  TestVector->Key, TestVector->KeyLength);
 		Result = VectorsEqual(GlobalScratch, TestVector->Message, TestVector->MessageLength);
 		if (Result == false)

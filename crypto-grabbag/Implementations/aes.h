@@ -18,7 +18,6 @@
 // TODO(brendan): use struct context instead of global state
 global_variable u8 GlobalStateArray[ROW_COUNT_NK*COL_COUNT_NB];
 global_variable u32 GlobalKeySchedule[(NUMBER_OF_ROUNDS + 1)*COL_COUNT_NB];
-global_variable u8 GlobalAesScratch[AES_128_BLOCK_LENGTH_BYTES];
 
 global_variable u8 SBox[] =
 {
@@ -146,7 +145,7 @@ internal inline u8
 MultiplyByPowerOfX(u8 ByteValue, u32 Power)
 {
 	u8 Result = ByteValue;
-	Stopif(Power >= 8, return 0xFF, "Power of X too high");
+	Stopif(Power >= 8, "Power of X too high");
 	for (u32 PowerIndex = 0;
 		 PowerIndex < Power;
 		 ++PowerIndex)
@@ -159,7 +158,7 @@ MultiplyByPowerOfX(u8 ByteValue, u32 Power)
 internal inline u8
 MultiplyByCoefficient(u8 Value, u8 Coefficient)
 {
-	Stopif(Coefficient & 0xF0, return 0xFF, "Invalid coefficient in MultiplyByCoefficient");
+	Stopif(Coefficient & 0xF0, "Invalid coefficient in MultiplyByCoefficient");
 	u8 Result = 0;
 	if (Coefficient & 0x1)
 	{
@@ -200,7 +199,7 @@ Word(u8 A, u8 B, u8 C, u8 D)
 internal void
 AddRoundKey(u8 *StateArray, u32 *KeySchedule)
 {
-	Stopif((StateArray == 0) || (KeySchedule == 0), return, "Null inputs to AddRoundKey()");
+	Stopif((StateArray == 0) || (KeySchedule == 0), "Null inputs to AddRoundKey()");
 	for (u32 RoundKeyIndex = 0;
 		 RoundKeyIndex < COL_COUNT_NB;
 		 ++RoundKeyIndex)
@@ -231,10 +230,8 @@ RotateWordRight(u32 Word, i32 Amount)
 internal inline void
 ShiftRowsInternal(u8 *StateArray, i32 InverseMultiplier)
 {
-	Stopif(StateArray == 0, return, "Null input to SubBytes()");
-	Stopif((InverseMultiplier != -1) && (InverseMultiplier != 1),
-		   return,
-		   "Invalid value for InverseMultiplier");
+	Stopif(StateArray == 0, "Null input to SubBytes()");
+	Stopif((InverseMultiplier != -1) && (InverseMultiplier != 1), "Invalid value for InverseMultiplier");
 	// s[r][c] = s[r][c + shift(r, Nb) mod Nb] for 0 < r < 4 and 0 <= c < Nb
 	// where shift(n, 4) == n
 	for (u32 RowIndex = 1;
@@ -278,7 +275,7 @@ SubstituteWord(u32 Word)
 internal inline void
 SubBytesInternal(u8 *StateArray, u32 Length, u8 *SBoxInternal)
 {
-	Stopif(StateArray == 0, return, "Null input to SubBytes/InverseSubBytes()");
+	Stopif(StateArray == 0, "Null input to SubBytes/InverseSubBytes()");
 	// 1.	Take the multiplicative inverse in the finite field GF(2^8).
 	// 2.	Apply the following affine transformation over GF(2):
 	//		b[i] = b[i] ^ b[(i + 4) mod 8] ^ b[(i + 5) mod 8] ^ b[(i + 6) mod 8] ^
@@ -308,7 +305,7 @@ InverseSubBytes(u8 *StateArray, u32 Length)
 internal void
 MixColumnsInternal(u8 *StateArray, u32 Coefficients)
 {
-	Stopif(StateArray == 0, return, "Null input to MixColumns");
+	Stopif(StateArray == 0, "Null input to MixColumns");
 	// Columns are considered as four-term polynomials over GF(2^8) and multiplied
 	// modulo x^4 + 1 with fixed polynomial a(x) = 3x^3 + x^2 + x + 2.
 	for (u32 ColumnOffset = 0;
@@ -353,7 +350,7 @@ InverseMixColumns(u8 *StateArray)
 internal void
 CreateKeySchedule(u32 *KeySchedule, u32 KeyScheduleLength, u8 *Key, u32 KeyLength)
 {
-	Stopif((Key == 0) || (KeySchedule == 0), return, "Null input passed to CreateKeySchedule()");
+	Stopif((Key == 0) || (KeySchedule == 0), "Null input passed to CreateKeySchedule()");
 	memcpy(KeySchedule, Key, KeyLength);
 	for (u32 KeyIndex = ROW_COUNT_NK;
 		 KeyIndex < KeyScheduleLength;
@@ -376,8 +373,8 @@ CreateKeySchedule(u32 *KeySchedule, u32 KeyScheduleLength, u8 *Key, u32 KeyLengt
 internal void
 AesEncryptBlock(u8 *Cipher, u8 *Message, u8 *Key, u32 KeyLength)
 {
-	Stopif((Cipher == 0) || (Message == 0) || (Key == 0), return, "Null input to AesEncrypt()");
-	Stopif(KeyLength != KEY_LENGTH_BYTES, return, "Invalid key length");
+	Stopif((Cipher == 0) || (Message == 0) || (Key == 0), "Null input to AesEncrypt()");
+	Stopif(KeyLength != KEY_LENGTH_BYTES, "Invalid key length");
 
 	// KeyExpansion(byte key[4*Nk], word w[Nb*(Nr + 1)], Nk)
 	CreateKeySchedule(GlobalKeySchedule, ArrayLength(GlobalKeySchedule), Key, KeyLength);
@@ -408,9 +405,9 @@ AesEncryptBlock(u8 *Cipher, u8 *Message, u8 *Key, u32 KeyLength)
 internal void
 AesDecryptBlock(u8 *Message, u8 *Cipher, u32 CipherLength, u8 *Key, u32 KeyLength)
 {
-	Stopif((Cipher == 0) || (Message == 0) || (Key == 0), return, "Null input to AesDecryptBlock()");
-	Stopif(CipherLength < COL_COUNT_NB*ROW_COUNT_NK, return, "Bad cipher block size");
-	Stopif(KeyLength != KEY_LENGTH_BYTES, return, "Invalid key length");
+	Stopif((Cipher == 0) || (Message == 0) || (Key == 0), "Null input to AesDecryptBlock()");
+	Stopif(CipherLength < COL_COUNT_NB*ROW_COUNT_NK, "Bad cipher block size");
+	Stopif(KeyLength != KEY_LENGTH_BYTES, "Invalid key length");
 
 	// KeyExpansion(byte key[4*Nk], word w[Nb*(Nr + 1)], Nk)
 	CreateKeySchedule(GlobalKeySchedule, ArrayLength(GlobalKeySchedule), Key, KeyLength);
@@ -446,7 +443,7 @@ internal u32
 Pkcs7Pad(u8 *PaddedMessage, u8 *Message, u32 MessageLength)
 {
 	u32 PaddedLength = MessageLength;
-	Stopif((PaddedMessage == 0) || (Message == 0), return 0xFFFFFFFF, "Null input to Pkcs7Pad()");
+	Stopif((PaddedMessage == 0) || (Message == 0), "Null input to Pkcs7Pad()");
 
 	if (PaddedMessage != Message)
 	{
@@ -482,27 +479,25 @@ XorVectorsUnchecked(u8 *Dest, u8 *A, u8 *B, u32 Length)
 internal void
 AesCbcEncrypt(u8 *Cipher, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength, u8 *Iv)
 {
-	Stopif((Message == 0) || (Cipher == 0) || (Key == 0) || (Iv == 0),
-		   return,
-		   "Null inputs to AesCbcEncrypt");
-	Stopif(KeyLength != KEY_LENGTH_BYTES, return, "Only AES-128 is supported");
-	Stopif(MessageLength == 0, return, "AesCbcEncrypt - Message of length 0");
+	Stopif((Message == 0) || (Cipher == 0) || (Key == 0) || (Iv == 0), "Null inputs to AesCbcEncrypt");
+	Stopif(KeyLength != KEY_LENGTH_BYTES, "Only AES-128 is supported");
+	Stopif(MessageLength == 0, "AesCbcEncrypt - Message of length 0");
 
 	u32 PaddedMsgLength = Pkcs7Pad(Message, Message, MessageLength);
 
-	XorVectorsUnchecked(GlobalAesScratch, Message, Iv, AES_128_BLOCK_LENGTH_BYTES);
-	AesEncryptBlock(Cipher, GlobalAesScratch, Key, KeyLength);
+	XorVectorsUnchecked(Cipher, Message, Iv, AES_128_BLOCK_LENGTH_BYTES);
+	AesEncryptBlock(Cipher, Cipher, Key, KeyLength);
 
 	for (u32 MessageBlockIndex = 1;
 		 MessageBlockIndex < PaddedMsgLength/AES_128_BLOCK_LENGTH_BYTES;
 		 ++MessageBlockIndex)
 	{
 		u32 MessageIndexBytes = MessageBlockIndex*AES_128_BLOCK_LENGTH_BYTES;
-		XorVectorsUnchecked(GlobalAesScratch,
+		XorVectorsUnchecked(Cipher + MessageIndexBytes,
 							Message + MessageIndexBytes,
 							Cipher + (MessageBlockIndex - 1)*AES_128_BLOCK_LENGTH_BYTES,
 							AES_128_BLOCK_LENGTH_BYTES);
-		AesEncryptBlock(Cipher + MessageIndexBytes, GlobalAesScratch, Key, KeyLength);
+		AesEncryptBlock(Cipher + MessageIndexBytes, Cipher + MessageIndexBytes, Key, KeyLength);
 	}
 }
 
@@ -516,7 +511,7 @@ FindPaddedLength(u32 MessageLength)
 		Result += AES_128_BLOCK_LENGTH_BYTES - MessageModBlock;
 	}
 
-	Stopif((Result % AES_128_BLOCK_LENGTH_BYTES) != 0, return 0, "FindPaddedLength output invalid byte-length");
+	Stopif((Result % AES_128_BLOCK_LENGTH_BYTES) != 0, "FindPaddedLength output invalid byte-length");
 
 	return Result;
 }
@@ -524,19 +519,17 @@ FindPaddedLength(u32 MessageLength)
 internal void
 AesCbcDecrypt(u8 *Message, u8 *Cipher, u32 MessageLength, u8 *Key, u32 KeyLength, u8 *Iv)
 {
-	Stopif((Message == 0) || (Cipher == 0) || (Key == 0) || (Iv == 0),
-		   return,
-		   "Null inputs to AesCbcDecrypt");
-	Stopif(KeyLength != KEY_LENGTH_BYTES, return, "Only AES-128 is supported");
-	Stopif(MessageLength == 0, return, "AesCbcDecrypt - Message of length 0");
+	Stopif((Message == 0) || (Cipher == 0) || (Key == 0) || (Iv == 0), "Null inputs to AesCbcDecrypt");
+	Stopif(KeyLength != KEY_LENGTH_BYTES, "Only AES-128 is supported");
+	Stopif(MessageLength == 0, "AesCbcDecrypt - Message of length 0");
 
 	u32 PaddedMsgLength = FindPaddedLength(MessageLength);
 
 	u32 PaddedBlockCount = PaddedMsgLength/AES_128_BLOCK_LENGTH_BYTES;
-	Stopif(PaddedBlockCount < 1, return, "Invalid block count in AesCbcDecrypt");
+	Stopif(PaddedBlockCount < 1, "Invalid block count in AesCbcDecrypt");
 
-	for (i32 MessageBlockIndex = (PaddedBlockCount - 1);
-		 MessageBlockIndex >= 0;
+	for (u32 MessageBlockIndex = (PaddedBlockCount - 1);
+		 MessageBlockIndex > 0;
 		 --MessageBlockIndex)
 	{
 		u32 MessageIndexBytes = MessageBlockIndex*AES_128_BLOCK_LENGTH_BYTES;
@@ -556,9 +549,9 @@ AesCbcDecrypt(u8 *Message, u8 *Cipher, u32 MessageLength, u8 *Key, u32 KeyLength
 internal void
 AesEcbEncrypt(u8 *Cipher, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength)
 {
-	Stopif((Message == 0) || (Cipher == 0) || (Key == 0), return, "Null inputs to AesCbcEncrypt");
-	Stopif(KeyLength != KEY_LENGTH_BYTES, return, "Only AES-128 is supported");
-	Stopif(MessageLength == 0, return, "AesEcbEncrypt - Message of length 0");
+	Stopif((Message == 0) || (Cipher == 0) || (Key == 0), "Null inputs to AesCbcEncrypt");
+	Stopif(KeyLength != KEY_LENGTH_BYTES, "Only AES-128 is supported");
+	Stopif(MessageLength == 0, "AesEcbEncrypt - Message of length 0");
 
 	u32 PaddedMsgLength = Pkcs7Pad(Message, Message, MessageLength);
 
@@ -574,9 +567,9 @@ AesEcbEncrypt(u8 *Cipher, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength
 internal void
 AesEcbDecrypt(u8 *Message, u8 *Cipher, u32 MessageLength, u8 *Key, u32 KeyLength)
 {
-	Stopif((Message == 0) || (Cipher == 0) || (Key == 0), return, "Null inputs to AesCbcEncrypt");
-	Stopif(KeyLength != KEY_LENGTH_BYTES, return, "Only AES-128 is supported");
-	Stopif(MessageLength == 0, return, "AesEcbDecrypt - Message of length 0");
+	Stopif((Message == 0) || (Cipher == 0) || (Key == 0), "Null inputs to AesCbcEncrypt");
+	Stopif(KeyLength != KEY_LENGTH_BYTES, "Only AES-128 is supported");
+	Stopif(MessageLength == 0, "AesEcbDecrypt - Message of length 0");
 
 	u32 PaddedMsgLength = FindPaddedLength(MessageLength);
 

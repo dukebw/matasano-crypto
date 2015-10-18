@@ -11,7 +11,7 @@ int main()
     // TODO(brendan): convert to base 256
     uint8 CipherBase64[MAX_MSG_LENGTH];
     FILE *InputFile = fopen("7_no_space.txt", "r");
-    Stopif(!InputFile, return EXIT_FAILURE, "No such file");
+    Stopif(!InputFile, "No such file");
     uint32 CipherIndex;
     for (CipherIndex = 0;
          (CipherBase64[CipherIndex] = fgetc(InputFile)) != (uint8)EOF;

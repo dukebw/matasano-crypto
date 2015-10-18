@@ -11,10 +11,10 @@
 int main()
 {
     char *Message = getenv("MESSAGE");
-    Stopif(!Message, return -1, "No message env variable");
+    Stopif(!Message, "No message env variable");
     uint32 MessageLength = strlen(Message);
     char *Key = getenv("KEY");
-    Stopif(!Key, return -1, "No shift env variable");
+    Stopif(!Key, "No shift env variable");
     uint32 KeyLength = strlen(Key);
 
     char Ciphertext[MessageLength + 1];

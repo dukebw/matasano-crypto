@@ -15,7 +15,7 @@
 int main()
 {
     char *Cipher = getenv("CIPHER");
-    Stopif(!Cipher, return -1, "No CIPHER env variable");
+    Stopif(!Cipher, "No CIPHER env variable");
     uint32 CipherLength = strlen(Cipher);
     
     uint32 CharCounts[ALPHABET_SIZE] = {};

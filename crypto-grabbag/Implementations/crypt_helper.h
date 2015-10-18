@@ -4,6 +4,9 @@
 #include "allheads.h"
 #include "aes.h"
 #include "min_unit.h"
+#include "compile_assert.h"
+
+CASSERT(RAND_MAX <= UINT32_MAX, crypt_helper_h);
 
 #pragma GCC diagnostic ignored "-Wunused-function"
 
@@ -20,7 +23,7 @@ global_variable real32 LetterFrequencies[] =
 internal b32
 VectorsEqual(void *A, void *B, u32 Length)
 {
-	Stopif((A == 0) || (B == 0), return false, "Null input to VectorsEqual");
+	Stopif((A == 0) || (B == 0), "Null input to VectorsEqual");
 	u32 Result = true;
 	u8 *AByteVec = (u8 *)A;
 	u8 *BByteVec = (u8 *)B;
@@ -45,7 +48,6 @@ ShiftChar(u32 ToShiftChar, u32 ShiftAmount)
     // TODO(brendan): more checking
     Stopif(!(((ToShiftChar <= 'Z') && (ToShiftChar >= 'A')) ||
              ((ToShiftChar <= 'z') && (ToShiftChar >= 'a'))),
-           return -1,
            "Bad input char");
     u32 Result;
     u32 PreModChar = tolower(ToShiftChar) + ShiftAmount;
@@ -123,14 +125,14 @@ Base64ToUInt(u8 Base64Digit)
     {
         return 63;
     }
-    Stopif(true, return -1, "Bad Base64Digit passed to Base64ToUint");
+    Stopif(true, "Bad Base64Digit passed to Base64ToUint");
 }
 
 internal u32
 Base64ToAscii(u8 *AsciiString, u8 *Base64String, u32 Base64StringLength)
 {
-	Stopif((AsciiString == 0) || (Base64String == 0), return 0xFFFFFFFF, "Null input to Base64ToAscii");
-	Stopif((Base64StringLength % 4) == 1, return 0xFFFFFFFF, "Bad Base64StringLength (ends in 6 bits)");
+	Stopif((AsciiString == 0) || (Base64String == 0), "Null input to Base64ToAscii");
+	Stopif((Base64StringLength % 4) == 1, "Bad Base64StringLength (ends in 6 bits)");
 
 	// 10101010 1010_1010 1010_1010
 	// 101010
@@ -256,7 +258,7 @@ Base16ToInteger(i32 Value)
     }
 	else
 	{
-        Stopif(true, return -1, "Bad char passed to Base16ToInteger");
+        Stopif(true, "Bad char passed to Base16ToInteger");
     }
 	return Result;
 }
@@ -281,10 +283,10 @@ HexStringToByteArray(u8 *Result, char *HexString, u32 Length)
 internal u32
 FileRead(u8 *OutputBuffer, char *FileName, u32 MaxLength)
 {
-	Stopif((OutputBuffer == 0) || (FileName == 0), return 0, "Null inputs to FileReadIgnoreSpace()");
+	Stopif((OutputBuffer == 0) || (FileName == 0), "Null inputs to FileReadIgnoreSpace()");
 
     FILE *InputFile = fopen(FileName, "r");
-    Stopif(!InputFile, return EXIT_FAILURE, "FileRead: No such file");
+    Stopif(!InputFile, "FileRead: No such file");
 
 	u32 ResultSize = fread(OutputBuffer, 1, MaxLength, InputFile);
 
@@ -296,9 +298,9 @@ FileRead(u8 *OutputBuffer, char *FileName, u32 MaxLength)
 internal u32
 FileReadIgnoreSpace(u8 *OutputBuffer, char *FileName, u32 MaxLength)
 {
-	Stopif((OutputBuffer == 0) || (FileName == 0), return 0, "Null inputs to FileReadIgnoreSpace()");
+	Stopif((OutputBuffer == 0) || (FileName == 0), "Null inputs to FileReadIgnoreSpace()");
     FILE *InputFile = fopen(FileName, "r");
-    Stopif(!InputFile, return EXIT_FAILURE, "FileReadIgnoreSpace: No such file");
+    Stopif(!InputFile, "FileReadIgnoreSpace: No such file");
 
     u32 OutBuffIndex = 0;
     for (u8 InputChar;
@@ -328,12 +330,30 @@ GenRandUnchecked(u32 *RandOut, u32 LengthInWords)
 	}
 }
 
+internal inline void
+GenRandBytesUnchecked(u8 *RandOut, u32 LengthInBytes)
+{
+	u32 WordsInRandOut = LengthInBytes/sizeof(u32);
+	GenRandUnchecked((u32 *)RandOut, WordsInRandOut);
+
+	u32 WordsInRandOutByteLength = sizeof(u32)*WordsInRandOut ;
+	u32 RemainingBytes = LengthInBytes - WordsInRandOutByteLength;
+	Stopif(RemainingBytes >= sizeof(u32), "Invalid remaining bytes GenRandBytesUnchecked");
+
+	for (u32 RandOutByteIndex = 0;
+		 RandOutByteIndex < RemainingBytes;
+		 ++RandOutByteIndex)
+	{
+		RandOut[WordsInRandOutByteLength + RandOutByteIndex] = rand() & 0xFF;
+	}
+}
+
 internal b32
 CipherIsEcbEncryptedBlock(u8 *Cipher, u32 BlockCount)
 {
 	b32 Result = false;
 
-	Stopif(Cipher == 0, return false, "Null input to CipherIsEcbEncrypted");
+	Stopif(Cipher == 0, "Null input to CipherIsEcbEncrypted");
 
 	for (u32 FirstBlockIndex = 0;
 		 FirstBlockIndex < (BlockCount - 1);
@@ -361,7 +381,7 @@ CipherIsEcbEncrypted(u8 *Cipher, u32 CipherLength)
 {
 	b32 Result;
 
-	Stopif(Cipher == 0, return false, "Null input to CipherIsEcbEncrypted");
+	Stopif(Cipher == 0, "Null input to CipherIsEcbEncrypted");
 
 	Result = CipherIsEcbEncryptedBlock(Cipher, CipherLength/AES_128_BLOCK_LENGTH_BYTES);
 

@@ -21,7 +21,7 @@ MinUnitAssert(b32 Test, char *Message)
 internal void
 MinUnitRunTest(min_unit_test_func *TestFunction)
 {
-	Stopif(TestFunction == 0, return, "Null input to MinUnitRunTest");
+	Stopif(TestFunction == 0, "Null input to MinUnitRunTest");
 	++MinUnitGlobalTestsRun;
 	TestFunction();
 }

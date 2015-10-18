@@ -51,12 +51,12 @@ int main()
 {
     // NOTE(brendan): BIG ENDIAN
     char *Message = getenv("MESSAGE");
-    Stopif(!Message, return -1, "No MESSAGE env variable");
+    Stopif(!Message, "No MESSAGE env variable");
     uint64 MessageLength = strlen(Message);
     // NOTE(brendan): ensure message is less than 2^64 bits long
     // TODO(brendan): only catches bad message length when message length in
     // bytes can be help in a uint64; fix
-    Stopif(MessageLength >= pow(2, 61), return -1, "Input too long");
+    Stopif(MessageLength >= pow(2, 61), "Input too long");
 
     // NOTE(brendan): We're assuming that the message comes in byte-sized
     // chunks
