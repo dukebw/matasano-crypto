@@ -581,4 +581,12 @@ AesEcbDecrypt(u8 *Message, u8 *Cipher, u32 MessageLength, u8 *Key, u32 KeyLength
 	}
 }
 
+// TODO(bwd):
+#if 0
+internal u32
+AesCtrMode(u8 *Output, u8 *Input, u32 MessageLength, u8 *Key, u8 *Nonce)
+{
+}
+#endif
+
 #endif // AES_H
