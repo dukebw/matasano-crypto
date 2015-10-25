@@ -51,7 +51,7 @@ const char *PLAINTEXT_ARRAY[] =
 	PLAINTEXT_23, PLAINTEXT_24, PLAINTEXT_25, PLAINTEXT_26, PLAINTEXT_27, PLAINTEXT_28, PLAINTEXT_29,
 	PLAINTEXT_30, PLAINTEXT_31, PLAINTEXT_32, PLAINTEXT_33, PLAINTEXT_34, PLAINTEXT_35, PLAINTEXT_36,
 	PLAINTEXT_37, PLAINTEXT_38, PLAINTEXT_39, PLAINTEXT_40
-}
+};
 
 const u32 PLAINTEXT_LENGTH_ARRAY[] =
 {
@@ -65,21 +65,67 @@ const u32 PLAINTEXT_LENGTH_ARRAY[] =
 	STR_LEN(PLAINTEXT_29), STR_LEN(PLAINTEXT_30), STR_LEN(PLAINTEXT_31), STR_LEN(PLAINTEXT_32),
 	STR_LEN(PLAINTEXT_33), STR_LEN(PLAINTEXT_34), STR_LEN(PLAINTEXT_35), STR_LEN(PLAINTEXT_36),
 	STR_LEN(PLAINTEXT_37), STR_LEN(PLAINTEXT_38), STR_LEN(PLAINTEXT_39), STR_LEN(PLAINTEXT_40)
-}
+};
 
 internal MIN_UNIT_TEST_FUNC(TestBreakFixedNonceCtr)
 {
+	u8 Key[AES_128_BLOCK_LENGTH_BYTES];
+	GenRandUnchecked((u32 *)Key, sizeof(Key)/sizeof(u32));
+
 	u8 CiphertextArray[ARRAY_LENGTH(PLAINTEXT_ARRAY)*MAX_PT_LENGTH];
 	u8 NonceCounter[AES_128_BLOCK_LENGTH_BYTES] = {0};
+	u32 SmallestPtLength = UINT32_MAX;
 	for (u32 PlaintextArrayIndex = 0;
 		 PlaintextArrayIndex < ARRAY_LENGTH(PLAINTEXT_ARRAY);
 		 ++PlaintextArrayIndex)
 	{
 		u8 *NextCiphertext = CiphertextArray + PlaintextArrayIndex*MAX_PT_LENGTH;
-		Base64ToAscii(NextCiphertext, PLAINTEXT_ARRAY[PlaintextArrayIndex],
-					  PLAINTEXT_LENGTH_ARRAY[PlaintextArrayIndex]);
-		AesCtrMode(NextCiphertext, NextCiphertext, u32 MessageLength, u8 *Key, u8 *NonceCounter);
+		u32 NextAsciiPtLength = Base64ToAscii(NextCiphertext, (u8 *)PLAINTEXT_ARRAY[PlaintextArrayIndex],
+											  PLAINTEXT_LENGTH_ARRAY[PlaintextArrayIndex]);
+		AesCtrMode(NextCiphertext, NextCiphertext, NextAsciiPtLength, Key, NonceCounter);
 		memset(NonceCounter, 0, sizeof(NonceCounter));
+
+		if (NextAsciiPtLength < SmallestPtLength)
+		{
+			SmallestPtLength = NextAsciiPtLength;
+		}
+	}
+	Stopif(SmallestPtLength == 0, "Smallest plaintext has no length!");
+
+	u8 DecryptedKey[SmallestPtLength];
+	u8 DecryptedPlaintextArray[sizeof(CiphertextArray)];
+	for (u32 DecryptedKeyIndex = 0;
+		 DecryptedKeyIndex < SmallestPtLength;
+		 ++DecryptedKeyIndex)
+	{
+		u8 NextBlockSameKeyByte[ARRAY_LENGTH(PLAINTEXT_ARRAY)];
+		for (u32 CiphertextArrayIndex = 0;
+			 CiphertextArrayIndex < ARRAY_LENGTH(PLAINTEXT_ARRAY);
+			 ++CiphertextArrayIndex)
+		{
+			NextBlockSameKeyByte[CiphertextArrayIndex] =
+				CiphertextArray[CiphertextArrayIndex*MAX_PT_LENGTH + DecryptedKeyIndex];
+		}
+		DecryptedKey[DecryptedKeyIndex] = ByteCipherAsciiDecode(NextBlockSameKeyByte,
+																ARRAY_LENGTH(PLAINTEXT_ARRAY));
+	}
+
+	for (u32 DecryptedPtIndex = 0;
+		 DecryptedPtIndex < ARRAY_LENGTH(PLAINTEXT_ARRAY);
+		 ++DecryptedPtIndex)
+	{
+		u8 *NextDecryptedPt = DecryptedPlaintextArray + DecryptedPtIndex*MAX_PT_LENGTH;
+		XorVectorsUnchecked(NextDecryptedPt, CiphertextArray + DecryptedPtIndex*MAX_PT_LENGTH,
+							DecryptedKey, SmallestPtLength);
+
+		u8 AsciiPlaintextScratch[PLAINTEXT_LENGTH_ARRAY[DecryptedPtIndex]];
+		Base64ToAscii(AsciiPlaintextScratch, (u8 *)PLAINTEXT_ARRAY[DecryptedPtIndex],
+					  PLAINTEXT_LENGTH_ARRAY[DecryptedPtIndex]);
+
+		MinUnitAssert(VectorsEqual((void *)AsciiPlaintextScratch, (void *)NextDecryptedPt, SmallestPtLength),
+					  "Expected: %s\nActual: %s\n"
+					  "Plaintext/Decrypted ciphertext mismatch in TestBreakFixedNonceCtr at Vector %u\n",
+					  AsciiPlaintextScratch, NextDecryptedPt, DecryptedPtIndex);
 	}
 }
 
