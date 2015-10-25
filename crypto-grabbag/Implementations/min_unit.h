@@ -9,12 +9,18 @@ global_variable u32 MinUnitGlobalTestsRun;
 typedef MIN_UNIT_TEST_FUNC(min_unit_test_func);
 
 internal void
-MinUnitAssert(b32 Test, char *Message)
+MinUnitAssert(b32 Test, char *MessageFormat, ...)
 {
 	if (!Test)
 	{
-		fprintf(stderr, "Test failed!\n%s\nTests run: %d\n", Message, MinUnitGlobalTestsRun);
+		va_list Args;
+		va_start(Args, MessageFormat);
+
+		vprintf(MessageFormat, Args);
+		fprintf(stderr, "Test failed!\nTests run: %d\n", MinUnitGlobalTestsRun);
 		abort();
+
+		va_end(Args);
 	}
 }
 

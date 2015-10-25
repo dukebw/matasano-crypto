@@ -581,12 +581,31 @@ AesEcbDecrypt(u8 *Message, u8 *Cipher, u32 MessageLength, u8 *Key, u32 KeyLength
 	}
 }
 
-// TODO(bwd):
-#if 0
-internal u32
-AesCtrMode(u8 *Output, u8 *Input, u32 MessageLength, u8 *Key, u8 *Nonce)
+internal void
+AesCtrMode(u8 *Output, u8 *Input, u32 MessageLength, u8 *Key, u8 *NonceCounter)
 {
+	Stopif((Output == 0) || (Input == 0) || (Key == 0) || (NonceCounter == 0), "Null input to AesCtrMode");
+
+	u8 EncryptedCounterScratch[AES_128_BLOCK_LENGTH_BYTES];
+	for (i32 InputIndex = 0;
+		 InputIndex <= ((i32)MessageLength - AES_128_BLOCK_LENGTH_BYTES);
+		 InputIndex += AES_128_BLOCK_LENGTH_BYTES)
+	{
+		AesEncryptBlock(EncryptedCounterScratch, NonceCounter, Key, AES_128_BLOCK_LENGTH_BYTES);
+		XorVectorsUnchecked(Output + InputIndex, Input + InputIndex, EncryptedCounterScratch,
+							AES_128_BLOCK_LENGTH_BYTES);
+		u32 *Counter = (u32 *)(NonceCounter + 8);
+		Stopif(*Counter == UINT32_MAX, "Counter overflow in TestCtrMode");
+		++*Counter;
+	}
+
+	u32 InputLengthMod16 = MessageLength % AES_128_BLOCK_LENGTH_BYTES;
+	if (InputLengthMod16)
+	{
+		AesEncryptBlock(EncryptedCounterScratch, NonceCounter, Key, AES_128_BLOCK_LENGTH_BYTES);
+		u8 *LastPartialBlock = Input + (MessageLength - InputLengthMod16);
+		XorVectorsUnchecked(LastPartialBlock, LastPartialBlock, EncryptedCounterScratch, InputLengthMod16);
+	}
 }
-#endif
 
 #endif // AES_H

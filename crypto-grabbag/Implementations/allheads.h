@@ -10,6 +10,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <ctype.h>
+#include <stdarg.h>
 #include "stopif.h"
 
 #define internal static
@@ -29,7 +30,7 @@ typedef int32_t i32;
 typedef int64_t i64;
 typedef i32 b32;
 
-typedef float real32;
-typedef double real64;
+typedef float r32;
+typedef double r64;
 
 #endif /* ALLHEADS_H */

@@ -14,7 +14,10 @@ CASSERT(RAND_MAX <= UINT32_MAX, crypt_helper_h);
 
 #define ALPHABET_SIZE 26
 
-global_variable real32 LetterFrequencies[] =
+#define EXPECTED_SPACE_FREQUENCY 0.15f
+#define EXPECTED_PUNCT_FREQUENCY 0.025f
+
+const r32 EXPECTED_LETTER_FREQUENCY[] =
 {
     0.08167, 0.01492, 0.02782, 0.04253, 0.12702, 0.02228, 0.02015, 0.06094,
     0.06966, 0.00153, 0.00772, 0.04025, 0.02406, 0.06749, 0.07507, 0.01929,
@@ -72,7 +75,7 @@ GetBestShiftAmount(char *Cipher, u32 CipherLength, u32 KeyLength)
 {
     u32 CharCounts[ALPHABET_SIZE] = {};
     u32 Result = 0;
-    real32 BestShiftDelta = INFINITY;
+    r32 BestShiftDelta = INFINITY;
  
     for (u32 ShiftAmount = 0; ShiftAmount < ALPHABET_SIZE; ++ShiftAmount)
     {
@@ -83,14 +86,13 @@ GetBestShiftAmount(char *Cipher, u32 CipherLength, u32 KeyLength)
             u32 AlphabetOffset = ShiftChar(Cipher[CipherIndex], ShiftAmount) - 'a';
             ++CharCounts[AlphabetOffset];
         }
-        real32 ShiftFrequencySum = 0.0f;
+        r32 ShiftFrequencySum = 0.0f;
         for (u32 CharIndex = 0; CharIndex < ALPHABET_SIZE; ++CharIndex)
         {
-            real32 KeyLetterFreq =
-                (real32)CharCounts[CharIndex]/(real32)CipherLength;
-            ShiftFrequencySum += KeyLetterFreq*LetterFrequencies[CharIndex];
+            r32 KeyLetterFreq = (r32)CharCounts[CharIndex]/(r32)CipherLength;
+            ShiftFrequencySum += KeyLetterFreq*EXPECTED_LETTER_FREQUENCY[CharIndex];
         }
-        real32 ShiftDelta = fabs(ShiftFrequencySum - 0.065);
+        r32 ShiftDelta = fabs(ShiftFrequencySum - 0.065);
         if (ShiftDelta < BestShiftDelta)
         {
             Result = ShiftAmount;
@@ -135,6 +137,8 @@ Base64ToAscii(u8 *AsciiString, u8 *Base64String, u32 Base64StringLength)
 {
 	Stopif((AsciiString == 0) || (Base64String == 0), "Null input to Base64ToAscii");
 	Stopif((Base64StringLength % 4) == 1, "Bad Base64StringLength (ends in 6 bits)");
+	// TODO(bwd): fix so target can == source
+	Stopif(AsciiString == Base64String, "Equal Source/Dest not supported yet in Base64ToAscii");
 
 	// 10101010 1010_1010 1010_1010
 	// 101010
@@ -437,6 +441,92 @@ StripPkcs7Padding(u8 *PaddedString, u32 PaddedStringLength)
 {
 	u8 *Result = StripPkcs7GetStrippedLength(PaddedString, 0, PaddedStringLength);
 	return Result;
+}
+
+// NOTE(brendan): INPUT: string OUTPUT: score of string, based on frequencies
+// of letters (score is sum of percentages of appearance)
+internal r32
+ScoreString(u8 *DecodedString, u32 Length)
+{
+	Stopif((DecodedString == 0), "Null input to ScoreString");
+	Stopif(Length == 0, "Invalid input (zero length) to ScoreString");
+
+    u32 LetterCount[ALPHABET_SIZE] = {0};
+	u32 SpacesCount = 0;
+	u32 PunctCount = 0;
+    r32 ResultScore = 0.0f;
+    for (u32 CharIndex = 0;
+		 CharIndex < Length;
+		 ++CharIndex)
+	{
+        u8 UpperChar = toupper(DecodedString[CharIndex]);
+        if (('A' <= UpperChar) && (UpperChar <= 'Z'))
+		{
+            ++LetterCount[UpperChar - 'A'];
+        }
+		else if (isspace(UpperChar))
+		{
+			++SpacesCount;
+        }
+		else if (ispunct(UpperChar))
+		{
+			++PunctCount;
+		}
+		else
+		{
+			ResultScore += 100.0f;
+		}
+		// TODO(bwd): punctuation
+    }
+	if (Length > SpacesCount)
+	{
+		for (u32 LetterIndex = 0;
+			 LetterIndex < ALPHABET_SIZE;
+			 ++LetterIndex)
+		{
+			ResultScore += (fabs(EXPECTED_LETTER_FREQUENCY[LetterIndex] -
+								 (r32)LetterCount[LetterIndex]/(r32)(Length - SpacesCount)));
+		}
+	}
+
+	ResultScore += fabs(EXPECTED_SPACE_FREQUENCY - (r32)SpacesCount/(r32)Length);
+	ResultScore += fabs(EXPECTED_PUNCT_FREQUENCY - (r32)PunctCount/(r32)Length);
+
+    return ResultScore;
+}
+
+// NOTE(brendan): INPUT: Ciphertext in ASCII-256, length of ciphertext.
+// OUTPUT: Repeating byte forming key
+// TODO(bwd): upper vs. lower case
+internal u8
+ByteCipherAsciiDecode(u8 *Ciphertext, u32 CipherLength)
+{
+    u8 Key[CipherLength];
+	u8 DecodedString[CipherLength];
+
+    r32 MinScore = INFINITY;
+    u32 MinCipher = 0;
+    for (u32 ByteCipher = 0;
+		 ByteCipher < 256;
+		 ++ByteCipher)
+	{
+		memset(Key, ByteCipher, CipherLength);
+        XorVectorsUnchecked(DecodedString, Key, Ciphertext, CipherLength);
+        for (u32 CipherIndex = 0;
+             CipherIndex < CipherLength;
+             ++CipherIndex)
+		{
+            DecodedString[CipherIndex] = Key[CipherIndex] ^ Ciphertext[CipherIndex];
+        }
+        r32 Score = ScoreString(DecodedString, CipherLength);
+        if (Score < MinScore)
+		{
+            MinScore = Score;
+            MinCipher = ByteCipher;
+        }
+    }
+
+    return MinCipher;
 }
 
 #endif /* CRYPT_HELPER_H */
