@@ -1,3 +1,3 @@
 #!/bin/bash
 ctags -R .
-P=break_fixed_nonce_ctr_statistically make
+P=clone_mt19937_rng_from_output make
