@@ -529,4 +529,80 @@ ByteCipherAsciiDecode(u8 *Ciphertext, u32 CipherLength)
     return MinCipher;
 }
 
+#define MT19937_W 32
+#define MT19937_N 624
+#define MT19937_M 397
+#define MT19937_R 31
+#define MT19937_A 0x9908B0DF
+#define MT19937_U 11
+#define MT19937_D 0xFFFFFFFF
+#define MT19937_S 7
+#define MT19937_B 0x9D2C5680
+#define MT19937_T 15
+#define MT19937_C 0xEFC60000
+#define MT19937_L 18
+#define MT19937_F 1812433253
+
+#define MT19937_LOWER_MASK ((u32)(1 << MT19937_R) - 1)
+#define MT19937_UPPER_MASK (~MT19937_LOWER_MASK)
+
+typedef struct
+{
+	u32 State[MT19937_N];
+	u32 Index;
+} mersenne_twister;
+
+internal void
+MtSeed(mersenne_twister *Mt, u32 Seed)
+{
+	Stopif(Mt == 0, "Null input to MtSeed");
+
+	Mt->Index = MT19937_N;
+	Mt->State[0] = Seed;
+	for (u32 MtStateIndex = 1;
+		 MtStateIndex < MT19937_N;
+		 ++MtStateIndex)
+	{
+		Mt->State[MtStateIndex] = (MT19937_F*(Mt->State[MtStateIndex - 1] ^ (Mt->State[MtStateIndex - 1] >> (MT19937_W - 2))) +
+								   MtStateIndex);
+	}
+}
+
+internal u32
+MtExtractNumber(mersenne_twister *Mt)
+{
+	u32 Result;
+
+	Stopif(Mt == 0, "Null input to MtExtractNumber");
+	Stopif(Mt->Index > MT19937_N, "Generator was never seeded");
+
+	if (Mt->Index == MT19937_N)
+	{
+		// Twist
+		for (u32 MtStateIndex = 0;
+			 MtStateIndex < MT19937_N;
+			 ++MtStateIndex)
+		{
+			u32 X = (Mt->State[MtStateIndex] & MT19937_UPPER_MASK) + (Mt->State[(MtStateIndex + 1) % MT19937_N] & MT19937_LOWER_MASK);
+			u32 XA = (X >> 1);
+			if (X % 2)
+			{
+				XA ^= MT19937_A;
+			}
+			Mt->State[MtStateIndex] = Mt->State[(MtStateIndex + MT19937_M) % MT19937_N] ^ XA;
+		}
+		Mt->Index = 0;
+	}
+
+	Result = Mt->State[Mt->Index];
+	Result = Result ^ ((Result >> MT19937_U) & MT19937_D);
+	Result = Result ^ ((Result << MT19937_S) & MT19937_B);
+	Result = Result ^ ((Result << MT19937_T) & MT19937_C);
+	Result = Result ^ (Result >> MT19937_L);
+
+	++Mt->Index;
+
+	return Result;
+}
+
 #endif /* CRYPT_HELPER_H */
