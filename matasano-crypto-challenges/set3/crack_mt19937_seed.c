@@ -8,7 +8,7 @@ internal MIN_UNIT_TEST_FUNC(TestCrackMt19937Seed)
 	srand(time(0));
 
 	mersenne_twister Mt;
-	Mt.Index = MT19937_N + 1;
+	MtInitUnchecked(&Mt);
 
 	u32 StartTime = time(0);
 	u32 SeedOracle[TEST_SEED_RANGE_SECONDS];

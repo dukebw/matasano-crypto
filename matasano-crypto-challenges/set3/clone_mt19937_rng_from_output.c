@@ -1,9 +1,26 @@
 #include "crypt_helper.h"
 
+#define BITS_IN_WORD 32
+
+internal inline u32
+Untemper(u32 TemperedValue, u32 Shift, u32 Mask)
+{
+	u32 Result = 0;
+	for (u32 MaskShiftIndex = 0;
+		 (MaskShiftIndex*Shift) < BITS_IN_WORD;
+		 ++MaskShiftIndex)
+	{
+		u32 ShiftedMask = (SHIFT_TO_MASK(Shift) << (MaskShiftIndex*Shift));
+		Result |= ((TemperedValue ^ ((Result << Shift) & Mask)) & ShiftedMask);
+	}
+
+	return Result;
+}
+
 internal MIN_UNIT_TEST_FUNC(TestCloneMt19937Rng)
 {
 	mersenne_twister Mt;
-	Mt.Index = MT19937_N + 1;
+	MtInitUnchecked(&Mt);
 	MtSeed(&Mt, time(0));
 
 	u32 ClonedMt[MT19937_N];
@@ -25,32 +42,35 @@ internal MIN_UNIT_TEST_FUNC(TestCloneMt19937Rng)
 		// Untemper
 		NextClonedMtState = NextClonedMtState ^ (NextClonedMtState >> MT19937_L);
 
-		MinUnitAssert(NextClonedMtState == D, "D not untempered! Expected: %x, Actual: %x\n",
+		MinUnitAssert(NextClonedMtState == D, "D not untempered! Expected: %x, Actual: 0x%x\n",
 					  D, NextClonedMtState);
 
-		u32 Temp = (NextClonedMtState ^ ((NextClonedMtState << MT19937_T) & MT19937_C)) & 0x3FFFFFFF;
-		NextClonedMtState = (((NextClonedMtState ^ ((Temp << MT19937_T) & MT19937_C)) & 0xC0000000) |
-							 Temp);
+		NextClonedMtState = Untemper(NextClonedMtState, MT19937_T, MT19937_C);
 
-		MinUnitAssert(NextClonedMtState == C, "C not untempered! Expected: %x, Actual: %x\n",
+		MinUnitAssert(NextClonedMtState == C, "C not untempered! Expected: %x, Actual: 0x%x\n",
 					  C, NextClonedMtState);
 
-		// TODO(bwd): recover B, A (the state)
+		NextClonedMtState = Untemper(NextClonedMtState, MT19937_S, MT19937_B);
+
+		MinUnitAssert(NextClonedMtState == B, "B not untempered! Expected: %x, Actual: 0x%x\n",
+					  B, NextClonedMtState);
+
+		u32 InitialMask = SHIFT_TO_MASK(MT19937_U) << (BITS_IN_WORD - MT19937_U);
+		u32 Temp = 0;
+		for (u32 MaskShiftIndex = 0;
+			 (MaskShiftIndex*MT19937_U) < BITS_IN_WORD;
+			 ++MaskShiftIndex)
+		{
+			u32 ShiftedMask = (InitialMask >> (MaskShiftIndex*MT19937_U));
+			Temp |= ((NextClonedMtState ^ (Temp >> MT19937_U)) & ShiftedMask);
+		}
+		NextClonedMtState = Temp;
+
+		MinUnitAssert(NextClonedMtState == A, "A not untempered! Expected: %x, Actual: 0x%x\n",
+					  A, NextClonedMtState);
 
 		ClonedMt[TappedMtIndex] = NextClonedMtState;
 	}
-
-/*
-	A = Mt->State[Mt->Index];
-	B = A ^ ((A >> MT19937_U) & MT19937_D);
-	C = B ^ ((B << MT19937_S) & MT19937_B);
-	D = C ^ ((C << MT19937_T) & MT19937_C);
-	E = D ^ (D >> MT19937_L);
-
-	D = E ^ (E >> L)
-	C' = ((D ^ ((D << MT19937_T) & MT19937_C)) & 0x3FFF_FFFF)
-	C = C' | (D ^ ((C' << T) & C))
-*/
 }
 
 internal MIN_UNIT_TEST_FUNC(AllTests)

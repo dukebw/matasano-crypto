@@ -86,7 +86,7 @@ const u32 TEST_MT_GEN_1234[] =
 internal MIN_UNIT_TEST_FUNC(TestMt19937)
 {
 	mersenne_twister Mt;
-	Mt.Index = MT19937_N + 1;
+	MtInitUnchecked(&Mt);
 
 	MtSeed(&Mt, 1234);
 
