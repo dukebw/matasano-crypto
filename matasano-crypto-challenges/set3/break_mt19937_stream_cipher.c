@@ -3,30 +3,44 @@
 #define MT19937_STREAM_SEED_BITS 16
 
 internal void
-Mt19937StreamEncrypt(u8 *Ciphertext, u8 *Plaintext, u32 PlaintextLength, mersenne_twister *Mt, u32 Seed)
+Mt19937StreamCipher(u8 *Output, u8 *Input, u32 InputLength, mersenne_twister *Mt, u32 Seed)
 {
-	Stopif((Ciphertext == 0) || (Plaintext == 0) || (Mt == 0), "Null input to Mt19937StreamEncrypt!");
-	Stopif(Seed & (~SHIFT_TO_MASK(MT19937_STREAM_SEED_BITS)), "Seed must be 16 bits for Mt19937StreamEncrypt");
+	Stopif((Output == 0) || (Input == 0) || (Mt == 0), "Null input to Mt19937StreamCipher!");
+	Stopif(Seed & (~SHIFT_TO_MASK(MT19937_STREAM_SEED_BITS)), "Seed must be 16 bits for Mt19937StreamCipher");
 
 	MtSeed(Mt, Seed);
 	u32 NextKeystreamWord;
-	for (u32 PlaintextIndex = 0;
-		 PlaintextIndex < PlaintextLength;
-		 ++PlaintextIndex)
+	for (u32 InputIndex = 0;
+		 InputIndex < InputLength;
+		 ++InputIndex)
 	{
-		u32 PtNextWordByteIndex = (PlaintextIndex % sizeof(NextKeystreamWord));
+		u32 PtNextWordByteIndex = (InputIndex % sizeof(NextKeystreamWord));
 		if (PtNextWordByteIndex == 0)
 		{
 			NextKeystreamWord = MtExtractNumber(Mt);
 		}
-		// TODO(bwd):
-		Ciphertext[PlaintextIndex] = Plaintext[PlaintextIndex] ^ (NextKeystreamWord);
+		Output[InputIndex] = (Input[InputIndex] ^ ((NextKeystreamWord >> (InputIndex*8)) & 0xFF));
 	}
 }
 
-internal void
-Mt19937StreamDecrypt(mersenne_twister *Mt)
+internal MIN_UNIT_TEST_FUNC(TestMt19937StreamCipher)
 {
+	mersenne_twister Mt;
+	MtInitUnchecked(&Mt);
+
+	u8 TestInput[] = "thequickbrownfoxjumpedoverthelazydog";
+	u32 TestLength = sizeof(TestInput);
+	u8 TestOutput[TestLength];
+	Mt19937StreamCipher(TestOutput, TestInput, TestLength, &Mt, 0xABCD);
+
+	u8 TestScratch[TestLength];
+	Mt19937StreamCipher(TestScratch, TestOutput, TestLength, &Mt, 0xABCD);
+	MinUnitAssert(VectorsEqual(TestScratch, TestInput, TestLength),
+				  "Positive test failure in TestMt19937StreamCipher");
+
+	Mt19937StreamCipher(TestScratch, TestOutput, TestLength, &Mt, 0xABCE);
+	MinUnitAssert(!VectorsEqual(TestScratch, TestInput, TestLength),
+				  "Negative test failure in TestMt19937StreamCipher");
 }
 
 internal MIN_UNIT_TEST_FUNC(TestBreakMt19937StreamCipher)
@@ -37,7 +51,7 @@ internal MIN_UNIT_TEST_FUNC(TestBreakMt19937StreamCipher)
 
 internal MIN_UNIT_TEST_FUNC(AllTests)
 {
-	MinUnitRunTest(TestMt19937StreamEncrypt);
+	MinUnitRunTest(TestMt19937StreamCipher);
 	MinUnitRunTest(TestBreakMt19937StreamCipher);
 }
 
