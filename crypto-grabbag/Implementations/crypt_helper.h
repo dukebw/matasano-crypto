@@ -17,6 +17,8 @@ CASSERT(RAND_MAX <= UINT32_MAX, crypt_helper_h);
 #define EXPECTED_SPACE_FREQUENCY 0.15f
 #define EXPECTED_PUNCT_FREQUENCY 0.025f
 
+#define SHIFT_TO_MASK(Shift) ((1 << (Shift)) - 1)
+
 const r32 EXPECTED_LETTER_FREQUENCY[] =
 {
     0.08167, 0.01492, 0.02782, 0.04253, 0.12702, 0.02228, 0.02015, 0.06094,
@@ -552,6 +554,12 @@ typedef struct
 	u32 Index;
 } mersenne_twister;
 
+internal inline void
+MtInitUnchecked(mersenne_twister *Mt)
+{
+	Mt->Index = MT19937_N + 1;
+}
+
 internal void
 MtSeed(mersenne_twister *Mt, u32 Seed)
 {
@@ -563,8 +571,9 @@ MtSeed(mersenne_twister *Mt, u32 Seed)
 		 MtStateIndex < MT19937_N;
 		 ++MtStateIndex)
 	{
-		Mt->State[MtStateIndex] = (MT19937_F*(Mt->State[MtStateIndex - 1] ^ (Mt->State[MtStateIndex - 1] >> (MT19937_W - 2))) +
-								   MtStateIndex);
+		Mt->State[MtStateIndex] =
+			(MT19937_F*(Mt->State[MtStateIndex - 1] ^ (Mt->State[MtStateIndex - 1] >> (MT19937_W - 2))) +
+			 MtStateIndex);
 	}
 }
 
@@ -583,7 +592,8 @@ MtExtractNumber(mersenne_twister *Mt)
 			 MtStateIndex < MT19937_N;
 			 ++MtStateIndex)
 		{
-			u32 X = (Mt->State[MtStateIndex] & MT19937_UPPER_MASK) + (Mt->State[(MtStateIndex + 1) % MT19937_N] & MT19937_LOWER_MASK);
+			u32 X = ((Mt->State[MtStateIndex] & MT19937_UPPER_MASK) +
+					 (Mt->State[(MtStateIndex + 1) % MT19937_N] & MT19937_LOWER_MASK));
 			u32 XA = (X >> 1);
 			if (X % 2)
 			{
