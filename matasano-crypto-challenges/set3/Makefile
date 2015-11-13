@@ -1,3 +1,5 @@
+P=break_mt19937_stream_cipher
+
 # NOTE(brendan): set P using "export P=program_name" from shell
 OBJECTS=
 STD_FLAGS=gnu11
