@@ -1,6 +1,6 @@
 #include "crypt_helper.h"
 
-#define RANDOM_CHAR_COUNT_MAX 256
+#define RANDOM_CHAR_COUNT_MAX 16
 #define MT19937_STREAM_SEED_BITS 16
 
 internal void
@@ -76,23 +76,29 @@ internal MIN_UNIT_TEST_FUNC(TestBreakMt19937StreamCipher)
 #endif
 
 	// Recover the 16-bit seed
-
-	// TODO(bwd): Get state for first word congruent to 0 mod 4, then find state backwards to seed by
-	// reverting above
-	u32 KnownPtByteOffsetFromWord = RandomPrefixCharCount % sizeof(u32);
-	if ()
+	u32 ByteOffsetFromWord = RandomPrefixCharCount % sizeof(u32);
+	u32 FirstAlignedWordOffset;
+	if (ByteOffsetFromWord)
 	{
+		FirstAlignedWordOffset = sizeof(u32) - ByteOffsetFromWord;
 	}
 	else
 	{
+		FirstAlignedWordOffset = 0;
 	}
 
-	u32 CtFirstKnownWord = *(u32 *)(Ciphertext + (EncryptedLength - sizeof(KNOWN_PLAINTEXT)));
-	u32 NthState = MtUntemper(*(u32 *)KNOWN_PLAINTEXT ^ CtFirstKnownWord);
-	for (u32 StateIndex = ;
-		 ;
-		)
+	u32 CtFirstKnownAlignedWordOffset = (EncryptedLength - sizeof(KNOWN_PLAINTEXT) + FirstAlignedWordOffset);
+	u32 CtFirstKnownAlignedWord = *(u32 *)(Ciphertext + CtFirstKnownAlignedWordOffset);
+	u32 NthState = MtUntemper(*(u32 *)(KNOWN_PLAINTEXT + FirstAlignedWordOffset) ^ CtFirstKnownAlignedWord);
+	u32 PrevState;
+	for (i32 StateIndex = (CtFirstKnownAlignedWordOffset/sizeof(u32)) - 1;
+		 StateIndex >= 0;
+		 --StateIndex)
 	{
+		PrevState = ((NthState - StateIndex)/MT19937_F) ^ (Mt.State[StateIndex] >> (MT19937_W - 2));
+		MinUnitAssert(PrevState == Mt.State[StateIndex],
+					  "State not recovered in TestBreakMt19937StreamCipher.\n"
+					  "Actual: 0x%x Expected: 0x%x\n", PrevState, Mt.State[StateIndex]);
 	}
 
 	// Generate a random "password reset token" using MT19937 seeded from current time
