@@ -19,6 +19,8 @@ CASSERT(RAND_MAX <= UINT32_MAX, crypt_helper_h);
 
 #define SHIFT_TO_MASK(Shift) ((1 << (Shift)) - 1)
 
+#define BITS_IN_WORD 32
+
 const r32 EXPECTED_LETTER_FREQUENCY[] =
 {
     0.08167, 0.01492, 0.02782, 0.04253, 0.12702, 0.02228, 0.02015, 0.06094,
@@ -611,6 +613,46 @@ MtExtractNumber(mersenne_twister *Mt)
 	Result = Result ^ (Result >> MT19937_L);
 
 	++Mt->Index;
+
+	return Result;
+}
+
+internal inline u32
+MtUntemperStep(u32 TemperedValue, u32 Shift, u32 Mask)
+{
+	u32 Result = 0;
+	for (u32 MaskShiftIndex = 0;
+		 (MaskShiftIndex*Shift) < BITS_IN_WORD;
+		 ++MaskShiftIndex)
+	{
+		u32 ShiftedMask = (SHIFT_TO_MASK(Shift) << (MaskShiftIndex*Shift));
+		Result |= ((TemperedValue ^ ((Result << Shift) & Mask)) & ShiftedMask);
+	}
+
+	return Result;
+}
+
+internal u32
+MtUntemper(u32 TemperedState)
+{
+	u32 Result;
+
+	Result = TemperedState ^ (TemperedState >> MT19937_L);
+
+	Result = MtUntemperStep(Result, MT19937_T, MT19937_C);
+
+	Result = MtUntemperStep(Result, MT19937_S, MT19937_B);
+
+	u32 InitialMask = SHIFT_TO_MASK(MT19937_U) << (BITS_IN_WORD - MT19937_U);
+	u32 Temp = 0;
+	for (u32 MaskShiftIndex = 0;
+		 (MaskShiftIndex*MT19937_U) < BITS_IN_WORD;
+		 ++MaskShiftIndex)
+	{
+		u32 ShiftedMask = (InitialMask >> (MaskShiftIndex*MT19937_U));
+		Temp |= ((Result ^ (Temp >> MT19937_U)) & ShiftedMask);
+	}
+	Result = Temp;
 
 	return Result;
 }
