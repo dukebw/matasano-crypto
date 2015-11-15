@@ -1,3 +1,3 @@
 #!/bin/bash
 ctags -R .
-P=clone_mt19937_rng_from_output make
+P=break_mt19937_stream_cipher make

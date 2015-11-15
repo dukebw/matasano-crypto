@@ -1,4 +1,4 @@
-P=break_mt19937_stream_cipher
+P=clone_mt19937_rng_from_output
 
 # NOTE(brendan): set P using "export P=program_name" from shell
 OBJECTS=

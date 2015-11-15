@@ -1,5 +1,6 @@
 #include "crypt_helper.h"
 
+#define RANDOM_CHAR_COUNT_MAX 256
 #define MT19937_STREAM_SEED_BITS 16
 
 internal void
@@ -43,8 +44,6 @@ internal MIN_UNIT_TEST_FUNC(TestMt19937StreamCipher)
 				  "Negative test failure in TestMt19937StreamCipher");
 }
 
-#define RANDOM_CHAR_COUNT_MAX 256
-
 internal MIN_UNIT_TEST_FUNC(TestBreakMt19937StreamCipher)
 {
 	mersenne_twister Mt;
@@ -67,9 +66,34 @@ internal MIN_UNIT_TEST_FUNC(TestBreakMt19937StreamCipher)
 
 	u8 Ciphertext[PlaintextMaxSize];
 	u32 Seed = rand() & 0xFFFF;
-	Mt19937StreamCipher(Ciphertext, Plaintext, RandomPrefixCharCount, &Mt, Seed);
+	u32 EncryptedLength = RandomPrefixCharCount + sizeof(KNOWN_PLAINTEXT);
+	Mt19937StreamCipher(Ciphertext, Plaintext, EncryptedLength, &Mt, Seed);
+
+#if 0
+	Mt->State[MtStateIndex] =
+		(MT19937_F*(Mt->State[MtStateIndex - 1] ^ (Mt->State[MtStateIndex - 1] >> (MT19937_W - 2))) +
+		 MtStateIndex);
+#endif
 
 	// Recover the 16-bit seed
+
+	// TODO(bwd): Get state for first word congruent to 0 mod 4, then find state backwards to seed by
+	// reverting above
+	u32 KnownPtByteOffsetFromWord = RandomPrefixCharCount % sizeof(u32);
+	if ()
+	{
+	}
+	else
+	{
+	}
+
+	u32 CtFirstKnownWord = *(u32 *)(Ciphertext + (EncryptedLength - sizeof(KNOWN_PLAINTEXT)));
+	u32 NthState = MtUntemper(*(u32 *)KNOWN_PLAINTEXT ^ CtFirstKnownWord);
+	for (u32 StateIndex = ;
+		 ;
+		)
+	{
+	}
 
 	// Generate a random "password reset token" using MT19937 seeded from current time
 
