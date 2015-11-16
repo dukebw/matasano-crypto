@@ -370,6 +370,7 @@ CreateKeySchedule(u32 *KeySchedule, u32 KeyScheduleLength, u8 *Key, u32 KeyLengt
 }
 
 // NOTE(brendan): INPUT: Sequences of 128 bits. OUTPUT: Same.
+// TODO(bwd): shouldn't take a keylength...
 internal void
 AesEncryptBlock(u8 *Cipher, u8 *Message, u8 *Key, u32 KeyLength)
 {
