@@ -1,6 +1,6 @@
 #include "crypt_helper.h"
 
-#define RANDOM_CHAR_COUNT_MAX 16
+#define RANDOM_CHAR_COUNT_MAX 64
 #define MT19937_STREAM_SEED_BITS 16
 
 internal void
@@ -63,17 +63,12 @@ internal MIN_UNIT_TEST_FUNC(TestBreakMt19937StreamCipher)
 	{
 		Plaintext[PlaintextIndex] = rand() % 0xFF;
 	}
+	memcpy(Plaintext + RandomPrefixCharCount, KNOWN_PLAINTEXT, sizeof(KNOWN_PLAINTEXT));
 
 	u8 Ciphertext[PlaintextMaxSize];
 	u32 Seed = rand() & 0xFFFF;
 	u32 EncryptedLength = RandomPrefixCharCount + sizeof(KNOWN_PLAINTEXT);
 	Mt19937StreamCipher(Ciphertext, Plaintext, EncryptedLength, &Mt, Seed);
-
-#if 0
-	Mt->State[MtStateIndex] =
-		(MT19937_F*(Mt->State[MtStateIndex - 1] ^ (Mt->State[MtStateIndex - 1] >> (MT19937_W - 2))) +
-		 MtStateIndex);
-#endif
 
 	// Recover the 16-bit seed
 	u32 ByteOffsetFromWord = RandomPrefixCharCount % sizeof(u32);
@@ -90,21 +85,32 @@ internal MIN_UNIT_TEST_FUNC(TestBreakMt19937StreamCipher)
 	u32 CtFirstKnownAlignedWordOffset = (EncryptedLength - sizeof(KNOWN_PLAINTEXT) + FirstAlignedWordOffset);
 	u32 CtFirstKnownAlignedWord = *(u32 *)(Ciphertext + CtFirstKnownAlignedWordOffset);
 	u32 NthState = MtUntemper(*(u32 *)(KNOWN_PLAINTEXT + FirstAlignedWordOffset) ^ CtFirstKnownAlignedWord);
-	u32 PrevState;
-	for (i32 StateIndex = (CtFirstKnownAlignedWordOffset/sizeof(u32)) - 1;
-		 StateIndex >= 0;
-		 --StateIndex)
+	u32 N = (CtFirstKnownAlignedWordOffset/sizeof(u32));
+
+	MinUnitAssert(NthState == Mt.State[N],
+				  "NthState not equal to Mt.State[N] in TestBreakMt19937StreamCipher!\n");
+
+	mersenne_twister GuessMt;
+	MtInitUnchecked(&GuessMt);
+	u32 SeedGuess;
+	for (SeedGuess = 0;
+		 SeedGuess <= 0xFFFF;
+		 ++SeedGuess)
 	{
-		PrevState = ((NthState - StateIndex)/MT19937_F) ^ (Mt.State[StateIndex] >> (MT19937_W - 2));
-		MinUnitAssert(PrevState == Mt.State[StateIndex],
-					  "State not recovered in TestBreakMt19937StreamCipher.\n"
-					  "Actual: 0x%x Expected: 0x%x\n", PrevState, Mt.State[StateIndex]);
+		MtSeed(&GuessMt, SeedGuess);
+		MtExtractNumber(&GuessMt);
+		if (GuessMt.State[N] == NthState)
+		{
+			break;
+		}
 	}
+	MinUnitAssert((SeedGuess <= 0xFFFF) && (SeedGuess == Seed),
+				  "No Seed found in TestBreakMt19937StreamCipher!\n");
 
-	// Generate a random "password reset token" using MT19937 seeded from current time
+	// TODO(bwd): Generate a random "password reset token" using MT19937 seeded from current time
 
-	// Write a function to check if any given password token is actually the product of an MT19937 PRNG seeded
-	// with the current time.
+	// TODO(bwd): Write a function to check if any given password token is actually the product of an MT19937
+	// PRNG seeded with the current time.
 }
 
 internal MIN_UNIT_TEST_FUNC(AllTests)
