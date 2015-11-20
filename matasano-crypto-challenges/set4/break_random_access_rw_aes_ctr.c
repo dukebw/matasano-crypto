@@ -34,6 +34,8 @@ internal MIN_UNIT_TEST_FUNC(TestBreakRandomAccessRwAesCtr)
 		'Y', 'E', 'L', 'L', 'O', 'W', ' ', 'S', 'U', 'B', 'M', 'A', 'R', 'I', 'N', 'E'
 	};
     u32 KeyLength = sizeof(Key);
+	Stopif(KeyLength != AES_128_BLOCK_LENGTH_BYTES,
+		   "Invalid AES-128 key length in TestBreakRandomAccessRwAesCtr\n");
 
     u8 Ciphertext[MAX_PLAINTEXT_LENGTH];
     u32 CiphertextLength = Base64ToAscii(Ciphertext, CipherBase64, CipherBase64Length);
@@ -45,31 +47,53 @@ internal MIN_UNIT_TEST_FUNC(TestBreakRandomAccessRwAesCtr)
 
 	u8 NonceCounter[AES_128_BLOCK_LENGTH_BYTES] = {0};
 	AesCtrMode(Ciphertext, Plaintext, CiphertextLength, Key, NonceCounter);
+
+	u8 KnownPlaintext[] =
+	{
+		'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A'
+	};
+	u32 KnownPtLength = sizeof(KnownPlaintext);
+	CtrEdit(Ciphertext, Key, 0, KnownPlaintext, KnownPtLength);
+
+	// TODO(bwd): Debug this step -- key guessing by XORing Known PT with first 16-bytes of ciphertext
+	u8 GuessedPlaintext[MAX_PLAINTEXT_LENGTH];
+	u8 GuessedKey[AES_128_BLOCK_LENGTH_BYTES];
+	XorVectorsUnchecked(GuessedKey, Ciphertext, KnownPlaintext, sizeof(GuessedKey));
+	MinUnitAssert(VectorsEqual(GuessedKey, Key, KeyLength),
+				  "Guessed key mismatch in TestBreakRandomAccessRwAesCtr!\n");
+
+	CtrEdit(Ciphertext, Key, 0, Plaintext, KnownPtLength);
+
+	memset(NonceCounter, 0, sizeof(NonceCounter));
+	AesCtrMode(GuessedPlaintext, Ciphertext, CiphertextLength, GuessedKey, NonceCounter);
+
+	MinUnitAssert(VectorsEqual(GuessedPlaintext, Plaintext, CiphertextLength),
+				  "Guessed Plaintext mismatch in TestBreakRandomAccessRwAesCtr!\n");
 }
 
 internal MIN_UNIT_TEST_FUNC(TestCtrEdit)
 {
 	u8 EditTestBuffer[MAX_PLAINTEXT_LENGTH];
-	// TODO(bwd): continue debugging failed test
-	/* GenRandUnchecked((u32 *)EditTestBuffer, sizeof(EditTestBuffer)/sizeof(u32)); */
-	memset(EditTestBuffer, 'A', sizeof(EditTestBuffer));
+	u32 EditTestBuffLength = sizeof(EditTestBuffer);
+	GenRandUnchecked((u32 *)EditTestBuffer, sizeof(EditTestBuffer)/sizeof(u32));
+
+	u32 Offset = rand() % EditTestBuffLength;
+	u8 NewPlaintext[MAX_PLAINTEXT_LENGTH];
+	u32 NewPtLength = rand() % (EditTestBuffLength - Offset);
+	memcpy(NewPlaintext, EditTestBuffer + Offset, NewPtLength);
 
 	u8 Key[AES_128_BLOCK_LENGTH_BYTES];
 	GenRandUnchecked((u32 *)Key, sizeof(Key)/sizeof(u32));
 
 	u8 NonceCounter[AES_128_BLOCK_LENGTH_BYTES] = {0};
-	AesCtrMode(EditTestBuffer, EditTestBuffer, sizeof(EditTestBuffer), Key, NonceCounter);
+	AesCtrMode(EditTestBuffer, EditTestBuffer, EditTestBuffLength, Key, NonceCounter);
 
 	u8 ExpectedCiphertext[sizeof(EditTestBuffer)];
-	memcpy(ExpectedCiphertext, EditTestBuffer, sizeof(EditTestBuffer));
+	memcpy(ExpectedCiphertext, EditTestBuffer, EditTestBuffLength);
 
-	u32 Offset = rand() % sizeof(EditTestBuffer);
-	u8 NewPlaintext[MAX_PLAINTEXT_LENGTH];
-	u32 NewPtLength = rand() % (sizeof(EditTestBuffer) - Offset);
-	memcpy(NewPlaintext, EditTestBuffer + Offset, NewPtLength);
 	CtrEdit(EditTestBuffer, Key, Offset, NewPlaintext, NewPtLength);
 
-	MinUnitAssert(VectorsEqual(EditTestBuffer, ExpectedCiphertext, sizeof(EditTestBuffer)),
+	MinUnitAssert(VectorsEqual(EditTestBuffer, ExpectedCiphertext, EditTestBuffLength),
 				  "EditTestBuffer changed by CtrEdit in TestCtrEdit!\n");
 }
 
