@@ -3,6 +3,7 @@
 
 #include "allheads.h"
 #include "aes.h"
+#include "sha.h"
 #include "min_unit.h"
 #include "compile_assert.h"
 
@@ -19,7 +20,7 @@ CASSERT(RAND_MAX <= UINT32_MAX, crypt_helper_h);
 
 #define SHIFT_TO_MASK(Shift) ((1 << (Shift)) - 1)
 
-#define BITS_IN_WORD 32
+#define SHA_1_KEYED_MAC_MAX_MSG_SIZE 256
 
 const r32 EXPECTED_LETTER_FREQUENCY[] =
 {
@@ -242,14 +243,6 @@ ReverseString(u8 *String)
         Swap(String + StringIndex, String + (StringLength - 1) - StringIndex);
     }
     return String;
-}
-
-inline u32
-ByteSwap32(u32 Word)
-{
-	u32 Result = ((Word << 24) | ((Word & 0xFF00) << 8) |
-				  ((Word & 0xFF0000) >> 8) | (Word >> 24));
-    return Result;
 }
 
 // NOTE(brendan): INPUT: hex character. OUTPUT: integer value of hex character
@@ -655,6 +648,61 @@ MtUntemper(u32 TemperedState)
 	Result = Temp;
 
 	return Result;
+}
+
+const char PREPEND_STRING[] = "comment1=cooking%20MCs;userdata=";
+#define PREPEND_LENGTH (sizeof(PREPEND_STRING) - 1)
+const char APPEND_STRING[] = "comment1=cooking%20MCs;userdata=";
+#define APPEND_LENGTH (sizeof(APPEND_STRING) - 1)
+const char ADMIN_TRUE_STRING[] = ";admin=true;";
+#define ADMIN_TRUE_STR_LENGTH (sizeof(ADMIN_TRUE_STRING) - 1)
+
+CASSERT(ADMIN_TRUE_STR_LENGTH < (PREPEND_LENGTH - AES_128_BLOCK_LENGTH_BYTES), crypt_helper_h);
+
+internal u32
+GenRandInputAppendPrepend(u8 *RandAppendPrependInput, u32 RandInputLength)
+{
+	Stopif(RandAppendPrependInput == 0, "Null input to GenRandInputAppendPrepend");
+
+	u8 RandValue[RandInputLength - PREPEND_LENGTH - APPEND_LENGTH];
+	memcpy(RandAppendPrependInput, PREPEND_STRING, PREPEND_LENGTH);
+
+	u32 RandomInputLengthBytes;
+	RandomInputLengthBytes = rand() % sizeof(RandValue);
+	GenRandBytesUnchecked(RandValue, RandomInputLengthBytes);
+
+	u32 ScratchInputIndex = PREPEND_LENGTH;
+	for (u32 RandValueIndex = 0;
+		 RandValueIndex < RandomInputLengthBytes;
+		 ++RandValueIndex)
+	{
+		u8 NextRandByte = RandValue[RandValueIndex];
+		if ((NextRandByte != ';') && (NextRandByte != '='))
+		{
+			RandAppendPrependInput[ScratchInputIndex] = NextRandByte;
+			++ScratchInputIndex;
+		}
+	}
+	memcpy(RandAppendPrependInput + ScratchInputIndex, APPEND_STRING, APPEND_LENGTH);
+	u32 TotalInputLength = (ScratchInputIndex + APPEND_LENGTH);
+	Stopif(TotalInputLength > RandInputLength, "Overflowed RandAppendPrependInput");
+
+	return TotalInputLength;
+}
+
+internal void
+Sha1KeyedMac(u8 *KeyedMac, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength)
+{
+	Stopif((KeyedMac == 0) || (Message == 0) || (Key == 0), "Null input to Sha1KeyedMac");
+
+	u8 KeyConcatMessage[SHA_1_KEYED_MAC_MAX_MSG_SIZE];
+	u32 TotalHmacInputSize = (MessageLength + KeyLength);
+	Stopif(TotalHmacInputSize > sizeof(KeyConcatMessage), "Message + Key lengths too long in Sha1KeyedMac");
+
+	memcpy(KeyConcatMessage, Key, KeyLength);
+	memcpy(KeyConcatMessage + KeyLength, Message, MessageLength);
+
+	Sha1(KeyedMac, KeyConcatMessage, TotalHmacInputSize);
 }
 
 #endif /* CRYPT_HELPER_H */

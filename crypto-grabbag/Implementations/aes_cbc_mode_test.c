@@ -19,8 +19,8 @@ AesCbcModeVecsPass(aes_cbc_mode_vec *AesCbcTestVec, u32 AesCbcTestVecCount)
 
 		// NOTE(bwd): test encrypt/decrypt in place
 		memcpy(GlobalAesCbcTestScratch, AesTestVec->Message, AesTestVec->MessageLength);
-		AesCbcEncrypt(GlobalAesCbcTestScratch, GlobalAesCbcTestScratch, AesTestVec->MessageLength,
-					  AesTestVec->Key, AesTestVec->KeyLength, AesCbcTestVec->Iv);
+		AesCbcEncrypt(GlobalAesCbcTestScratch, GlobalAesCbcTestScratch, AesTestVec->MessageLength, AesTestVec->Key,
+					  AesCbcTestVec->Iv);
 		Result = VectorsEqual(GlobalAesCbcTestScratch, AesTestVec->Cipher, AesTestVec->MessageLength);
 		if (Result == false)
 		{
@@ -28,8 +28,8 @@ AesCbcModeVecsPass(aes_cbc_mode_vec *AesCbcTestVec, u32 AesCbcTestVecCount)
 		}
 
 		memcpy(GlobalAesCbcTestScratch, AesTestVec->Cipher, AesTestVec->MessageLength);
-		AesCbcDecrypt(GlobalAesCbcTestScratch, GlobalAesCbcTestScratch, AesTestVec->MessageLength,
-					  AesTestVec->Key, AesTestVec->KeyLength, AesCbcTestVec->Iv);
+		AesCbcDecrypt(GlobalAesCbcTestScratch, GlobalAesCbcTestScratch, AesTestVec->MessageLength, AesTestVec->Key,
+					  AesCbcTestVec->Iv);
 		Result = VectorsEqual(GlobalAesCbcTestScratch, AesTestVec->Message, AesTestVec->MessageLength);
 		if (Result == false)
 		{

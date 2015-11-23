@@ -16,8 +16,7 @@ AesVectorsPass(aes_test_vector *TestVector, u32 VectorCount)
 
 		// NOTE(bwd): Test encrypt/decrypt in place
 		memcpy(GlobalScratch, TestVector->Message, TestVector->MessageLength);
-		AesEcbEncrypt(GlobalScratch, GlobalScratch, TestVector->MessageLength,
-					  TestVector->Key, TestVector->KeyLength);
+		AesEcbEncrypt(GlobalScratch, GlobalScratch, TestVector->MessageLength, TestVector->Key);
 		Result = VectorsEqual(GlobalScratch, TestVector->Cipher, TestVector->MessageLength);
 		if (Result == false)
 		{
@@ -25,8 +24,7 @@ AesVectorsPass(aes_test_vector *TestVector, u32 VectorCount)
 		}
 
 		memcpy(GlobalScratch, TestVector->Cipher, TestVector->MessageLength);
-		AesEcbDecrypt(GlobalScratch, GlobalScratch, TestVector->MessageLength,
-					  TestVector->Key, TestVector->KeyLength);
+		AesEcbDecrypt(GlobalScratch, GlobalScratch, TestVector->MessageLength, TestVector->Key);
 		Result = VectorsEqual(GlobalScratch, TestVector->Message, TestVector->MessageLength);
 		if (Result == false)
 		{

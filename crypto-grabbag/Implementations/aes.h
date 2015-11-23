@@ -370,7 +370,6 @@ CreateKeySchedule(u32 *KeySchedule, u32 KeyScheduleLength, u8 *Key, u32 KeyLengt
 }
 
 // NOTE(brendan): INPUT: Sequences of 128 bits. OUTPUT: Same.
-// TODO(bwd): shouldn't take a keylength...
 internal void
 AesEncryptBlock(u8 *Cipher, u8 *Message, u8 *Key, u32 KeyLength)
 {
@@ -475,16 +474,15 @@ XorVectorsUnchecked(u8 *Dest, u8 *A, u8 *B, u32 Length)
 }
 
 internal u32
-AesCbcEncrypt(u8 *Cipher, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength, u8 *Iv)
+AesCbcEncrypt(u8 *Cipher, u8 *Message, u32 MessageLength, u8 *Key, u8 *Iv)
 {
 	Stopif((Message == 0) || (Cipher == 0) || (Key == 0) || (Iv == 0), "Null inputs to AesCbcEncrypt");
-	Stopif(KeyLength != KEY_LENGTH_BYTES, "Only AES-128 is supported");
 	Stopif(MessageLength == 0, "AesCbcEncrypt - Message of length 0");
 
 	u32 PaddedMsgLength = Pkcs7Pad(Message, Message, MessageLength);
 
 	XorVectorsUnchecked(Cipher, Message, Iv, AES_128_BLOCK_LENGTH_BYTES);
-	AesEncryptBlock(Cipher, Cipher, Key, KeyLength);
+	AesEncryptBlock(Cipher, Cipher, Key, AES_128_BLOCK_LENGTH_BYTES);
 
 	for (u32 MessageBlockIndex = 1;
 		 MessageBlockIndex < PaddedMsgLength/AES_128_BLOCK_LENGTH_BYTES;
@@ -495,7 +493,7 @@ AesCbcEncrypt(u8 *Cipher, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength
 							Message + MessageIndexBytes,
 							Cipher + (MessageBlockIndex - 1)*AES_128_BLOCK_LENGTH_BYTES,
 							AES_128_BLOCK_LENGTH_BYTES);
-		AesEncryptBlock(Cipher + MessageIndexBytes, Cipher + MessageIndexBytes, Key, KeyLength);
+		AesEncryptBlock(Cipher + MessageIndexBytes, Cipher + MessageIndexBytes, Key, AES_128_BLOCK_LENGTH_BYTES);
 	}
 	return PaddedMsgLength;
 }
@@ -516,10 +514,9 @@ FindPaddedLength(u32 MessageLength)
 }
 
 internal void
-AesCbcDecrypt(u8 *Message, u8 *Cipher, u32 MessageLength, u8 *Key, u32 KeyLength, u8 *Iv)
+AesCbcDecrypt(u8 *Message, u8 *Cipher, u32 MessageLength, u8 *Key, u8 *Iv)
 {
 	Stopif((Message == 0) || (Cipher == 0) || (Key == 0) || (Iv == 0), "Null inputs to AesCbcDecrypt");
-	Stopif(KeyLength != KEY_LENGTH_BYTES, "Only AES-128 is supported");
 	Stopif(MessageLength == 0, "AesCbcDecrypt - Message of length 0");
 
 	u32 PaddedMsgLength = FindPaddedLength(MessageLength);
@@ -534,22 +531,21 @@ AesCbcDecrypt(u8 *Message, u8 *Cipher, u32 MessageLength, u8 *Key, u32 KeyLength
 		u32 MessageIndexBytes = MessageBlockIndex*AES_128_BLOCK_LENGTH_BYTES;
 		u8 *MsgStartOfBlock = Message + MessageIndexBytes;
 		AesDecryptBlock(MsgStartOfBlock, Cipher + MessageIndexBytes, AES_128_BLOCK_LENGTH_BYTES,
-						Key, KeyLength);
+						Key, AES_128_BLOCK_LENGTH_BYTES);
 		XorVectorsUnchecked(MsgStartOfBlock,
 							MsgStartOfBlock,
 							Cipher + (MessageBlockIndex - 1)*AES_128_BLOCK_LENGTH_BYTES,
 							AES_128_BLOCK_LENGTH_BYTES);
 	}
 
-	AesDecryptBlock(Message, Cipher, PaddedMsgLength, Key, KeyLength);
+	AesDecryptBlock(Message, Cipher, PaddedMsgLength, Key, AES_128_BLOCK_LENGTH_BYTES);
 	XorVectorsUnchecked(Message, Message, Iv, AES_128_BLOCK_LENGTH_BYTES);
 }
 
 internal void
-AesEcbEncrypt(u8 *Cipher, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength)
+AesEcbEncrypt(u8 *Cipher, u8 *Message, u32 MessageLength, u8 *Key)
 {
 	Stopif((Message == 0) || (Cipher == 0) || (Key == 0), "Null inputs to AesCbcEncrypt");
-	Stopif(KeyLength != KEY_LENGTH_BYTES, "Only AES-128 is supported");
 	Stopif(MessageLength == 0, "AesEcbEncrypt - Message of length 0");
 
 	u32 PaddedMsgLength = Pkcs7Pad(Message, Message, MessageLength);
@@ -559,15 +555,14 @@ AesEcbEncrypt(u8 *Cipher, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength
 		 ++MessageBlockIndex)
 	{
 		u32 MessageIndexBytes = MessageBlockIndex*AES_128_BLOCK_LENGTH_BYTES;
-		AesEncryptBlock(Cipher + MessageIndexBytes, Message + MessageIndexBytes, Key, KeyLength);
+		AesEncryptBlock(Cipher + MessageIndexBytes, Message + MessageIndexBytes, Key, AES_128_BLOCK_LENGTH_BYTES);
 	}
 }
 
 internal void
-AesEcbDecrypt(u8 *Message, u8 *Cipher, u32 MessageLength, u8 *Key, u32 KeyLength)
+AesEcbDecrypt(u8 *Message, u8 *Cipher, u32 MessageLength, u8 *Key)
 {
 	Stopif((Message == 0) || (Cipher == 0) || (Key == 0), "Null inputs to AesCbcEncrypt");
-	Stopif(KeyLength != KEY_LENGTH_BYTES, "Only AES-128 is supported");
 	Stopif(MessageLength == 0, "AesEcbDecrypt - Message of length 0");
 
 	u32 PaddedMsgLength = FindPaddedLength(MessageLength);
@@ -578,7 +573,7 @@ AesEcbDecrypt(u8 *Message, u8 *Cipher, u32 MessageLength, u8 *Key, u32 KeyLength
 	{
 		u32 MessageIndexBytes = MessageBlockIndex*AES_128_BLOCK_LENGTH_BYTES;
 		AesDecryptBlock(Message + MessageIndexBytes, Cipher + MessageIndexBytes, AES_128_BLOCK_LENGTH_BYTES,
-						Key, KeyLength);
+						Key, AES_128_BLOCK_LENGTH_BYTES);
 	}
 }
 
