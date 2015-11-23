@@ -2,6 +2,11 @@
 
 #define MAX_PLAINTEXT_LENGTH 65536
 
+const u8 KNOWN_PLAINTEXT[] =
+{
+	'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A'
+};
+
 internal void
 CtrEdit(u8 *Ciphertext, u8 *Key, u32 Offset, u8 *NewPlaintext, u32 NewPlaintextLength)
 {
@@ -23,6 +28,19 @@ CtrEdit(u8 *Ciphertext, u8 *Key, u32 Offset, u8 *NewPlaintext, u32 NewPlaintextL
 	AesCtrMode(CtAlignedBlockStart, CtAlignedBlockStart, TotalDecryptLength, Key, NonceCounter);
 }
 
+internal inline void
+EditAndDecryptBlock(u8 *GuessedPlaintext, u8 *EditedCiphertext, u8 *Ciphertext, u8 *Key, u32 Offset, u32 BlockLength)
+{
+	Stopif((GuessedPlaintext == 0) || (EditedCiphertext == 0) || (Ciphertext == 0),
+		   "Null input to EditAndDecryptBlock");
+
+	u8 CounterEncryptedWithKey[AES_128_BLOCK_LENGTH_BYTES];
+	CtrEdit(EditedCiphertext, Key, Offset, (u8 *)KNOWN_PLAINTEXT, BlockLength);
+	XorVectorsUnchecked(CounterEncryptedWithKey, EditedCiphertext + Offset, (u8 *)KNOWN_PLAINTEXT, BlockLength);
+	XorVectorsUnchecked(GuessedPlaintext + Offset, Ciphertext + Offset, CounterEncryptedWithKey, BlockLength);
+}
+
+
 internal MIN_UNIT_TEST_FUNC(TestBreakRandomAccessRwAesCtr)
 {
     u8 CipherBase64[MAX_PLAINTEXT_LENGTH];
@@ -41,31 +59,29 @@ internal MIN_UNIT_TEST_FUNC(TestBreakRandomAccessRwAesCtr)
     u32 CiphertextLength = Base64ToAscii(Ciphertext, CipherBase64, CipherBase64Length);
 
 	u8 Plaintext[MAX_PLAINTEXT_LENGTH];
-	AesEcbDecrypt(Plaintext, Ciphertext, CiphertextLength, Key, KeyLength);
+	AesEcbDecrypt(Plaintext, Ciphertext, CiphertextLength, Key);
 
 	GenRandUnchecked((u32 *)Key, AES_128_BLOCK_LENGTH_WORDS);
 
 	u8 NonceCounter[AES_128_BLOCK_LENGTH_BYTES] = {0};
 	AesCtrMode(Ciphertext, Plaintext, CiphertextLength, Key, NonceCounter);
 
-	u8 KnownPlaintext[] =
-	{
-		'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A', 'A'
-	};
-	u32 KnownPtLength = sizeof(KnownPlaintext);
-	CtrEdit(Ciphertext, Key, 0, KnownPlaintext, KnownPtLength);
+	u8 EditedCiphertext[MAX_PLAINTEXT_LENGTH];
+	memcpy(EditedCiphertext, Ciphertext, CiphertextLength);
 
-	// TODO(bwd): Debug this step -- key guessing by XORing Known PT with first 16-bytes of ciphertext
 	u8 GuessedPlaintext[MAX_PLAINTEXT_LENGTH];
-	u8 GuessedKey[AES_128_BLOCK_LENGTH_BYTES];
-	XorVectorsUnchecked(GuessedKey, Ciphertext, KnownPlaintext, sizeof(GuessedKey));
-	MinUnitAssert(VectorsEqual(GuessedKey, Key, KeyLength),
-				  "Guessed key mismatch in TestBreakRandomAccessRwAesCtr!\n");
-
-	CtrEdit(Ciphertext, Key, 0, Plaintext, KnownPtLength);
-
-	memset(NonceCounter, 0, sizeof(NonceCounter));
-	AesCtrMode(GuessedPlaintext, Ciphertext, CiphertextLength, GuessedKey, NonceCounter);
+	for (i32 CiphertextIndex = 0;
+		 CiphertextIndex <= ((i32)CiphertextLength - AES_128_BLOCK_LENGTH_BYTES);
+		 CiphertextIndex += AES_128_BLOCK_LENGTH_BYTES)
+	{
+		EditAndDecryptBlock(GuessedPlaintext, EditedCiphertext, Ciphertext, Key, CiphertextIndex,
+							AES_128_BLOCK_LENGTH_BYTES);
+		MinUnitAssert(VectorsEqual(GuessedPlaintext + CiphertextIndex, Plaintext + CiphertextIndex, AES_128_BLOCK_LENGTH_BYTES),
+					  "Guessed Plaintext mismatch in TestBreakRandomAccessRwAesCtr! CiphertextIndex: %d\n", CiphertextIndex);
+	}
+	u32 CtLengthMod16 = CiphertextLength % AES_128_BLOCK_LENGTH_BYTES;
+	u32 LastAligned16CtIndex = (CiphertextLength/AES_128_BLOCK_LENGTH_BYTES)*AES_128_BLOCK_LENGTH_BYTES;
+	EditAndDecryptBlock(GuessedPlaintext, EditedCiphertext, Ciphertext, Key, LastAligned16CtIndex, CtLengthMod16);
 
 	MinUnitAssert(VectorsEqual(GuessedPlaintext, Plaintext, CiphertextLength),
 				  "Guessed Plaintext mismatch in TestBreakRandomAccessRwAesCtr!\n");

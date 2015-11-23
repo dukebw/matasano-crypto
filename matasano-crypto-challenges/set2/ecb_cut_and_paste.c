@@ -144,20 +144,19 @@ int main()
 	u32 EncodedProfileLength = ProfileFor(TestEncodedProfile, TEST_EMAIL, strlen(TEST_EMAIL));
 
 	u8 EncryptedProfile[MAX_ENCODED_PROFILE_LENGTH];
-	AesEcbEncrypt(EncryptedProfile, (u8 *)TestEncodedProfile, EncodedProfileLength, (u8 *)Key, sizeof(Key));
+	AesEcbEncrypt(EncryptedProfile, (u8 *)TestEncodedProfile, EncodedProfileLength, (u8 *)Key);
 
 	u8 EncryptedAdmin[AES_128_BLOCK_LENGTH_BYTES];
 	u32 EncryptedAdminStringLength = sizeof(ADMIN_STRING);
 	u8 PaddedAdminMessage[AES_128_BLOCK_LENGTH_BYTES];
 	memcpy(PaddedAdminMessage, ADMIN_STRING, EncryptedAdminStringLength);
-	AesEcbEncrypt(EncryptedAdmin, PaddedAdminMessage, EncryptedAdminStringLength, (u8 *)Key, sizeof(Key));
+	AesEcbEncrypt(EncryptedAdmin, PaddedAdminMessage, EncryptedAdminStringLength, (u8 *)Key);
 
 	u32 ProfileLengthNoUser = EncodedProfileLength - sizeof(USER_STRING);
 	memcpy(EncryptedProfile + ProfileLengthNoUser, EncryptedAdmin, AES_128_BLOCK_LENGTH_BYTES);
 
 	EncodedProfileLength = ProfileLengthNoUser + EncryptedAdminStringLength;
-	AesEcbDecrypt((u8 *)TestEncodedProfile, (u8 *)EncryptedProfile, EncodedProfileLength,
-				  (u8 *)Key, sizeof(Key));
+	AesEcbDecrypt((u8 *)TestEncodedProfile, (u8 *)EncryptedProfile, EncodedProfileLength, (u8 *)Key);
 
 	printf("%s\n", TestEncodedProfile);
 

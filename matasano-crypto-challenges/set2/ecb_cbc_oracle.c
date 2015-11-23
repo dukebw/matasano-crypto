@@ -36,14 +36,12 @@ int main()
 	u32 RandomEcbCbc = rand() % 2;
 	if (RandomEcbCbc == RANDOM_ECB)
 	{
-		AesEcbEncrypt(Cipher, (u8 *)GlobalOracleScratch, AppendedMessageLength,
-					  (u8 *)Key, AES_128_BLOCK_LENGTH_BYTES);
+		AesEcbEncrypt(Cipher, (u8 *)GlobalOracleScratch, AppendedMessageLength, (u8 *)Key);
 	}
 	else
 	{
 		GenRandUnchecked(Iv, AES_128_BLOCK_LENGTH_WORDS);
-		AesCbcEncrypt(Cipher, (u8 *)GlobalOracleScratch, AppendedMessageLength,
-					  (u8 *)Key, AES_128_BLOCK_LENGTH_BYTES, (u8 *)Iv);
+		AesCbcEncrypt(Cipher, (u8 *)GlobalOracleScratch, AppendedMessageLength, (u8 *)Key, (u8 *)Iv);
 	}
 
 	u32 PaddedMsgBlockCount;

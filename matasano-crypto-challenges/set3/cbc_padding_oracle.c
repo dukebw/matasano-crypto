@@ -39,8 +39,7 @@ internal MIN_UNIT_TEST_FUNC(TestPaddingOracleDecrypt)
 	u8 Ciphertext[MAX_INPUT_PADDED_SIZE];
 	Stopif(sizeof(Ciphertext) < InputStringLength,
 		   "String too long for Ciphertext TestPaddingOracleDecrypt");
-	u32 PaddedLength = AesCbcEncrypt(Ciphertext, InputString, InputStringLength,
-									 (u8 *)Key, AES_128_BLOCK_LENGTH_BYTES, (u8 *)Iv);
+	u32 PaddedLength = AesCbcEncrypt(Ciphertext, InputString, InputStringLength, (u8 *)Key, (u8 *)Iv);
 	u32 InputStringLengthMod16 = (InputStringLength % AES_128_BLOCK_LENGTH_BYTES);
 	Stopif((PaddedLength < InputStringLength) ||
 		   ((InputStringLengthMod16 == 0) &&
@@ -93,8 +92,8 @@ internal MIN_UNIT_TEST_FUNC(TestPaddingOracleDecrypt)
 
 				// NOTE(bwd): server padding check
 				AesCbcDecrypt(DecryptScratchBuffer,
-							  Ciphertext + BlockOffsetInBytes, sizeof(DecryptScratchBuffer),
-							  (u8 *)Key, AES_128_BLOCK_LENGTH_BYTES, (u8 *)GuessPrevCipherBlock);
+							  Ciphertext + BlockOffsetInBytes, sizeof(DecryptScratchBuffer), (u8 *)Key,
+							  (u8 *)GuessPrevCipherBlock);
 
 				*CurrentXorByte ^= CurrentXorValue;
 

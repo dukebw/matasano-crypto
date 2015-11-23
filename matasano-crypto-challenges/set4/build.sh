@@ -1,3 +1,5 @@
 #!/bin/bash
+cd ../..
 ctags -R .
-P=break_mt19937_stream_cipher make
+cd matasano-crypto-challenges/set4
+P=break_hmac_sha1_artifical_timing_leak make

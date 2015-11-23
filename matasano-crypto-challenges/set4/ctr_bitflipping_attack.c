@@ -1,25 +1,22 @@
 #include "crypt_helper.h"
 
-internal MIN_UNIT_TEST_FUNC(TestCiphertextModification)
+internal MIN_UNIT_TEST_FUNC(TestCtrCtModification)
 {
 	u8 ScratchInput[256];
 	u32 TotalInputLength = GenRandInputAppendPrepend(ScratchInput, sizeof(ScratchInput));
 
-	u32 Iv[AES_128_BLOCK_LENGTH_WORDS];
-	GenRandUnchecked(Iv, AES_128_BLOCK_LENGTH_WORDS);
+	u8 NonceCounter[AES_128_BLOCK_LENGTH_BYTES] = {0};
 	u32 Key[AES_128_BLOCK_LENGTH_WORDS];
 	GenRandUnchecked(Key, AES_128_BLOCK_LENGTH_WORDS);
 
-	AesCbcEncrypt(ScratchInput, ScratchInput, TotalInputLength, (u8 *)Key, (u8 *)Iv);
+	AesCtrMode(ScratchInput, ScratchInput, TotalInputLength, (u8 *)Key, NonceCounter);
 
 	u8 PlaintextXorAdminTrue[AES_128_BLOCK_LENGTH_BYTES];
-	XorVectorsUnchecked(PlaintextXorAdminTrue,
-						(u8 *)ADMIN_TRUE_STRING,
-						(u8 *)PREPEND_STRING + AES_128_BLOCK_LENGTH_BYTES,
-						ADMIN_TRUE_STR_LENGTH);
+	XorVectorsUnchecked(PlaintextXorAdminTrue, (u8 *)ADMIN_TRUE_STRING, (u8 *)PREPEND_STRING, ADMIN_TRUE_STR_LENGTH);
 	XorVectorsUnchecked(ScratchInput, ScratchInput, PlaintextXorAdminTrue, ADMIN_TRUE_STR_LENGTH);
 
-	AesCbcDecrypt(ScratchInput, ScratchInput, TotalInputLength, (u8 *)Key, (u8 *)Iv);
+	memset(NonceCounter, 0, sizeof(NonceCounter));
+	AesCtrMode(ScratchInput, ScratchInput, TotalInputLength, (u8 *)Key, NonceCounter);
 
 	b32 AdminTrueFound = false;
 	for (u32 AdminTrueCheckIndex = 0;
@@ -38,7 +35,7 @@ internal MIN_UNIT_TEST_FUNC(TestCiphertextModification)
 internal MIN_UNIT_TEST_FUNC(AllTests)
 {
 	srand(time(0));
-	MinUnitRunTest(TestCiphertextModification);
+	MinUnitRunTest(TestCtrCtModification);
 }
 
 int main()

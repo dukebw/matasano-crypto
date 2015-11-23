@@ -16,6 +16,6 @@ int main()
 
     u8 Key[] = "YELLOW SUBMARINE";
 	u8 Iv[AES_128_BLOCK_LENGTH_BYTES] = {0};
-	AesCbcDecrypt(GlobalCbcMessageHex, Cipher, CipherLength, Key, AES_128_BLOCK_LENGTH_BYTES, Iv);
+	AesCbcDecrypt(GlobalCbcMessageHex, Cipher, CipherLength, Key, Iv);
     printf("%s\n", GlobalCbcMessageHex);
 }

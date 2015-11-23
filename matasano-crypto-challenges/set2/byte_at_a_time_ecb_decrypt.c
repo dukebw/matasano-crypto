@@ -11,7 +11,7 @@ internal void
 OracleFunction(u8 *Cipher, u8 *Plaintext, u32 PlaintextLength)
 {
 	Stopif((Plaintext == 0) || (Cipher == 0), "Null input to OracleFunction");
-	AesEcbEncrypt(Cipher, Plaintext, PlaintextLength, (u8 *)GlobalOracleKey, sizeof(GlobalOracleKey));
+	AesEcbEncrypt(Cipher, Plaintext, PlaintextLength, (u8 *)GlobalOracleKey);
 }
 
 internal void
