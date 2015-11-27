@@ -1,4 +1,5 @@
 # NOTE(brendan): set P using "export P=program_name" from shell
+P=break_hmac_sha1_artifical_timing_leak
 
 OBJECTS=
 STD_FLAGS=gnu11
