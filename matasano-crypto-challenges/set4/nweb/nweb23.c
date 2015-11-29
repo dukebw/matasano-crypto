@@ -195,21 +195,32 @@ void web(int fd, int hit)
 			logger(ERROR, "No valid signature= in request string", buffer, fd);
 		}
 
+		timespec Remaining;
+
 		timespec Request;
 		Request.tv_sec = 0;
-		Request.tv_nsec = 50000000;
 
-		timespec Remaining;
 		u32 ReceivedSigHexIndex;
 		for (ReceivedSigHexIndex = 0;
 			 ReceivedSigHexIndex < HmacKeyHexDigitCount;
 			 ++ReceivedSigHexIndex)
 		{
-			nanosleep(&Request, &Remaining);
+			Request.tv_nsec = 500000000;
+
+			do
+			{
+				nanosleep(&Request, &Remaining);
+
+				sprintf(DebugBuffer, "Request: %ld Remaining: %ld", Request.tv_nsec, Remaining.tv_nsec);
+				logger(LOG, "FileHmac", DebugBuffer, fd);
+			} while (Remaining.tv_nsec > 0);
+
+#if 0
 			if (*(ReceivedSignaturePrefix + STR_LEN(SIG_PREFIX)) != DebugBuffer[ReceivedSigHexIndex])
 			{
 				break;
 			}
+#endif
 		}
 		
 		if (ReceivedSigHexIndex == HmacKeyHexDigitCount)
