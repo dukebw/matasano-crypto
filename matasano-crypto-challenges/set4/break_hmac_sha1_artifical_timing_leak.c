@@ -1,55 +1,12 @@
 #include "crypt_helper.h"
 
 typedef struct sockaddr_in sockaddr_in;
+typedef struct sockaddr sockaddr;
 
-#define SHA_1_BLOCK_SIZE 64
-#define SHA_1_HMAC_MAX_HASH_INPUT_LENGTH 512
+#define PORT 8181
+#define IP_ADDRESS "192.168.11.42"
 
-internal void
-HmacSha1(u8 *Hmac, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength)
-{
-	Stopif((Hmac == 0) || (Message == 0) || (Key == 0), "Null input to HmacSha1");
-	u32 TotalHashedInputSize = (SHA_1_BLOCK_SIZE + MessageLength);
-	Stopif(TotalHashedInputSize > SHA_1_HMAC_MAX_HASH_INPUT_LENGTH, "Buffer overflow in HmacSha1");
-
-	u8 KeyScratch[SHA_1_BLOCK_SIZE];
-	u8 *K_0;
-	if (KeyLength == SHA_1_BLOCK_SIZE)
-	{
-		K_0 = Key;
-	}
-	else if (KeyLength > SHA_1_BLOCK_SIZE)
-	{
-		Sha1(KeyScratch, Key, KeyLength);
-		memset(KeyScratch + SHA_1_HASH_LENGTH_BYTES, 0, sizeof(KeyScratch) - SHA_1_HASH_LENGTH_BYTES);
-		K_0 = KeyScratch;
-	}
-	else
-	{
-		memcpy(KeyScratch, Key, KeyLength);
-		memset(KeyScratch + KeyLength, 0, sizeof(KeyScratch) - KeyLength);
-		K_0 = KeyScratch;
-	}
-
-	u8 HmacScratch[SHA_1_HMAC_MAX_HASH_INPUT_LENGTH];
-	for (u32 HmacScratchByteIndex = 0;
-		 HmacScratchByteIndex < SHA_1_BLOCK_SIZE;
-		 ++HmacScratchByteIndex)
-	{
-		HmacScratch[HmacScratchByteIndex] = K_0[HmacScratchByteIndex] ^ 0x36;
-	}
-	memcpy(HmacScratch + SHA_1_BLOCK_SIZE, Message, MessageLength);
-	Sha1(HmacScratch + SHA_1_BLOCK_SIZE, HmacScratch, TotalHashedInputSize);
-
-	for (u32 HmacScratchByteIndex = 0;
-		 HmacScratchByteIndex < SHA_1_BLOCK_SIZE;
-		 ++HmacScratchByteIndex)
-	{
-		HmacScratch[HmacScratchByteIndex] = K_0[HmacScratchByteIndex] ^ 0x5C;
-	}
-
-	Sha1(Hmac, HmacScratch, SHA_1_BLOCK_SIZE + SHA_1_HASH_LENGTH_BYTES);
-}
+char Command[] = "test?file=index.html&signature=46b4ec586117154dacd49d664e5d63fdc88efb51";
 
 const u8 HMAC_SHA_1_KEY_0[] =
 {
@@ -82,18 +39,35 @@ internal MIN_UNIT_TEST_FUNC(TestHmacSha1)
 				  "Expected HMAC mismatch in TestBreakHmacSha1TimingLeak!");
 }
 
-#define PORT 8181
-#define IP_ADDRESS "192.168.11.42"
-
 internal MIN_UNIT_TEST_FUNC(TestBreakHmacSha1TimingLeak)
 {
 	i32 SocketFileDescriptor = socket(AF_INET, SOCK_STREAM, 0);
 	Stopif(SocketFileDescriptor < 0, "Error from socket() call in TestBreakHmacSha1TimingLeak");
 
-	static sockaddr_in ServerSocketAddr;
+	sockaddr_in ServerSocketAddr;
 	ServerSocketAddr.sin_family = AF_INET;
-	ServerSocketAddr.sin_port = inet_addr(IP_ADDRESS);
-	ServerSocketAddr.sin_addr = htons(PORT);
+	ServerSocketAddr.sin_addr.s_addr = inet_addr(IP_ADDRESS);
+	ServerSocketAddr.sin_port = htons(PORT);
+
+	i32 Status = connect(SocketFileDescriptor, (sockaddr *)&ServerSocketAddr, sizeof(ServerSocketAddr));
+	Stopif(Status < 0, "Error from connect() call in TestBreakHmacSha1TimingLeak");
+
+	write(SocketFileDescriptor, Command, STR_LEN(Command));
+
+	u8 ReceiveBuffer[8196];
+	i32 ReadBytes;
+	for (;;)
+	{
+		ReadBytes = read(SocketFileDescriptor, ReceiveBuffer, sizeof(ReceiveBuffer));
+		if (ReadBytes <= 0)
+		{
+			break;
+		}
+
+		write(1, ReceiveBuffer, ReadBytes);
+	}
+
+	write(1, "\n", 1);
 }
 
 internal MIN_UNIT_TEST_FUNC(AllTests)

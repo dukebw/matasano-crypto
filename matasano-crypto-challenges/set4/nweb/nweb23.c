@@ -9,12 +9,16 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include "crypt_helper.h"
+
 #define VERSION 23
 #define BUFSIZE 8096
 #define ERROR      42
 #define LOG        44
 #define FORBIDDEN 403
 #define NOTFOUND  404
+
+typedef struct timespec timespec;
 
 struct {
 	char *ext;
@@ -59,6 +63,15 @@ void logger(int type, char *s1, char *s2, int socket_fd)
 	if(type == ERROR || type == NOTFOUND || type == FORBIDDEN) exit(3);
 }
 
+const char TEST_HMAC_PREFIX[] = "test?";
+const char FILE_PREFIX[] = "file=";
+const char SIG_PREFIX[] = "signature=";
+const u8 TEST_HMAC_KEY[] =
+{
+	0x82, 0xF3, 0xB6, 0x9A, 0x1B, 0xFF, 0x4D, 0xE1, 0x5C, 0x33, 
+	0x82, 0xF3, 0xB6, 0x9A, 0x1B, 0xFF, 0x4D, 0xE1, 0x5C, 0x33, 
+};
+
 /* this is a child web server process, so we can exit on errors */
 void web(int fd, int hit)
 {
@@ -78,47 +91,141 @@ void web(int fd, int hit)
 		if(buffer[i] == '\r' || buffer[i] == '\n')
 			buffer[i]='*';
 	logger(LOG,"request",buffer,hit);
-	if( strncmp(buffer,"GET ",4) && strncmp(buffer,"get ",4) ) {
-		logger(FORBIDDEN,"Only simple GET operation supported",buffer,fd);
-	}
-	for(i=4;i<BUFSIZE;i++) { /* null terminate after the second space to ignore extra stuff */
-		if(buffer[i] == ' ') { /* string is "GET URL " +lots of other stuff */
-			buffer[i] = 0;
-			break;
+
+	if( (strncmp(buffer,"GET ",4) == 0) || (strncmp(buffer,"get ",4) == 0))
+	{
+		for(i=4;i<BUFSIZE;i++) { /* null terminate after the second space to ignore extra stuff */
+			if(buffer[i] == ' ') { /* string is "GET URL " +lots of other stuff */
+				buffer[i] = 0;
+				break;
+			}
+		}
+		for(j=0;j<i-1;j++) 	/* check for illegal parent directory use .. */
+			if(buffer[j] == '.' && buffer[j+1] == '.') {
+				logger(FORBIDDEN,"Parent directory (..) path names not supported",buffer,fd);
+			}
+		if( !strncmp(&buffer[0],"GET /\0",6) || !strncmp(&buffer[0],"get /\0",6) ) /* convert no filename to index file */
+			(void)strcpy(buffer,"GET /index.html");
+
+		/* work out the file type and check we support it */
+		buflen=strlen(buffer);
+		fstr = (char *)0;
+		for(i=0;extensions[i].ext != 0;i++) {
+			len = strlen(extensions[i].ext);
+			if( !strncmp(&buffer[buflen-len], extensions[i].ext, len)) {
+				fstr =extensions[i].filetype;
+				break;
+			}
+		}
+		if(fstr == 0) logger(FORBIDDEN,"file extension type not supported",buffer,fd);
+
+		if(( file_fd = open(&buffer[5],O_RDONLY)) == -1) {  /* open the file for reading */
+			logger(NOTFOUND, "failed to open file",&buffer[5],fd);
+		}
+		logger(LOG,"SEND",&buffer[5],hit);
+		len = (long)lseek(file_fd, (off_t)0, SEEK_END); /* lseek to the file end to find the length */
+		(void)lseek(file_fd, (off_t)0, SEEK_SET); /* lseek back to the file start ready for reading */
+		(void)sprintf(buffer,"HTTP/1.1 200 OK\nServer: nweb/%d.0\nContent-Length: %ld\nConnection: close\nContent-Type: %s\n\n", VERSION, len, fstr); /* Header + a blank line */
+		logger(LOG,"Header",buffer,hit);
+		(void)write(fd,buffer,strlen(buffer));
+
+		/* send file in 8KB block - last block may be smaller */
+		while (	(ret = read(file_fd, buffer, BUFSIZE)) > 0 ) {
+			(void)write(fd,buffer,ret);
 		}
 	}
-	for(j=0;j<i-1;j++) 	/* check for illegal parent directory use .. */
-		if(buffer[j] == '.' && buffer[j+1] == '.') {
-			logger(FORBIDDEN,"Parent directory (..) path names not supported",buffer,fd);
+	else if (strncmp(buffer, TEST_HMAC_PREFIX, STR_LEN(TEST_HMAC_PREFIX)) == 0)
+	{
+		if (strncmp(buffer + STR_LEN(TEST_HMAC_PREFIX), FILE_PREFIX, STR_LEN(FILE_PREFIX)))
+		{
+			logger(ERROR, "No valid file= in request string", buffer, fd);
 		}
-	if( !strncmp(&buffer[0],"GET /\0",6) || !strncmp(&buffer[0],"get /\0",6) ) /* convert no filename to index file */
-		(void)strcpy(buffer,"GET /index.html");
 
-	/* work out the file type and check we support it */
-	buflen=strlen(buffer);
-	fstr = (char *)0;
-	for(i=0;extensions[i].ext != 0;i++) {
-		len = strlen(extensions[i].ext);
-		if( !strncmp(&buffer[buflen-len], extensions[i].ext, len)) {
-			fstr =extensions[i].filetype;
-			break;
+		u32 PrefixToFilename = (STR_LEN(TEST_HMAC_PREFIX) + STR_LEN(FILE_PREFIX));
+		u32 RemainingReceivedLength = (ret - PrefixToFilename);
+		u32 FilenameLength;
+		for (FilenameLength = 0;
+			 (FilenameLength < RemainingReceivedLength) &&
+			 buffer[PrefixToFilename + FilenameLength] != '&';
+			 ++FilenameLength)
+		{
 		}
-	}
-	if(fstr == 0) logger(FORBIDDEN,"file extension type not supported",buffer,fd);
 
-	if(( file_fd = open(&buffer[5],O_RDONLY)) == -1) {  /* open the file for reading */
-		logger(NOTFOUND, "failed to open file",&buffer[5],fd);
-	}
-	logger(LOG,"SEND",&buffer[5],hit);
-	len = (long)lseek(file_fd, (off_t)0, SEEK_END); /* lseek to the file end to find the length */
-	      (void)lseek(file_fd, (off_t)0, SEEK_SET); /* lseek back to the file start ready for reading */
-          (void)sprintf(buffer,"HTTP/1.1 200 OK\nServer: nweb/%d.0\nContent-Length: %ld\nConnection: close\nContent-Type: %s\n\n", VERSION, len, fstr); /* Header + a blank line */
-	logger(LOG,"Header",buffer,hit);
-	(void)write(fd,buffer,strlen(buffer));
+		if ((RemainingReceivedLength - FilenameLength - 1 - STR_LEN(SIG_PREFIX)) < 2*sizeof(TEST_HMAC_KEY))
+		{
+			logger(ERROR, "No signature of correct length in request string", buffer, fd);
+		}
 
-	/* send file in 8KB block - last block may be smaller */
-	while (	(ret = read(file_fd, buffer, BUFSIZE)) > 0 ) {
-		(void)write(fd,buffer,ret);
+		buffer[PrefixToFilename + FilenameLength] = 0;
+
+		char DebugBuffer[256];
+		sprintf(DebugBuffer, "%d", FilenameLength);
+		logger(LOG, "Length of filename received", DebugBuffer, fd);
+
+		file_fd = open(buffer + PrefixToFilename, O_RDONLY);
+		if (file_fd == -1)
+		{
+			memcpy(DebugBuffer, buffer + PrefixToFilename, FilenameLength);
+			DebugBuffer[FilenameLength] = 0;
+			logger(NOTFOUND, "failed to open file", DebugBuffer, fd);
+		}
+
+		u8 FileBuffer[8196];
+		u32 FileSize = read(file_fd, FileBuffer, sizeof(FileBuffer));
+		if (FileSize == sizeof(FileBuffer))
+		{
+			sprintf(DebugBuffer, "%d", FileSize);
+			logger(ERROR, "File size too large to HMAC", DebugBuffer, fd);
+		}
+
+		sprintf(DebugBuffer, "%s == %d", buffer + PrefixToFilename, FileSize);
+		logger(LOG, "Length of file", DebugBuffer, fd);
+
+		u8 FileHmac[SHA_1_HASH_LENGTH_BYTES];
+		HmacSha1(FileHmac, FileBuffer, FileSize, (u8 *)TEST_HMAC_KEY, sizeof(TEST_HMAC_KEY));
+
+		StringToHex((u8 *)DebugBuffer, FileHmac, sizeof(TEST_HMAC_KEY));
+		u32 HmacKeyHexDigitCount = 2*sizeof(TEST_HMAC_KEY);
+		DebugBuffer[HmacKeyHexDigitCount] = 0;
+		logger(LOG, "FileHmac", DebugBuffer, fd);
+
+		char *ReceivedSignaturePrefix = buffer + PrefixToFilename + FilenameLength + 1;
+		if (strncmp(ReceivedSignaturePrefix, SIG_PREFIX, STR_LEN(SIG_PREFIX)))
+		{
+			logger(ERROR, "No valid signature= in request string", buffer, fd);
+		}
+
+		timespec Request;
+		Request.tv_sec = 0;
+		Request.tv_nsec = 50000000;
+
+		timespec Remaining;
+		u32 ReceivedSigHexIndex;
+		for (ReceivedSigHexIndex = 0;
+			 ReceivedSigHexIndex < HmacKeyHexDigitCount;
+			 ++ReceivedSigHexIndex)
+		{
+			nanosleep(&Request, &Remaining);
+			if (*(ReceivedSignaturePrefix + STR_LEN(SIG_PREFIX)) != DebugBuffer[ReceivedSigHexIndex])
+			{
+				break;
+			}
+		}
+		
+		if (ReceivedSigHexIndex == HmacKeyHexDigitCount)
+		{
+			sprintf(DebugBuffer, "%d", HMAC_RET_CODE_VALID);
+		}
+		else
+		{
+			sprintf(DebugBuffer, "%d", HMAC_RET_CODE_INVALID);
+		}
+
+		write(fd, DebugBuffer, HMAC_RET_CODE_LENGTH_BYTES);
+	}
+	else
+	{
+		logger(FORBIDDEN,"Only simple GET operation, and test HMAC verification supported",buffer,fd);
 	}
 	sleep(1);	/* allow socket to drain before signalling the socket is closed */
 	close(fd);
