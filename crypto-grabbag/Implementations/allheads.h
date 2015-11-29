@@ -11,6 +11,10 @@
 #include <stdint.h>
 #include <ctype.h>
 #include <stdarg.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include "stopif.h"
 
 #define internal static
