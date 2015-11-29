@@ -211,7 +211,7 @@ Base64ToAscii(u8 *AsciiString, u8 *Base64String, u32 Base64StringLength)
 // NOTE(brendan): OUTPUT: OutHex[] array of hex values corresponding to input
 // string.  INPUT: String[], Length of String
 internal void
-StringToHex(u8 OutHex[], u8 String[], u32 StringLength)
+StringToHex(u8 *OutHex, u8 *String, u32 StringLength)
 {
     for (u32 StringIndex = 0;
          StringIndex < StringLength;
@@ -703,6 +703,58 @@ Sha1KeyedMac(u8 *KeyedMac, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLengt
 	memcpy(KeyConcatMessage + KeyLength, Message, MessageLength);
 
 	Sha1(KeyedMac, KeyConcatMessage, TotalHmacInputSize);
+}
+
+#define SHA_1_BLOCK_SIZE 64
+#define SHA_1_HMAC_MAX_HASH_INPUT_LENGTH 512
+#define HMAC_RET_CODE_VALID 200
+#define HMAC_RET_CODE_INVALID 500
+#define HMAC_RET_CODE_LENGTH_BYTES 4
+
+internal void
+HmacSha1(u8 *Hmac, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength)
+{
+	Stopif((Hmac == 0) || (Message == 0) || (Key == 0), "Null input to HmacSha1");
+	u32 TotalHashedInputSize = (SHA_1_BLOCK_SIZE + MessageLength);
+	Stopif(TotalHashedInputSize > SHA_1_HMAC_MAX_HASH_INPUT_LENGTH, "Buffer overflow in HmacSha1");
+
+	u8 KeyScratch[SHA_1_BLOCK_SIZE];
+	u8 *K_0;
+	if (KeyLength == SHA_1_BLOCK_SIZE)
+	{
+		K_0 = Key;
+	}
+	else if (KeyLength > SHA_1_BLOCK_SIZE)
+	{
+		Sha1(KeyScratch, Key, KeyLength);
+		memset(KeyScratch + SHA_1_HASH_LENGTH_BYTES, 0, sizeof(KeyScratch) - SHA_1_HASH_LENGTH_BYTES);
+		K_0 = KeyScratch;
+	}
+	else
+	{
+		memcpy(KeyScratch, Key, KeyLength);
+		memset(KeyScratch + KeyLength, 0, sizeof(KeyScratch) - KeyLength);
+		K_0 = KeyScratch;
+	}
+
+	u8 HmacScratch[SHA_1_HMAC_MAX_HASH_INPUT_LENGTH];
+	for (u32 HmacScratchByteIndex = 0;
+		 HmacScratchByteIndex < SHA_1_BLOCK_SIZE;
+		 ++HmacScratchByteIndex)
+	{
+		HmacScratch[HmacScratchByteIndex] = K_0[HmacScratchByteIndex] ^ 0x36;
+	}
+	memcpy(HmacScratch + SHA_1_BLOCK_SIZE, Message, MessageLength);
+	Sha1(HmacScratch + SHA_1_BLOCK_SIZE, HmacScratch, TotalHashedInputSize);
+
+	for (u32 HmacScratchByteIndex = 0;
+		 HmacScratchByteIndex < SHA_1_BLOCK_SIZE;
+		 ++HmacScratchByteIndex)
+	{
+		HmacScratch[HmacScratchByteIndex] = K_0[HmacScratchByteIndex] ^ 0x5C;
+	}
+
+	Sha1(Hmac, HmacScratch, SHA_1_BLOCK_SIZE + SHA_1_HASH_LENGTH_BYTES);
 }
 
 #endif /* CRYPT_HELPER_H */
