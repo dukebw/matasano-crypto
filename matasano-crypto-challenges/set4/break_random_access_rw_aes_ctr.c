@@ -29,7 +29,8 @@ CtrEdit(u8 *Ciphertext, u8 *Key, u32 Offset, u8 *NewPlaintext, u32 NewPlaintextL
 }
 
 internal inline void
-EditAndDecryptBlock(u8 *GuessedPlaintext, u8 *EditedCiphertext, u8 *Ciphertext, u8 *Key, u32 Offset, u32 BlockLength)
+EditAndDecryptBlock(u8 *GuessedPlaintext, u8 *EditedCiphertext, u8 *Ciphertext, u8 *Key, u32 Offset,
+					u32 BlockLength)
 {
 	Stopif((GuessedPlaintext == 0) || (EditedCiphertext == 0) || (Ciphertext == 0),
 		   "Null input to EditAndDecryptBlock");

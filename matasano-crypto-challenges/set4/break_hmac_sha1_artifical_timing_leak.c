@@ -1,25 +1,9 @@
 #include "crypt_helper.h"
 
-const u8 IPAD[] =
-{
-	0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36,
-	0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36,
-	0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36,
-	0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36,
-};
-const u8 OPAD[] =
-{
-	0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C,
-	0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C,
-	0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C,
-	0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C,
-};
+typedef struct sockaddr_in sockaddr_in;
 
 #define SHA_1_BLOCK_SIZE 64
 #define SHA_1_HMAC_MAX_HASH_INPUT_LENGTH 512
-
-CASSERT(sizeof(IPAD) == SHA_1_BLOCK_SIZE, break_hmac_sha1_artifical_timing_leak_c);
-CASSERT(sizeof(OPAD) == SHA_1_BLOCK_SIZE, break_hmac_sha1_artifical_timing_leak_c);
 
 internal void
 HmacSha1(u8 *Hmac, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength)
@@ -48,12 +32,21 @@ HmacSha1(u8 *Hmac, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength)
 	}
 
 	u8 HmacScratch[SHA_1_HMAC_MAX_HASH_INPUT_LENGTH];
-	// TODO(bwd): XOR byte at a time
-	XorVectorsUnchecked(HmacScratch, K_0, (u8 *)IPAD, SHA_1_BLOCK_SIZE);
+	for (u32 HmacScratchByteIndex = 0;
+		 HmacScratchByteIndex < SHA_1_BLOCK_SIZE;
+		 ++HmacScratchByteIndex)
+	{
+		HmacScratch[HmacScratchByteIndex] = K_0[HmacScratchByteIndex] ^ 0x36;
+	}
 	memcpy(HmacScratch + SHA_1_BLOCK_SIZE, Message, MessageLength);
 	Sha1(HmacScratch + SHA_1_BLOCK_SIZE, HmacScratch, TotalHashedInputSize);
 
-	XorVectorsUnchecked(HmacScratch, K_0, (u8 *)OPAD, SHA_1_BLOCK_SIZE);
+	for (u32 HmacScratchByteIndex = 0;
+		 HmacScratchByteIndex < SHA_1_BLOCK_SIZE;
+		 ++HmacScratchByteIndex)
+	{
+		HmacScratch[HmacScratchByteIndex] = K_0[HmacScratchByteIndex] ^ 0x5C;
+	}
 
 	Sha1(Hmac, HmacScratch, SHA_1_BLOCK_SIZE + SHA_1_HASH_LENGTH_BYTES);
 }
@@ -89,8 +82,18 @@ internal MIN_UNIT_TEST_FUNC(TestHmacSha1)
 				  "Expected HMAC mismatch in TestBreakHmacSha1TimingLeak!");
 }
 
+#define PORT 8181
+#define IP_ADDRESS "192.168.11.42"
+
 internal MIN_UNIT_TEST_FUNC(TestBreakHmacSha1TimingLeak)
 {
+	i32 SocketFileDescriptor = socket(AF_INET, SOCK_STREAM, 0);
+	Stopif(SocketFileDescriptor < 0, "Error from socket() call in TestBreakHmacSha1TimingLeak");
+
+	static sockaddr_in ServerSocketAddr;
+	ServerSocketAddr.sin_family = AF_INET;
+	ServerSocketAddr.sin_port = inet_addr(IP_ADDRESS);
+	ServerSocketAddr.sin_addr = htons(PORT);
 }
 
 internal MIN_UNIT_TEST_FUNC(AllTests)

@@ -9,7 +9,7 @@
 
 /* YOU WILL HAVE TO CHANGE THESE TWO LINES  TO MATCH YOUR CONFIG */
 #define PORT        8181		/* Port number as an integer - web server default is 80 */
-#define IP_ADDRESS "192.168.0.8"	/* IP Address as a string */
+#define IP_ADDRESS "192.168.11.42"	/* IP Address as a string */
 
 char *command = "GET /index.html HTTP/1.0 \r\n\r\n" ;
 /* Note: spaces are delimiters and VERY important */
@@ -24,9 +24,9 @@ pexit(char * msg)
 
 main()
 {
-int i,sockfd;
-char buffer[BUFSIZE];
-static struct sockaddr_in serv_addr;
+	int i,sockfd;
+	char buffer[BUFSIZE];
+	static struct sockaddr_in serv_addr;
 
 	printf("client trying to connect to %s and port %d\n",IP_ADDRESS,PORT);
 	if((sockfd = socket(AF_INET, SOCK_STREAM,0)) <0) 
