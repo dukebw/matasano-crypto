@@ -17,6 +17,8 @@
 #define LOG        44
 #define FORBIDDEN 403
 #define NOTFOUND  404
+#define ONE_THOUSAND 1000
+#define ONE_MILLION (ONE_THOUSAND*ONE_THOUSAND)
 
 typedef struct timespec timespec;
 
@@ -199,28 +201,19 @@ void web(int fd, int hit)
 
 		timespec Request;
 		Request.tv_sec = 0;
+		Request.tv_nsec = 50*ONE_MILLION;
 
 		u32 ReceivedSigHexIndex;
 		for (ReceivedSigHexIndex = 0;
 			 ReceivedSigHexIndex < HmacKeyHexDigitCount;
 			 ++ReceivedSigHexIndex)
 		{
-			Request.tv_nsec = 500000000;
+			nanosleep(&Request, &Remaining);
 
-			do
-			{
-				nanosleep(&Request, &Remaining);
-
-				sprintf(DebugBuffer, "Request: %ld Remaining: %ld", Request.tv_nsec, Remaining.tv_nsec);
-				logger(LOG, "FileHmac", DebugBuffer, fd);
-			} while (Remaining.tv_nsec > 0);
-
-#if 0
 			if (*(ReceivedSignaturePrefix + STR_LEN(SIG_PREFIX)) != DebugBuffer[ReceivedSigHexIndex])
 			{
 				break;
 			}
-#endif
 		}
 		
 		if (ReceivedSigHexIndex == HmacKeyHexDigitCount)

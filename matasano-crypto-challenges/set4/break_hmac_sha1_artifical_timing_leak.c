@@ -2,6 +2,7 @@
 
 typedef struct sockaddr_in sockaddr_in;
 typedef struct sockaddr sockaddr;
+typedef struct timespec timespec;
 
 #define PORT 8181
 #define IP_ADDRESS "192.168.11.42"
@@ -41,6 +42,8 @@ internal MIN_UNIT_TEST_FUNC(TestHmacSha1)
 
 internal MIN_UNIT_TEST_FUNC(TestBreakHmacSha1TimingLeak)
 {
+	i32 Status;
+
 	i32 SocketFileDescriptor = socket(AF_INET, SOCK_STREAM, 0);
 	Stopif(SocketFileDescriptor < 0, "Error from socket() call in TestBreakHmacSha1TimingLeak");
 
@@ -49,25 +52,43 @@ internal MIN_UNIT_TEST_FUNC(TestBreakHmacSha1TimingLeak)
 	ServerSocketAddr.sin_addr.s_addr = inet_addr(IP_ADDRESS);
 	ServerSocketAddr.sin_port = htons(PORT);
 
-	i32 Status = connect(SocketFileDescriptor, (sockaddr *)&ServerSocketAddr, sizeof(ServerSocketAddr));
+	timespec TimeSpec;
+	Status = clock_getres(CLOCK_REALTIME, &TimeSpec);
+	Stopif(Status == -1, "Error in getting clock resolution in TestBreakHmacSha1TimingLeak!");
+
+	Status = connect(SocketFileDescriptor, (sockaddr *)&ServerSocketAddr, sizeof(ServerSocketAddr));
 	Stopif(Status < 0, "Error from connect() call in TestBreakHmacSha1TimingLeak");
 
-	write(SocketFileDescriptor, Command, STR_LEN(Command));
+	printf("CLOCK_REALTIME resolution: tv_sec: %d tv_nsec: %ld\n", (int)TimeSpec.tv_sec, TimeSpec.tv_nsec);
 
 	u8 ReceiveBuffer[8196];
 	i32 ReadBytes;
-	for (;;)
+	u64 ElapsedTime;
+	do
 	{
+		write(SocketFileDescriptor, Command, STR_LEN(Command));
+
+		Status = clock_gettime(CLOCK_REALTIME, &TimeSpec);
+		Stopif(Status == -1, "Error in getting clocktime in TestBreakHmacSha1TimingLeak!");
+
+		ElapsedTime = TimeSpec.tv_nsec;
+
 		ReadBytes = read(SocketFileDescriptor, ReceiveBuffer, sizeof(ReceiveBuffer));
-		if (ReadBytes <= 0)
-		{
-			break;
-		}
+		Stopif(ReadBytes == sizeof(ReceiveBuffer), "Received message too long in TestBreakHmacSha1TimingLeak!");
 
-		write(1, ReceiveBuffer, ReadBytes);
-	}
+		Status = clock_gettime(CLOCK_REALTIME, &TimeSpec);
+		Stopif(Status == -1, "Error in getting clocktime in TestBreakHmacSha1TimingLeak!");
 
-	write(1, "\n", 1);
+		ElapsedTime = TimeSpec.tv_nsec - ElapsedTime;
+
+		printf("ElapsedTime: %lu\n", ElapsedTime);
+
+		sleep(1);
+	} while (memcmp(ReceiveBuffer, HMAC_VALID_STRING, sizeof(HMAC_VALID_STRING)));
+
+	ReceiveBuffer[ReadBytes] = '\n';
+
+	write(1, ReceiveBuffer, ReadBytes + 1);
 }
 
 internal MIN_UNIT_TEST_FUNC(AllTests)
