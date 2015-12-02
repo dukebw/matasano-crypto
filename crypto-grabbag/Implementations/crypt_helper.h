@@ -22,6 +22,10 @@ CASSERT(RAND_MAX <= UINT32_MAX, crypt_helper_h);
 
 #define SHA_1_KEYED_MAC_MAX_MSG_SIZE 256
 
+#define ONE_THOUSAND 1000
+#define ONE_MILLION (ONE_THOUSAND*ONE_THOUSAND)
+#define ONE_BILLION (ONE_THOUSAND*ONE_MILLION)
+
 const r32 EXPECTED_LETTER_FREQUENCY[] =
 {
     0.08167, 0.01492, 0.02782, 0.04253, 0.12702, 0.02228, 0.02015, 0.06094,
@@ -710,6 +714,9 @@ Sha1KeyedMac(u8 *KeyedMac, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLengt
 #define HMAC_RET_CODE_VALID 200
 #define HMAC_RET_CODE_INVALID 500
 #define HMAC_RET_CODE_LENGTH_BYTES 4
+
+const char HMAC_VALID_STRING[] = "200";
+const char HMAC_INVALID_STRING[] = "500";
 
 internal void
 HmacSha1(u8 *Hmac, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength)
