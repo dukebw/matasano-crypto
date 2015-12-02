@@ -17,8 +17,6 @@
 #define LOG        44
 #define FORBIDDEN 403
 #define NOTFOUND  404
-#define ONE_THOUSAND 1000
-#define ONE_MILLION (ONE_THOUSAND*ONE_THOUSAND)
 
 typedef struct timespec timespec;
 
@@ -186,10 +184,11 @@ void web(int fd, int hit)
 		u8 FileHmac[SHA_1_HASH_LENGTH_BYTES];
 		HmacSha1(FileHmac, FileBuffer, FileSize, (u8 *)TEST_HMAC_KEY, sizeof(TEST_HMAC_KEY));
 
-		StringToHex((u8 *)DebugBuffer, FileHmac, sizeof(TEST_HMAC_KEY));
+        u8 FileHmacHex[2*sizeof(TEST_HMAC_KEY) + 1];
+		StringToHex((u8 *)FileHmacHex, FileHmac, sizeof(TEST_HMAC_KEY));
 		u32 HmacKeyHexDigitCount = 2*sizeof(TEST_HMAC_KEY);
-		DebugBuffer[HmacKeyHexDigitCount] = 0;
-		logger(LOG, "FileHmac", DebugBuffer, fd);
+		FileHmacHex[HmacKeyHexDigitCount] = 0;
+		logger(LOG, "FileHmac", (char *)FileHmacHex, fd);
 
 		char *ReceivedSignaturePrefix = buffer + PrefixToFilename + FilenameLength + 1;
 		if (strncmp(ReceivedSignaturePrefix, SIG_PREFIX, STR_LEN(SIG_PREFIX)))
@@ -208,9 +207,20 @@ void web(int fd, int hit)
 			 ReceivedSigHexIndex < HmacKeyHexDigitCount;
 			 ++ReceivedSigHexIndex)
 		{
+            sprintf(DebugBuffer, "Iteration: %u\nRemaining.tv_sec: %ld\nRemaining.tv_nsec: %ld\n"
+                                 "Request.tv_sec: %ld\nRequest.tv_nsec: %ld\n",
+                                 ReceivedSigHexIndex,
+                                 Remaining.tv_sec, Remaining.tv_nsec, Request.tv_sec, Request.tv_nsec);
+            logger(LOG, "nanosleep debug\n", DebugBuffer, fd);
+
 			nanosleep(&Request, &Remaining);
 
-			if (*(ReceivedSignaturePrefix + STR_LEN(SIG_PREFIX)) != DebugBuffer[ReceivedSigHexIndex])
+            sprintf(DebugBuffer, "Next hex digit in signature: %c\n",
+                    ReceivedSignaturePrefix[ReceivedSigHexIndex + STR_LEN(SIG_PREFIX)]);
+            logger(LOG, "Buffer debug", DebugBuffer, fd);
+
+			if (ReceivedSignaturePrefix[ReceivedSigHexIndex + STR_LEN(SIG_PREFIX)] !=
+                FileHmacHex[ReceivedSigHexIndex])
 			{
 				break;
 			}
