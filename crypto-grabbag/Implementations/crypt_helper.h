@@ -718,6 +718,10 @@ Sha1KeyedMac(u8 *KeyedMac, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLengt
 const char HMAC_VALID_STRING[] = "200";
 const char HMAC_INVALID_STRING[] = "500";
 
+const char TEST_HMAC_PREFIX[] = "test?";
+const char FILE_PREFIX[] = "file=";
+const char SIG_PREFIX[] = "signature=";
+
 internal void
 HmacSha1(u8 *Hmac, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength)
 {
