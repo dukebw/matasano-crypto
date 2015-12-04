@@ -63,9 +63,6 @@ void logger(int type, char *s1, char *s2, int socket_fd)
 	if(type == ERROR || type == NOTFOUND || type == FORBIDDEN) exit(3);
 }
 
-const char TEST_HMAC_PREFIX[] = "test?";
-const char FILE_PREFIX[] = "file=";
-const char SIG_PREFIX[] = "signature=";
 const u8 TEST_HMAC_KEY[] =
 {
 	0x82, 0xF3, 0xB6, 0x9A, 0x1B, 0xFF, 0x4D, 0xE1, 0x5C, 0x33, 

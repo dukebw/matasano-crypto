@@ -5,13 +5,16 @@ typedef struct sockaddr sockaddr;
 typedef struct timespec timespec;
 
 #define PORT 8181
+// TODO(bwd): Connection issues?
 #define IP_ADDRESS "192.168.1.9"
 
 #if 1
-char Command[] = "test?file=index.html&signature=553536586117154dacd49d664e5d63fdc88efb51";
+char GlobalCommand[] = "test?file=index.html&signature=553536586117154dacd49d664e5d63fdc88efb51";
 #else
-char Command[] = "GET /index.html HTTP/1.0 \r\n\r\n";
+char GlobalCommand[] = "GET /index.html HTTP/1.0 \r\n\r\n";
 #endif
+
+#define FILE_NAME_LENGTH 10
 
 const u8 HMAC_SHA_1_KEY_0[] =
 {
@@ -40,12 +43,29 @@ internal MIN_UNIT_TEST_FUNC(TestHmacSha1)
 	u8 HmacScratch[SHA_1_HASH_LENGTH_BYTES];
 	HmacSha1(HmacScratch, (u8 *)HMAC_SHA_1_MSG_0, sizeof(HMAC_SHA_1_MSG_0),
 			 (u8 *)HMAC_SHA_1_KEY_0, sizeof(HMAC_SHA_1_KEY_0));
-	MinUnitAssert(VectorsEqual(HmacScratch, (u8 *)HMAC_SHA_1_EXPECTED_HASH_0, sizeof(HMAC_SHA_1_EXPECTED_HASH_0)),
+	MinUnitAssert(VectorsEqual(HmacScratch, (u8 *)HMAC_SHA_1_EXPECTED_HASH_0,
+                               sizeof(HMAC_SHA_1_EXPECTED_HASH_0)),
 				  "Expected HMAC mismatch in TestBreakHmacSha1TimingLeak!");
 }
 
-// TODO(bwd): 1. Break with artificial timing leak hardcoded times, then,
-//            2. Generalize
+internal void
+OpenSocketConnectAndWrite(i32 *SocketFileDescriptor, sockaddr_in *ServerSocketAddr,
+                          char *Command, u32 CommandLength)
+{
+    i32 Status;
+
+    Stopif((SocketFileDescriptor == 0) || (ServerSocketAddr == 0) || (Command == 0),
+           "Null input to OpenSocketConnectAndWrite!");
+
+    *SocketFileDescriptor = socket(AF_INET, SOCK_STREAM, 0);
+    Stopif(*SocketFileDescriptor < 0, "Error from socket() call in TestBreakHmacSha1TimingLeak");
+
+    Status = connect(*SocketFileDescriptor, (sockaddr *)ServerSocketAddr, sizeof(*ServerSocketAddr));
+    Stopif(Status < 0, "Error from connect() call in TestBreakHmacSha1TimingLeak");
+
+    write(*SocketFileDescriptor, Command, CommandLength);
+}
+
 internal MIN_UNIT_TEST_FUNC(TestBreakHmacSha1TimingLeak)
 {
 	i32 Status;
@@ -61,39 +81,64 @@ internal MIN_UNIT_TEST_FUNC(TestBreakHmacSha1TimingLeak)
 
 	printf("CLOCK_MONOTONIC resolution: tv_sec: %d tv_nsec: %ld\n", (int)TimeSpec.tv_sec, TimeSpec.tv_nsec);
 
+    i32 SocketFileDescriptor;
+
 	u8 ReceiveBuffer[8196];
 	i32 ReadBytes;
-	i64 ElapsedTime;
-	do
-	{
-		i32 SocketFileDescriptor = socket(AF_INET, SOCK_STREAM, 0);
-		Stopif(SocketFileDescriptor < 0, "Error from socket() call in TestBreakHmacSha1TimingLeak");
+    for (u32 SignatureIndex = 0;
+         SignatureIndex < SHA_1_HASH_LENGTH_BYTES;
+         ++SignatureIndex)
+    {
+        u32 GuessByte = 0;
+        i64 MaxElapsedTime = 0;
+        for (u32 ByteGuessIndex = 0;
+             ByteGuessIndex <= 0xFF;
+             ++ByteGuessIndex)
+        {
+            OpenSocketConnectAndWrite(&SocketFileDescriptor, &ServerSocketAddr,
+                                      GlobalCommand, STR_LEN(GlobalCommand));
 
-		Status = connect(SocketFileDescriptor, (sockaddr *)&ServerSocketAddr, sizeof(ServerSocketAddr));
-		Stopif(Status < 0, "Error from connect() call in TestBreakHmacSha1TimingLeak");
+            Status = clock_gettime(CLOCK_MONOTONIC, &TimeSpec);
+            Stopif(Status == -1, "Error in getting clocktime in TestBreakHmacSha1TimingLeak!");
 
-		write(SocketFileDescriptor, Command, STR_LEN(Command));
+            timespec SavedTimeAfterWrite = TimeSpec;
 
-		Status = clock_gettime(CLOCK_MONOTONIC, &TimeSpec);
-		Stopif(Status == -1, "Error in getting clocktime in TestBreakHmacSha1TimingLeak!");
+            ReadBytes = read(SocketFileDescriptor, ReceiveBuffer, sizeof(ReceiveBuffer));
+            Stopif(ReadBytes == sizeof(ReceiveBuffer),
+                   "Received message too long in TestBreakHmacSha1TimingLeak!");
 
-		timespec SavedTimeAfterWrite = TimeSpec;
+            Status = clock_gettime(CLOCK_MONOTONIC, &TimeSpec);
+            Stopif(Status == -1, "Error in getting clocktime in TestBreakHmacSha1TimingLeak!");
 
-		ReadBytes = read(SocketFileDescriptor, ReceiveBuffer, sizeof(ReceiveBuffer));
-		Stopif(ReadBytes == sizeof(ReceiveBuffer), "Received message too long in TestBreakHmacSha1TimingLeak!");
+            i64 ElapsedTime = (ONE_BILLION*(TimeSpec.tv_sec - SavedTimeAfterWrite.tv_sec) +
+                               (TimeSpec.tv_nsec - SavedTimeAfterWrite.tv_nsec));
+            if (ElapsedTime > MaxElapsedTime)
+            {
+                MaxElapsedTime = ElapsedTime;
+                GuessByte = ByteGuessIndex;
+            }
 
-		Status = clock_gettime(CLOCK_MONOTONIC, &TimeSpec);
-		Stopif(Status == -1, "Error in getting clocktime in TestBreakHmacSha1TimingLeak!");
+            close(SocketFileDescriptor);
 
-		ElapsedTime = (ONE_BILLION*(TimeSpec.tv_sec - SavedTimeAfterWrite.tv_sec) +
-                       (TimeSpec.tv_nsec - SavedTimeAfterWrite.tv_nsec));
+            sleep(1);
+        }
 
-        printf("ElapsedTime: %ld\n", ElapsedTime);
+        u32 SignatureOffset = (STR_LEN(TEST_HMAC_PREFIX) + STR_LEN(FILE_PREFIX) + STR_LEN(SIG_PREFIX) +
+                               FILE_NAME_LENGTH);
+        GlobalCommand[SignatureOffset + SignatureIndex] = GuessByte;
+    }
 
-		close(SocketFileDescriptor);
+    OpenSocketConnectAndWrite(&SocketFileDescriptor, &ServerSocketAddr,
+                              GlobalCommand, STR_LEN(GlobalCommand));
 
-        sleep(1);
-	} while (memcmp(ReceiveBuffer, HMAC_VALID_STRING, sizeof(HMAC_VALID_STRING)));
+    ReadBytes = read(SocketFileDescriptor, ReceiveBuffer, sizeof(ReceiveBuffer));
+    Stopif(ReadBytes == sizeof(ReceiveBuffer),
+           "Received message too long in TestBreakHmacSha1TimingLeak!");
+
+    close(SocketFileDescriptor);
+
+    MinUnitAssert(memcmp(ReceiveBuffer, HMAC_VALID_STRING, sizeof(HMAC_VALID_STRING)) == 0,
+                 "Artificial timing leak attack failed!");
 
 	ReceiveBuffer[ReadBytes] = '\n';
 
