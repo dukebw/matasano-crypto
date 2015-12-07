@@ -801,7 +801,6 @@ typedef struct
     u32 SizeWords;
 } bignum;
 
-// TODO(bwd): write BigNumSubtract and compress with Add
 // IN: integers A, B in [0, 2^(W*t))
 // OUT: (eps, C) where C = A + B mod 2^(W*t), and eps is the carry bit
 internal u32 
@@ -857,6 +856,13 @@ BigNumAdd(bignum *SumAB, bignum *A, bignum *B)
     return Carry;
 }
 
+// TODO(bwd): write BigNumSubtract and compress with Add
+internal u32 
+BigNumSubtract(bignum *AMinusB, bignum *A, bignum *B)
+{
+    Stopif((AMinusB == 0) || (A == 0) || (B == 0), "Null input to BigNumSubtract!");
+}
+
 internal inline void
 AdjustSizeWordsUnchecked(bignum *BigNum)
 {
@@ -908,13 +914,19 @@ IsAGreaterThanB(bignum *A, bignum *B)
 	return Result;
 }
 
-#if 0
 internal u32 
 BigNumAddModN(bignum *SumABModN, bignum *A, bignum *B, bignum *N)
 {
 	Stopif((SumABModN == 0) || (A == 0) || (B == 0) || (N == 0), "Null input to BigNumAdd!");
+
+    u32 Carry = BigNumAdd(bignum *SumAB, bignum *A, bignum *B);
+
+    if (Carry)
+    {
+    }
+
+    return Carry;
 }
-#endif
 
 internal void
 ByteSwap(u8 *Buffer, u32 Length)
