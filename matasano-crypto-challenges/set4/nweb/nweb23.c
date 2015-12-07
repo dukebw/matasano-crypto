@@ -69,6 +69,9 @@ const u8 TEST_HMAC_KEY[] =
 	0x82, 0xF3, 0xB6, 0x9A, 0x1B, 0xFF, 0x4D, 0xE1, 0x5C, 0x33, 
 };
 
+const u8 TEST_FILE_HMAC_HEX[] = "254b6040afd5a30d669c06c8a7e4e3e2e771fa51";
+#define HMAC_TEST_KEY_HEX_DIGIT_COUNT (2*sizeof(TEST_HMAC_KEY))
+
 /* this is a child web server process, so we can exit on errors */
 void web(int fd, int hit)
 {
@@ -159,6 +162,7 @@ void web(int fd, int hit)
 		sprintf(DebugBuffer, "%d", FilenameLength);
 		logger(LOG, "Length of filename received", DebugBuffer, fd);
 
+#if 1
 		file_fd = open(buffer + PrefixToFilename, O_RDONLY);
 		if (file_fd == -1)
 		{
@@ -183,9 +187,9 @@ void web(int fd, int hit)
 
         u8 FileHmacHex[2*sizeof(TEST_HMAC_KEY) + 1];
 		StringToHex((u8 *)FileHmacHex, FileHmac, sizeof(TEST_HMAC_KEY));
-		u32 HmacKeyHexDigitCount = 2*sizeof(TEST_HMAC_KEY);
-		FileHmacHex[HmacKeyHexDigitCount] = 0;
+		FileHmacHex[HMAC_TEST_KEY_HEX_DIGIT_COUNT] = 0;
 		logger(LOG, "FileHmac", (char *)FileHmacHex, fd);
+#endif
 
 		char *ReceivedSignaturePrefix = buffer + PrefixToFilename + FilenameLength + 1;
 		if (strncmp(ReceivedSignaturePrefix, SIG_PREFIX, STR_LEN(SIG_PREFIX)))
@@ -193,37 +197,47 @@ void web(int fd, int hit)
 			logger(ERROR, "No valid signature= in request string", buffer, fd);
 		}
 
-		timespec Remaining;
 
 		timespec Request;
 		Request.tv_sec = 0;
-		Request.tv_nsec = 50*ONE_MILLION;
+		Request.tv_nsec = 2*ONE_MILLION;
 
 		u32 ReceivedSigHexIndex;
 		for (ReceivedSigHexIndex = 0;
-			 ReceivedSigHexIndex < HmacKeyHexDigitCount;
+			 ReceivedSigHexIndex < HMAC_TEST_KEY_HEX_DIGIT_COUNT;
 			 ++ReceivedSigHexIndex)
 		{
-            sprintf(DebugBuffer, "Iteration: %u\nRemaining.tv_sec: %ld\nRemaining.tv_nsec: %ld\n"
-                                 "Request.tv_sec: %ld\nRequest.tv_nsec: %ld\n",
-                                 ReceivedSigHexIndex,
-                                 Remaining.tv_sec, Remaining.tv_nsec, Request.tv_sec, Request.tv_nsec);
-            logger(LOG, "nanosleep debug\n", DebugBuffer, fd);
-
+#if 1
+			timespec Remaining;
 			nanosleep(&Request, &Remaining);
+#else
+			timespec StartArtificialDelay;
+			clock_gettime(CLOCK_MONOTONIC, &StartArtificialDelay);
 
-            sprintf(DebugBuffer, "Next hex digit in signature: %c\n",
-                    ReceivedSignaturePrefix[ReceivedSigHexIndex + STR_LEN(SIG_PREFIX)]);
-            logger(LOG, "Buffer debug", DebugBuffer, fd);
+			timespec EndArtificialDelay;
+			i64 ElapsedTime;
+			do
+			{
+				clock_gettime(CLOCK_MONOTONIC, &EndArtificialDelay);
 
+				ElapsedTime = (ONE_BILLION*(EndArtificialDelay.tv_sec - StartArtificialDelay.tv_sec) +
+							   (EndArtificialDelay.tv_nsec - StartArtificialDelay.tv_nsec));
+			} while (ElapsedTime < Request.tv_nsec);
+#endif
+
+#if 1
 			if (ReceivedSignaturePrefix[ReceivedSigHexIndex + STR_LEN(SIG_PREFIX)] !=
                 FileHmacHex[ReceivedSigHexIndex])
+#else
+			if (ReceivedSignaturePrefix[ReceivedSigHexIndex + STR_LEN(SIG_PREFIX)] !=
+                TEST_FILE_HMAC_HEX[ReceivedSigHexIndex])
+#endif
 			{
 				break;
 			}
 		}
 		
-		if (ReceivedSigHexIndex == HmacKeyHexDigitCount)
+		if (ReceivedSigHexIndex == HMAC_TEST_KEY_HEX_DIGIT_COUNT)
 		{
 			sprintf(DebugBuffer, "%d", HMAC_RET_CODE_VALID);
 		}

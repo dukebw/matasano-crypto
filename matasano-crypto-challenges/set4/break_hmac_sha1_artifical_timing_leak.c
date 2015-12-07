@@ -4,9 +4,11 @@ typedef struct sockaddr_in sockaddr_in;
 typedef struct sockaddr sockaddr;
 typedef struct timespec timespec;
 
+#define PRINT_ELAPSED_TIME 1
+
 #define PORT 8181
 // TODO(bwd): Connection issues?
-#define IP_ADDRESS "192.168.1.9"
+#define IP_ADDRESS "192.168.11.42"
 
 #if 1
 char GlobalCommand[] = "test?file=index.html&signature=553536586117154dacd49d664e5d63fdc88efb51";
@@ -14,7 +16,9 @@ char GlobalCommand[] = "test?file=index.html&signature=553536586117154dacd49d664
 char GlobalCommand[] = "GET /index.html HTTP/1.0 \r\n\r\n";
 #endif
 
-#define FILE_NAME_LENGTH 10
+#define FILE_NAME_LENGTH 11
+#define MAX_GUESSES_PER_DIGIT 16
+#define SIG_OFFSET (STR_LEN(TEST_HMAC_PREFIX) + STR_LEN(FILE_PREFIX) + STR_LEN(SIG_PREFIX) + FILE_NAME_LENGTH)
 
 const u8 HMAC_SHA_1_KEY_0[] =
 {
@@ -49,21 +53,73 @@ internal MIN_UNIT_TEST_FUNC(TestHmacSha1)
 }
 
 internal void
-OpenSocketConnectAndWrite(i32 *SocketFileDescriptor, sockaddr_in *ServerSocketAddr,
-                          char *Command, u32 CommandLength)
+OpenSocketAndConnect(i32 *SocketFileDescriptor, sockaddr_in *ServerSocketAddr)
 {
     i32 Status;
 
-    Stopif((SocketFileDescriptor == 0) || (ServerSocketAddr == 0) || (Command == 0),
-           "Null input to OpenSocketConnectAndWrite!");
+    Stopif((SocketFileDescriptor == 0) || (ServerSocketAddr == 0), "Null input to OpenSocketConnectAndWrite!");
 
     *SocketFileDescriptor = socket(AF_INET, SOCK_STREAM, 0);
     Stopif(*SocketFileDescriptor < 0, "Error from socket() call in TestBreakHmacSha1TimingLeak");
 
     Status = connect(*SocketFileDescriptor, (sockaddr *)ServerSocketAddr, sizeof(*ServerSocketAddr));
     Stopif(Status < 0, "Error from connect() call in TestBreakHmacSha1TimingLeak");
+}
 
-    write(*SocketFileDescriptor, Command, CommandLength);
+internal u32
+GetGuessHexDigit(u32 SignatureIndex, sockaddr_in *ServerSocketAddr, u8 *ReceiveBuffer, u32 ReceiveBufferLength)
+{
+	u32 GuessHexDigit = 0;
+	i32 Status;
+
+	timespec TimeAfterRead;
+	i32 SocketFileDescriptor;
+	i64 MaxElapsedTime = 0;
+	for (u32 HexDigitGuess = 0;
+		 HexDigitGuess <= 0xF;
+		 ++HexDigitGuess)
+	{
+		u32 NextHexDigit = IntegerToBase16(HexDigitGuess);
+
+		GlobalCommand[SIG_OFFSET + SignatureIndex] = NextHexDigit;
+
+		OpenSocketAndConnect(&SocketFileDescriptor, ServerSocketAddr);
+
+		write(SocketFileDescriptor, GlobalCommand, STR_LEN(GlobalCommand));
+
+		timespec SavedTimeAfterWrite;
+		Status = clock_gettime(CLOCK_MONOTONIC, &SavedTimeAfterWrite);
+		Stopif(Status == -1, "Error in getting clocktime in TestBreakHmacSha1TimingLeak!");
+
+		u32 ReadBytes = read(SocketFileDescriptor, ReceiveBuffer, ReceiveBufferLength);
+		Stopif(ReadBytes == ReceiveBufferLength, "Received message too long in TestBreakHmacSha1TimingLeak!");
+
+		Status = clock_gettime(CLOCK_MONOTONIC, &TimeAfterRead);
+		Stopif(Status == -1, "Error in getting clocktime in TestBreakHmacSha1TimingLeak!");
+
+		i64 ElapsedTime = (ONE_BILLION*(TimeAfterRead.tv_sec - SavedTimeAfterWrite.tv_sec) +
+						   (TimeAfterRead.tv_nsec - SavedTimeAfterWrite.tv_nsec));
+
+#if 0 // PRINT_ELAPSED_TIME
+		printf("NextHexDigit: %c -- ElapsedTime: %ld\n", NextHexDigit, ElapsedTime);
+#endif // PRINT_ELAPSED_TIME
+
+		if (ElapsedTime > MaxElapsedTime)
+		{
+			MaxElapsedTime = ElapsedTime;
+			GuessHexDigit = NextHexDigit;
+		}
+
+		close(SocketFileDescriptor);
+	}
+
+#if PRINT_ELAPSED_TIME
+	printf("----------\n");
+	printf("GuessHexDigit: %c -- MaxElapsedTime: %ld\n", GuessHexDigit, MaxElapsedTime);
+	printf("----------\n");
+#endif // PRINT_ELAPSED_TIME
+
+	return GuessHexDigit;
 }
 
 internal MIN_UNIT_TEST_FUNC(TestBreakHmacSha1TimingLeak)
@@ -81,64 +137,76 @@ internal MIN_UNIT_TEST_FUNC(TestBreakHmacSha1TimingLeak)
 
 	printf("CLOCK_MONOTONIC resolution: tv_sec: %d tv_nsec: %ld\n", (int)TimeSpec.tv_sec, TimeSpec.tv_nsec);
 
-    i32 SocketFileDescriptor;
-
+	u32 HitTable[16];
 	u8 ReceiveBuffer[8196];
-	i32 ReadBytes;
     for (u32 SignatureIndex = 0;
-         SignatureIndex < SHA_1_HASH_LENGTH_BYTES;
+         SignatureIndex < ((2*SHA_1_HASH_LENGTH_BYTES) - 1);
          ++SignatureIndex)
     {
-        u32 GuessByte = 0;
-        i64 MaxElapsedTime = 0;
-        for (u32 ByteGuessIndex = 0;
-             ByteGuessIndex <= 0xFF;
-             ++ByteGuessIndex)
-        {
-            OpenSocketConnectAndWrite(&SocketFileDescriptor, &ServerSocketAddr,
-                                      GlobalCommand, STR_LEN(GlobalCommand));
+		memset(HitTable, 0, sizeof(HitTable));
 
-            Status = clock_gettime(CLOCK_MONOTONIC, &TimeSpec);
-            Stopif(Status == -1, "Error in getting clocktime in TestBreakHmacSha1TimingLeak!");
+		for (u32 RepeatGuessIndex = 0;
+			 RepeatGuessIndex < MAX_GUESSES_PER_DIGIT;
+			 ++RepeatGuessIndex)
+		{
+			u32 GuessHexDigit = GetGuessHexDigit(SignatureIndex, &ServerSocketAddr,
+												 ReceiveBuffer, sizeof(ReceiveBuffer));
 
-            timespec SavedTimeAfterWrite = TimeSpec;
+			u32 HitTableIndex = Base16ToInteger(GuessHexDigit);
+			++HitTable[HitTableIndex];
+		}
 
-            ReadBytes = read(SocketFileDescriptor, ReceiveBuffer, sizeof(ReceiveBuffer));
-            Stopif(ReadBytes == sizeof(ReceiveBuffer),
-                   "Received message too long in TestBreakHmacSha1TimingLeak!");
+		u32 MaxHits = 0;
+		u32 MaxHitTableIndex;
+		for (u32 HitTableIndex = 0;
+			 HitTableIndex < ARRAY_LENGTH(HitTable);
+			 ++HitTableIndex)
+		{
+			if (HitTable[HitTableIndex] > MaxHits)
+			{
+				MaxHits = HitTable[HitTableIndex];
+				MaxHitTableIndex = HitTableIndex;
+			}
+		}
 
-            Status = clock_gettime(CLOCK_MONOTONIC, &TimeSpec);
-            Stopif(Status == -1, "Error in getting clocktime in TestBreakHmacSha1TimingLeak!");
+		u32 BestGuessHexDigit = IntegerToBase16(MaxHitTableIndex);
 
-            i64 ElapsedTime = (ONE_BILLION*(TimeSpec.tv_sec - SavedTimeAfterWrite.tv_sec) +
-                               (TimeSpec.tv_nsec - SavedTimeAfterWrite.tv_nsec));
-            if (ElapsedTime > MaxElapsedTime)
-            {
-                MaxElapsedTime = ElapsedTime;
-                GuessByte = ByteGuessIndex;
-            }
+        GlobalCommand[SIG_OFFSET + SignatureIndex] = BestGuessHexDigit;
 
-            close(SocketFileDescriptor);
+		printf("***********************************\n");
+		printf("BestGuessHexDigit: %c MaxHits: %u\n", BestGuessHexDigit, MaxHits);
+		printf("***********************************\n");
+	}
 
-            sleep(1);
-        }
+    i32 SocketFileDescriptor;
 
-        u32 SignatureOffset = (STR_LEN(TEST_HMAC_PREFIX) + STR_LEN(FILE_PREFIX) + STR_LEN(SIG_PREFIX) +
-                               FILE_NAME_LENGTH);
-        GlobalCommand[SignatureOffset + SignatureIndex] = GuessByte;
-    }
+	b32 ValidHmacFound = false;
+	i32 ReadBytes;
+	for (u32 HexDigitGuess = 0;
+		 HexDigitGuess <= 0xF;
+		 ++HexDigitGuess)
+	{
+		u32 HexDigitGuessChar = IntegerToBase16(HexDigitGuess);
+        GlobalCommand[SIG_OFFSET + (2*SHA_1_HASH_LENGTH_BYTES) - 1] = HexDigitGuessChar;
 
-    OpenSocketConnectAndWrite(&SocketFileDescriptor, &ServerSocketAddr,
-                              GlobalCommand, STR_LEN(GlobalCommand));
+		OpenSocketAndConnect(&SocketFileDescriptor, &ServerSocketAddr);
 
-    ReadBytes = read(SocketFileDescriptor, ReceiveBuffer, sizeof(ReceiveBuffer));
-    Stopif(ReadBytes == sizeof(ReceiveBuffer),
-           "Received message too long in TestBreakHmacSha1TimingLeak!");
+		write(SocketFileDescriptor, GlobalCommand, STR_LEN(GlobalCommand));
+
+		ReadBytes = read(SocketFileDescriptor, ReceiveBuffer, sizeof(ReceiveBuffer));
+		Stopif(ReadBytes == sizeof(ReceiveBuffer),
+			   "Received message too long in TestBreakHmacSha1TimingLeak!");
+
+		if (memcmp(ReceiveBuffer, HMAC_VALID_STRING, STR_LEN(HMAC_VALID_STRING)) == 0)
+		{
+			ValidHmacFound = true;
+			break;
+		}
+	}
 
     close(SocketFileDescriptor);
 
-    MinUnitAssert(memcmp(ReceiveBuffer, HMAC_VALID_STRING, sizeof(HMAC_VALID_STRING)) == 0,
-                 "Artificial timing leak attack failed!");
+    MinUnitAssert(ValidHmacFound, "Artificial timing leak attack failed!");
 
 	ReceiveBuffer[ReadBytes] = '\n';
 
