@@ -11,6 +11,8 @@ CASSERT(RAND_MAX <= UINT32_MAX, crypt_helper_h);
 
 #pragma GCC diagnostic ignored "-Wunused-function"
 
+#define INVALID_CODE_PATH Stopif(true, "Invalid code path!")
+
 #define STR_LEN(String) (ARRAY_LENGTH(String) - 1)
 
 #define ALPHABET_SIZE 26
@@ -249,6 +251,27 @@ ReverseString(u8 *String)
     return String;
 }
 
+internal u32
+IntegerToBase16(u32 Value)
+{
+	u32 Result;
+
+	if (Value < 10)
+	{
+		Result = '0' + Value;
+	}
+	else if ((Value >= 10) && (Value < 16))
+	{
+		Result = 'a' + (Value - 10);
+	}
+	else
+	{
+		INVALID_CODE_PATH;
+	}
+
+	return Result;
+}
+
 // NOTE(brendan): INPUT: hex character. OUTPUT: integer value of hex character
 internal i32
 Base16ToInteger(i32 Value)
@@ -275,6 +298,8 @@ Base16ToInteger(i32 Value)
 internal void
 HexStringToByteArray(u8 *Result, char *HexString, u32 Length)
 {
+	Stopif(Length % 2, "Length input to HexStringToByteArray must be multiple of 2");
+
     char TempString[2];
     for (u32 ResultIndex = 0;
 		 ResultIndex < (Length - 1);
@@ -766,6 +791,142 @@ HmacSha1(u8 *Hmac, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength)
 	}
 
 	Sha1(Hmac, HmacScratch, SHA_1_BLOCK_SIZE + SHA_1_HASH_LENGTH_BYTES);
+}
+
+#define MAX_BIGNUM_SIZE_BYTES (2048/BITS_IN_BYTE)
+#define MAX_BIGNUM_SIZE_WORDS (MAX_BIGNUM_SIZE_BYTES/sizeof(u64))
+typedef struct
+{
+    u64 Num[MAX_BIGNUM_SIZE_WORDS];
+    u32 SizeWords;
+} bignum;
+
+// TODO(bwd): write BigNumSubtract and compress with Add
+// IN: integers A, B in [0, 2^(W*t))
+// OUT: (eps, C) where C = A + B mod 2^(W*t), and eps is the carry bit
+internal u32 
+BigNumAdd(bignum *SumAB, bignum *A, bignum *B)
+{
+    Stopif((SumAB == 0) || (A == 0) || (B == 0), "Null input to BigNumAdd!");
+
+    u32 MaxSize;
+    if (A->SizeWords > B->SizeWords)
+    {
+        MaxSize = A->SizeWords;
+    }
+    else
+    {
+        MaxSize = B->SizeWords;
+    }
+
+    u32 Carry = 0;
+
+    SumAB->Num[0] = A->Num[0] + B->Num[0];
+    if (SumAB->Num[0] < A->Num[0])
+    {
+        Carry = 1;
+    }
+
+    // TODO(brendan): use inline assembly adc to add with carry
+    for (u32 BufferIndex = 1;
+         BufferIndex < MaxSize;
+         ++BufferIndex)
+    {
+        if (SumAB->Num[BufferIndex - 1] < (A->Num[BufferIndex - 1] + Carry))
+        {
+            Carry = 1;
+        }
+        else
+        {
+            Carry = 0;
+        }
+        SumAB->Num[BufferIndex] = A->Num[BufferIndex] + B->Num[BufferIndex] + Carry;
+    }
+
+    if (Carry && (MaxSize < MAX_BIGNUM_SIZE_WORDS))
+    {
+        Carry = 0;
+        SumAB->Num[MaxSize] = 1;
+        SumAB->SizeWords = MaxSize + 1;
+    }
+    else
+    {
+        SumAB->SizeWords = MaxSize;
+    }
+
+    return Carry;
+}
+
+internal inline void
+AdjustSizeWordsUnchecked(bignum *BigNum)
+{
+	while (BigNum->SizeWords &&
+		   (BigNum->Num[BigNum->SizeWords - 1] == 0))
+	{
+		--BigNum->SizeWords;
+	}
+}
+
+internal b32
+IsAGreaterThanB(bignum *A, bignum *B)
+{
+	b32 Result = false;
+
+	Stopif((A == 0) || (B == 0), "Null input to IsAGreaterThanB");
+
+	AdjustSizeWordsUnchecked(A);
+	AdjustSizeWordsUnchecked(B);
+
+	if (A->SizeWords > B->SizeWords)
+	{
+		Result = true;
+	}
+	else if (A->SizeWords < B->SizeWords)
+	{
+		Result = false;
+	}
+
+	else
+	{
+		for (i32 AIndex = (A->SizeWords - 1);
+			 AIndex >= 0;
+			 --AIndex)
+		{
+			if (A->Num[AIndex] > B->Num[AIndex])
+			{
+				Result = true;
+				break;
+			}
+			else if (A->Num[AIndex] < B->Num[AIndex])
+			{
+				Result = false;
+				break;
+			}
+		}
+	}
+
+	return Result;
+}
+
+#if 0
+internal u32 
+BigNumAddModN(bignum *SumABModN, bignum *A, bignum *B, bignum *N)
+{
+	Stopif((SumABModN == 0) || (A == 0) || (B == 0) || (N == 0), "Null input to BigNumAdd!");
+}
+#endif
+
+internal void
+ByteSwap(u8 *Buffer, u32 Length)
+{
+	for (u32 BufferIndex = 0;
+		 BufferIndex < (Length/2);
+		 ++BufferIndex)
+	{
+		u8 Temp = Buffer[Length - 1 - BufferIndex];
+		Buffer[Length - 1 - BufferIndex] = Buffer[BufferIndex];
+		Buffer[BufferIndex] = Temp;
+	}
 }
 
 #endif /* CRYPT_HELPER_H */
