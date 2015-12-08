@@ -36,6 +36,23 @@ const r32 EXPECTED_LETTER_FREQUENCY[] =
     0.01974, 0.00074
 };
 
+internal inline u32
+Maximum(u32 A, u32 B)
+{
+    u32 Result;
+
+    if (A > B)
+    {
+        Result = A;
+    }
+    else
+    {
+        Result = B;
+    }
+
+    return Result;
+}
+
 internal b32
 VectorsEqual(void *A, void *B, u32 Length)
 {
@@ -801,66 +818,21 @@ typedef struct
     u32 SizeWords;
 } bignum;
 
-// IN: integers A, B in [0, 2^(W*t))
-// OUT: (eps, C) where C = A + B mod 2^(W*t), and eps is the carry bit
-internal u32 
-BigNumAdd(bignum *SumAB, bignum *A, bignum *B)
+internal inline u32
+CheckForCarry(u32 Sum, u32 AdditionOperand)
 {
-    Stopif((SumAB == 0) || (A == 0) || (B == 0), "Null input to BigNumAdd!");
+    u32 Carry;
 
-    u32 MaxSize;
-    if (A->SizeWords > B->SizeWords)
-    {
-        MaxSize = A->SizeWords;
-    }
-    else
-    {
-        MaxSize = B->SizeWords;
-    }
-
-    u32 Carry = 0;
-
-    SumAB->Num[0] = A->Num[0] + B->Num[0];
-    if (SumAB->Num[0] < A->Num[0])
+    if (Sum < AdditionOperand)
     {
         Carry = 1;
     }
-
-    // TODO(brendan): use inline assembly adc to add with carry
-    for (u32 BufferIndex = 1;
-         BufferIndex < MaxSize;
-         ++BufferIndex)
-    {
-        if (SumAB->Num[BufferIndex - 1] < (A->Num[BufferIndex - 1] + Carry))
-        {
-            Carry = 1;
-        }
-        else
-        {
-            Carry = 0;
-        }
-        SumAB->Num[BufferIndex] = A->Num[BufferIndex] + B->Num[BufferIndex] + Carry;
-    }
-
-    if (Carry && (MaxSize < MAX_BIGNUM_SIZE_WORDS))
-    {
-        Carry = 0;
-        SumAB->Num[MaxSize] = 1;
-        SumAB->SizeWords = MaxSize + 1;
-    }
     else
     {
-        SumAB->SizeWords = MaxSize;
+        Carry = 0;
     }
 
     return Carry;
-}
-
-// TODO(bwd): write BigNumSubtract and compress with Add
-internal u32 
-BigNumSubtract(bignum *AMinusB, bignum *A, bignum *B)
-{
-    Stopif((AMinusB == 0) || (A == 0) || (B == 0), "Null input to BigNumSubtract!");
 }
 
 internal inline void
@@ -914,6 +886,80 @@ IsAGreaterThanB(bignum *A, bignum *B)
 	return Result;
 }
 
+// IN: integers A, B in [0, 2^(W*t))
+// OUT: (eps, C) where C = A + B mod 2^(W*t), and eps is the carry bit
+internal u32 
+BigNumAdd(bignum *SumAB, bignum *A, bignum *B)
+{
+    Stopif((SumAB == 0) || (A == 0) || (B == 0), "Null input to BigNumAdd!");
+
+    u32 MaxSize = Maximum(A->SizeWords, B->SizeWords);
+
+    u32 Carry = 0;
+
+    u32 SumABIndex = 0;
+    do
+    {
+        if (SumABIndex >= A->SizeWords)
+        {
+            SumAB->Num[SumABIndex] = B->Num[SumABIndex] + Carry;
+
+            Carry = CheckForCarry(SumAB->Num[SumABIndex], B->Num[SumABIndex]);
+        }
+        else if (SumABIndex >= B->SizeWords)
+        {
+            SumAB->Num[SumABIndex] = A->Num[SumABIndex] + Carry;
+
+            Carry = CheckForCarry(SumAB->Num[SumABIndex], A->Num[SumABIndex]);
+        }
+        else
+        {
+            SumAB->Num[SumABIndex] = A->Num[SumABIndex] + B->Num[SumABIndex] + Carry;
+
+            Carry = CheckForCarry(SumAB->Num[SumABIndex], A->Num[SumABIndex]);
+        }
+
+        ++SumABIndex;
+    } while (SumABIndex < MaxSize);
+
+    if (Carry && (MaxSize < MAX_BIGNUM_SIZE_WORDS))
+    {
+        Carry = 0;
+        SumAB->Num[MaxSize] = 1;
+        SumAB->SizeWords = MaxSize + 1;
+    }
+    else
+    {
+        SumAB->SizeWords = MaxSize;
+    }
+
+    return Carry;
+}
+
+#if 0
+// TODO(bwd): write BigNumSubtract and compress with Add
+internal u32 
+BigNumSubtract(bignum *AMinusB, bignum *A, bignum *B)
+{
+    u32 Carry = 0;
+
+    Stopif((AMinusB == 0) || (A == 0) || (B == 0), "Null input to BigNumSubtract!");
+
+    Stopif(!IsAGreaterThanB(A, B), "No support for negative numbers yet! (BigNumSubtract)");
+
+    u32 MaxSize = Maximum(A->SizeWords, B->SizeWords);
+
+    u32 Borrow = 0;
+
+    AMinusB->Num[0] = A->Num[0] - B->Num[0];
+    if (AMinusB->Num[0] > A->Num[0])
+    {
+        Borrow = 1;
+    }
+
+    return Carry;
+}
+
 internal u32 
 BigNumAddModN(bignum *SumABModN, bignum *A, bignum *B, bignum *N)
 {
@@ -921,12 +967,15 @@ BigNumAddModN(bignum *SumABModN, bignum *A, bignum *B, bignum *N)
 
     u32 Carry = BigNumAdd(bignum *SumAB, bignum *A, bignum *B);
 
+    MaxSize = Maximum(A->SizeWords, B->SizeWords);
+
     if (Carry)
     {
     }
 
     return Carry;
 }
+#endif
 
 internal void
 ByteSwap(u8 *Buffer, u32 Length)
