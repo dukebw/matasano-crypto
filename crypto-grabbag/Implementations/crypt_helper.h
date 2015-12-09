@@ -936,18 +936,13 @@ BigNumAdd(bignum *SumAB, bignum *A, bignum *B)
     return Carry;
 }
 
-#if 0
 // TODO(bwd): write BigNumSubtract and compress with Add
 internal u32 
 BigNumSubtract(bignum *AMinusB, bignum *A, bignum *B)
 {
-    u32 Carry = 0;
-
     Stopif((AMinusB == 0) || (A == 0) || (B == 0), "Null input to BigNumSubtract!");
 
-    Stopif(!IsAGreaterThanB(A, B), "No support for negative numbers yet! (BigNumSubtract)");
-
-    u32 MaxSize = Maximum(A->SizeWords, B->SizeWords);
+    Stopif(IsAGreaterThanB(B, A), "No support for negative numbers yet! (BigNumSubtract)");
 
     u32 Borrow = 0;
 
@@ -957,9 +952,29 @@ BigNumSubtract(bignum *AMinusB, bignum *A, bignum *B)
         Borrow = 1;
     }
 
-    return Carry;
+    u32 AMinusBIndex = 0;
+    do
+    {
+        // Since A is greater than B, we must have A->SizeWords >= B->SizeWords, so no need to check
+        // for AMinusBIndex >= A->SizeWords case (i.e. MaxSize == A->SizeWords)
+        if (AMinusBIndex >= B->SizeWords)
+        {
+            AMinusB->Num[AMinusBIndex] = A->Num[AMinusBIndex] - Borrow;
+        }
+        else
+        {
+            AMinusB->Num[AMinusBIndex] = A->Num[AMinusBIndex] - B->Num[AMinusBIndex] - Borrow;
+        }
+    } while (AMinusBIndex < A->SizeWords);
+
+    Stopif(Borrow, "Negative numbers currently not supported.");
+
+    AdjustSizeWordsUnchecked(AMinusB);
+
+    return Borrow;
 }
 
+#if 0
 internal u32 
 BigNumAddModN(bignum *SumABModN, bignum *A, bignum *B, bignum *N)
 {
