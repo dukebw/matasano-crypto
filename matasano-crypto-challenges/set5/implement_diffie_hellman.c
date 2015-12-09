@@ -112,6 +112,20 @@ const bignum TEST_BIGNUM_2_SUM_MOD_P =
     .SizeWords = 24
 };
 
+
+const bignum TEST_BIGNUM_2_DIFFERENCE =
+{
+    .Num =
+    {
+        0x6B703895C02E3C3C, 0x7522E713AD434DA7, 0x45873809F985B7FF, 0xA115ADC22BC25E27, 0x9E98D962C6289D21,
+        0xC9B176E8AC44A7BE, 0xBC3A71D82BF1A235, 0x49CA6997764E9B65, 0xB8DF8A6D6656952E, 0xF9194463A5888E93,
+        0x48F0B4CF9D982A75, 0x28293C60BFBCFEAF, 0xDF2C895FEFE6A35, 0x5DE91F5689887D04, 0x44A0236E32F0D2A2,
+        0x9EB98146D2D7A732, 0x139EBF7FFB50F0A2, 0x4F2520C5621779CC, 0x61084D6FD7D104BE, 0xFBF8708E7A14184D,
+        0x9CD3E4F4338243A8, 0x6B5947869CC84751, 0x687721A9748301, 0x8584698542708E46,
+    },
+    .SizeWords = 24
+};
+
 internal u32
 NthPowerModP(u32 Value, u32 Power, u32 Prime)
 {
@@ -163,6 +177,7 @@ internal MIN_UNIT_TEST_FUNC(TestBigNumAddModN)
 #endif
 }
 
+// TODO(bwd): Debug this one!
 internal MIN_UNIT_TEST_FUNC(TestBigNumAdd)
 {
     BigNumAdd(&GlobalScratchBigNum, (bignum *)&TEST_BIGNUM_0_LEFT, (bignum *)&TEST_BIGNUM_0_RIGHT);
@@ -171,6 +186,17 @@ internal MIN_UNIT_TEST_FUNC(TestBigNumAdd)
                   "SizeWords incorrect in TestBigNumAdd!");
     MinUnitAssert(VectorsEqual(GlobalScratchBigNum.Num, (void *)TEST_BIGNUM_0_SUM.Num,
                                sizeof(u64)*TEST_BIGNUM_0_SUM.SizeWords),
+                  "Expected/actual mismatch in TestBigNumAdd!");
+}
+
+internal MIN_UNIT_TEST_FUNC(TestBigNumSubtract)
+{
+    BigNumSubtract(&GlobalScratchBigNum, (bignum *)&TEST_BIGNUM_2_LEFT, (bignum *)&TEST_BIGNUM_2_RIGHT);
+
+    MinUnitAssert(GlobalScratchBigNum.SizeWords == TEST_BIGNUM_2_DIFFERENCE.SizeWords,
+                  "SizeWords incorrect in TestBigNumAdd!");
+    MinUnitAssert(VectorsEqual(GlobalScratchBigNum.Num, (void *)TEST_BIGNUM_2_DIFFERENCE.Num,
+                               sizeof(u64)*TEST_BIGNUM_2_DIFFERENCE.SizeWords),
                   "Expected/actual mismatch in TestBigNumAdd!");
 }
 
