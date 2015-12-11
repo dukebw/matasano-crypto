@@ -818,10 +818,10 @@ typedef struct
     u32 SizeWords;
 } bignum;
 
-internal inline u32
-CheckForCarry(u32 Sum, u32 AdditionOperand)
+internal inline u64
+CheckForCarry(u64 Sum, u64 AdditionOperand)
 {
-    u32 Carry;
+    u64 Carry;
 
     if (Sum < AdditionOperand)
     {
@@ -836,7 +836,7 @@ CheckForCarry(u32 Sum, u32 AdditionOperand)
 }
 
 internal inline void
-AdjustSizeWordsUnchecked(bignum *BigNum)
+AdjustSizeWordsDownUnchecked(bignum *BigNum)
 {
 	while (BigNum->SizeWords &&
 		   (BigNum->Num[BigNum->SizeWords - 1] == 0))
@@ -851,9 +851,6 @@ IsAGreaterThanB(bignum *A, bignum *B)
 	b32 Result = false;
 
 	Stopif((A == 0) || (B == 0), "Null input to IsAGreaterThanB");
-
-	AdjustSizeWordsUnchecked(A);
-	AdjustSizeWordsUnchecked(B);
 
 	if (A->SizeWords > B->SizeWords)
 	{
@@ -936,7 +933,23 @@ BigNumAdd(bignum *SumAB, bignum *A, bignum *B)
     return Carry;
 }
 
-// TODO(bwd): write BigNumSubtract and compress with Add
+internal inline u64
+CheckForBorrow(u64 Difference, u64 LeftOperand)
+{
+    u64 Borrow;
+
+    if (Difference > LeftOperand)
+    {
+        Borrow = 1;
+    }
+    else
+    {
+        Borrow = 0;
+    }
+
+    return Borrow;
+}
+
 internal u32 
 BigNumSubtract(bignum *AMinusB, bignum *A, bignum *B)
 {
@@ -946,51 +959,59 @@ BigNumSubtract(bignum *AMinusB, bignum *A, bignum *B)
 
     u32 Borrow = 0;
 
-    AMinusB->Num[0] = A->Num[0] - B->Num[0];
-    if (AMinusB->Num[0] > A->Num[0])
+    u64 LeftOperand = A->Num[0];
+    AMinusB->Num[0] = LeftOperand - B->Num[0];
+    if (AMinusB->Num[0] > LeftOperand)
     {
         Borrow = 1;
     }
 
-    u32 AMinusBIndex = 0;
+    u32 AMinusBIndex = 1;
     do
     {
         // Since A is greater than B, we must have A->SizeWords >= B->SizeWords, so no need to check
         // for AMinusBIndex >= A->SizeWords case (i.e. MaxSize == A->SizeWords)
+        LeftOperand = A->Num[AMinusBIndex];
         if (AMinusBIndex >= B->SizeWords)
         {
-            AMinusB->Num[AMinusBIndex] = A->Num[AMinusBIndex] - Borrow;
+            AMinusB->Num[AMinusBIndex] = LeftOperand - Borrow;
+
+            Borrow = CheckForBorrow(AMinusB->Num[AMinusBIndex], LeftOperand);
         }
         else
         {
-            AMinusB->Num[AMinusBIndex] = A->Num[AMinusBIndex] - B->Num[AMinusBIndex] - Borrow;
+            AMinusB->Num[AMinusBIndex] = LeftOperand - B->Num[AMinusBIndex] - Borrow;
+
+            Borrow = CheckForBorrow(AMinusB->Num[AMinusBIndex], LeftOperand);
         }
+
+        ++AMinusBIndex;
     } while (AMinusBIndex < A->SizeWords);
 
     Stopif(Borrow, "Negative numbers currently not supported.");
 
-    AdjustSizeWordsUnchecked(AMinusB);
+    AMinusB->SizeWords = A->SizeWords;
+    AdjustSizeWordsDownUnchecked(AMinusB);
 
     return Borrow;
 }
 
-#if 0
-internal u32 
+internal void 
 BigNumAddModN(bignum *SumABModN, bignum *A, bignum *B, bignum *N)
 {
 	Stopif((SumABModN == 0) || (A == 0) || (B == 0) || (N == 0), "Null input to BigNumAdd!");
 
-    u32 Carry = BigNumAdd(bignum *SumAB, bignum *A, bignum *B);
-
-    MaxSize = Maximum(A->SizeWords, B->SizeWords);
+    u32 Carry = BigNumAdd(SumABModN, A, B);
 
     if (Carry)
     {
+        BigNumSubtract(SumABModN, SumABModN, N);
     }
-
-    return Carry;
+    else if (!IsAGreaterThanB(N, SumABModN))
+    {
+        BigNumSubtract(SumABModN, SumABModN, N);
+    }
 }
-#endif
 
 internal void
 ByteSwap(u8 *Buffer, u32 Length)
