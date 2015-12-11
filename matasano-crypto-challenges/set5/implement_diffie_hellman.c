@@ -163,21 +163,6 @@ internal MIN_UNIT_TEST_FUNC(TestIsAGreaterThanB)
                   "Bad response in TestIsAGreaterThanB!");
 }
 
-internal MIN_UNIT_TEST_FUNC(TestBigNumAddModN)
-{
-#if 0
-    BigNumAddModN(&GlobalScratchBigNum, (bignum *)&TEST_BIGNUM_2_LEFT, (bignum *)&TEST_BIGNUM_2_RIGHT,
-                  (bignum *)&NIST_RFC_3526_PRIME_1536);
-
-    MinUnitAssert(GlobalScratchBigNum.SizeWords == TEST_BIGNUM_2_SUM_MOD_P.SizeWords,
-                  "SizeWords incorrect in TestBigNumAddModN!");
-    MinUnitAssert(VectorsEqual(GlobalScratchBigNum.Num, (void *)TEST_BIGNUM_2_SUM_MOD_P.Num,
-                               sizeof(u64)*TEST_BIGNUM_2_SUM_MOD_P.SizeWords),
-                  "Expected/actual mismatch in TestBigNumAddModN!");
-#endif
-}
-
-// TODO(bwd): Debug this one!
 internal MIN_UNIT_TEST_FUNC(TestBigNumAdd)
 {
     BigNumAdd(&GlobalScratchBigNum, (bignum *)&TEST_BIGNUM_0_LEFT, (bignum *)&TEST_BIGNUM_0_RIGHT);
@@ -198,6 +183,23 @@ internal MIN_UNIT_TEST_FUNC(TestBigNumSubtract)
     MinUnitAssert(VectorsEqual(GlobalScratchBigNum.Num, (void *)TEST_BIGNUM_2_DIFFERENCE.Num,
                                sizeof(u64)*TEST_BIGNUM_2_DIFFERENCE.SizeWords),
                   "Expected/actual mismatch in TestBigNumAdd!");
+
+    BigNumSubtract(&GlobalScratchBigNum, &GlobalScratchBigNum, &GlobalScratchBigNum);
+
+    MinUnitAssert(GlobalScratchBigNum.SizeWords == 0, "Expected (X - X) == 0 in TestBigNumSubtract!");
+}
+
+// TODO(bwd): Test case where A + B overflow 2^(W*t)
+internal MIN_UNIT_TEST_FUNC(TestBigNumAddModN)
+{
+    BigNumAddModN(&GlobalScratchBigNum, (bignum *)&TEST_BIGNUM_2_LEFT, (bignum *)&TEST_BIGNUM_2_RIGHT,
+                  (bignum *)&NIST_RFC_3526_PRIME_1536);
+
+    MinUnitAssert(GlobalScratchBigNum.SizeWords == TEST_BIGNUM_2_SUM_MOD_P.SizeWords,
+                  "SizeWords incorrect in TestBigNumAddModN!");
+    MinUnitAssert(VectorsEqual(GlobalScratchBigNum.Num, (void *)TEST_BIGNUM_2_SUM_MOD_P.Num,
+                               sizeof(u64)*TEST_BIGNUM_2_SUM_MOD_P.SizeWords),
+                  "Expected/actual mismatch in TestBigNumAddModN!");
 }
 
 internal MIN_UNIT_TEST_FUNC(TestDiffieHellmanBigNum)
@@ -208,6 +210,7 @@ internal MIN_UNIT_TEST_FUNC(AllTests)
 {
 	MinUnitRunTest(TestDiffieHellmanWord);
 	MinUnitRunTest(TestBigNumAdd);
+	MinUnitRunTest(TestBigNumSubtract);
 	MinUnitRunTest(TestBigNumAddModN);
 	MinUnitRunTest(TestDiffieHellmanBigNum);
 }
