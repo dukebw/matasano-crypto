@@ -22,11 +22,16 @@ CASSERT(RAND_MAX <= UINT32_MAX, crypt_helper_h);
 
 #define SHIFT_TO_MASK(Shift) ((1 << (Shift)) - 1)
 
+#define MASK_64BIT 0xFFFFFFFFFFFFFFFFull
+
 #define SHA_1_KEYED_MAC_MAX_MSG_SIZE 256
 
 #define ONE_THOUSAND 1000
 #define ONE_MILLION (ONE_THOUSAND*ONE_THOUSAND)
 #define ONE_BILLION (ONE_THOUSAND*ONE_MILLION)
+
+#define IS_ODD(Value) ((Value) & 0x1)
+#define IS_EVEN(Value) (!IS_ODD(Value))
 
 const r32 EXPECTED_LETTER_FREQUENCY[] =
 {
@@ -810,6 +815,7 @@ HmacSha1(u8 *Hmac, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength)
 	Sha1(Hmac, HmacScratch, SHA_1_BLOCK_SIZE + SHA_1_HASH_LENGTH_BYTES);
 }
 
+#define BITS_IN_BIGNUM_WORD 64
 #define MAX_BIGNUM_SIZE_BYTES (2048/BITS_IN_BYTE)
 #define MAX_BIGNUM_SIZE_WORDS (MAX_BIGNUM_SIZE_BYTES/sizeof(u64))
 typedef struct
@@ -881,6 +887,14 @@ IsAGreaterThanB(bignum *A, bignum *B)
 	}
 
 	return Result;
+}
+
+internal b32
+IsAGreaterThanOrEqualToB(bignum *A, bignum *B)
+{
+    b32 Result = !IsAGreaterThanB(B, A);
+
+    return Result;
 }
 
 // IN: integers A, B in [0, 2^(W*t))
@@ -1024,6 +1038,154 @@ ByteSwap(u8 *Buffer, u32 Length)
 		Buffer[Length - 1 - BufferIndex] = Buffer[BufferIndex];
 		Buffer[BufferIndex] = Temp;
 	}
+}
+
+internal inline void
+BigNumCopyUnchecked(bignum *Dest, bignum *Source)
+{
+    Dest->SizeWords = Source->SizeWords;
+    memcpy(Dest->Num, Source->Num, Source->SizeWords*sizeof(Source->Num[0]));
+}
+
+internal inline b32
+IsEqualToUnityUnchecked(bignum *Num)
+{
+    b32 Result;
+
+    if ((Num->SizeWords == 1) && (Num->Num[0] == 1))
+    {
+        Result = true;
+    }
+    else
+    {
+        Result = false;
+    }
+
+    return Result;
+}
+
+internal inline void
+DivideByTwoUnchecked(bignum *Num)
+{
+    Num->Num[0] >>= 1;
+
+    for (u32 UIndex = 1;
+         UIndex < Num->SizeWords;
+         ++UIndex)
+    {
+        Num->Num[UIndex - 1] |= (Num->Num[UIndex] & 0x1) << (BITS_IN_BIGNUM_WORD - 1);
+        Num->Num[UIndex] >>= 1;
+    }
+}
+
+internal void
+DoInnerReduceToOddStep(bignum *UOrV, bignum *X1OrX2, bignum *P)
+{
+    while (IS_EVEN(UOrV->Num[0]))
+    {
+        DivideByTwoUnchecked(UOrV);
+
+        if (IS_EVEN(X1OrX2->Num[0]))
+        {
+            DivideByTwoUnchecked(X1OrX2);
+        }
+        else
+        {
+            BigNumAdd(X1OrX2, X1OrX2, P);
+
+            DivideByTwoUnchecked(X1OrX2);
+        }
+    }
+}
+
+// TODO(bwd): Montgomery inverse and reduction...
+
+#if 0
+internal void
+BigNumModInverse(bignum *A, bignum *P)
+{
+    Stopif((A == 0) || (P == 0), "Null input to BigNumModInverse!");
+
+    Stopif((A->SizeWords == 0) || (P->SizeWords == 0), "Invalid 0 parameter to BigNumModInverse!");
+
+    bignum U;
+    BigNumCopyUnchecked(&U, A);
+
+    bignum V;
+    BigNumCopyUnchecked(&V, P);
+
+    bignum X1;
+    X1.SizeWords = 1;
+    X1.Num[0] = 1;
+
+    bignum X2;
+    X2.SizeWords = 1;
+    X2.Num[0] = 0;
+
+    while (!IsEqualToUnityUnchecked(&U) && (!IsEqualToUnityUnchecked(&V)))
+    {
+        DoInnerReduceToOddStep(&U, &X1, P);
+
+        DoInnerReduceToOddStep(&V, &X2, P);
+
+        if (IsAGreaterThanOrEqualToB(&U, &V))
+        {
+            BigNumSubtract(&U, &U, &V);
+
+            BigNumSubtract(&X1, &X1, &X2);
+        }
+        else
+        {
+            BigNumSubtract(&V, &V, &U);
+
+            BigNumSubtract(&X2, &X2, &X1);
+        }
+    }
+
+    if (IsEqualToUnityUnchecked(&U))
+    {
+        BigNumCopyUnchecked(A, );
+    }
+    else
+    {
+        BigNumCopyUnchecked(A, );
+    }
+}
+#endif
+
+// INPUT: p, b >= 3, k = floor(log_b(p) + 1), 0 <= z <= b^(2k), and mu = floor(b^(2k) / p)
+// OUTPUT: z mod p
+// b := 2^64 (64-bit word size)
+internal void
+BigNumModReductionBarrett(bignum *Z, bignum *P)
+{
+    Stopif((P == 0) || (Z == 0), "Null input to BigNumModReductionBarrett!");
+}
+
+internal void
+BigNumMultiplyModNOperandScanning(bignum *SumABModN, bignum *A, bignum *B, bignum *N)
+{
+    Stopif((SumABModN == 0) || (A == 0) || (B == 0) || (N == 0), "Null input to BigNumMultiplyModNOperandScanning!");
+
+    u64 ProductScratch[2*MAX_BIGNUM_SIZE_WORDS] = {0};
+
+    for (u32 AIndex = 0;
+         AIndex < A->SizeWords;
+         ++AIndex)
+    {
+        u128 UV = 0;
+
+        for (u32 BIndex = 0;
+             BIndex < B->SizeWords;
+             ++BIndex)
+        {
+            UV = ProductScratch[AIndex + BIndex] + ((u128)A->Num[AIndex])*((u128)B->Num[BIndex]) + (UV & MASK_64BIT);
+
+            ProductScratch[AIndex + BIndex] = UV & MASK_64BIT;
+        }
+
+        ProductScratch[MAX_BIGNUM_SIZE_WORDS + AIndex] = UV >> 64;
+    }
 }
 
 #endif /* CRYPT_HELPER_H */
