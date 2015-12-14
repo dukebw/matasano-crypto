@@ -19,7 +19,8 @@ const bignum NIST_RFC_3526_PRIME_1536 =
 };
 const u32 NIST_RFC_3526_GEN = 2;
 
-global_variable bignum GlobalScratchBigNum;
+global_variable bignum GlobalScratchBigNumA;
+global_variable bignum GlobalScratchBigNumB;
 
 const bignum TEST_BIGNUM_0_LEFT =
 {
@@ -165,45 +166,68 @@ internal MIN_UNIT_TEST_FUNC(TestIsAGreaterThanB)
 
 internal MIN_UNIT_TEST_FUNC(TestBigNumAdd)
 {
-    BigNumAdd(&GlobalScratchBigNum, (bignum *)&TEST_BIGNUM_0_LEFT, (bignum *)&TEST_BIGNUM_0_RIGHT);
+    BigNumAdd(&GlobalScratchBigNumA, (bignum *)&TEST_BIGNUM_0_LEFT, (bignum *)&TEST_BIGNUM_0_RIGHT);
 
-    MinUnitAssert(GlobalScratchBigNum.SizeWords == TEST_BIGNUM_0_SUM.SizeWords,
+    MinUnitAssert(GlobalScratchBigNumA.SizeWords == TEST_BIGNUM_0_SUM.SizeWords,
                   "SizeWords incorrect in TestBigNumAdd!");
-    MinUnitAssert(VectorsEqual(GlobalScratchBigNum.Num, (void *)TEST_BIGNUM_0_SUM.Num,
+    MinUnitAssert(VectorsEqual(GlobalScratchBigNumA.Num, (void *)TEST_BIGNUM_0_SUM.Num,
                                sizeof(u64)*TEST_BIGNUM_0_SUM.SizeWords),
                   "Expected/actual mismatch in TestBigNumAdd!");
 }
 
 internal MIN_UNIT_TEST_FUNC(TestBigNumSubtract)
 {
-    BigNumSubtract(&GlobalScratchBigNum, (bignum *)&TEST_BIGNUM_2_LEFT, (bignum *)&TEST_BIGNUM_2_RIGHT);
+    BigNumSubtract(&GlobalScratchBigNumA, (bignum *)&TEST_BIGNUM_2_LEFT, (bignum *)&TEST_BIGNUM_2_RIGHT);
 
-    MinUnitAssert(GlobalScratchBigNum.SizeWords == TEST_BIGNUM_2_DIFFERENCE.SizeWords,
+    MinUnitAssert(GlobalScratchBigNumA.SizeWords == TEST_BIGNUM_2_DIFFERENCE.SizeWords,
                   "SizeWords incorrect in TestBigNumAdd!");
-    MinUnitAssert(VectorsEqual(GlobalScratchBigNum.Num, (void *)TEST_BIGNUM_2_DIFFERENCE.Num,
+    MinUnitAssert(VectorsEqual(GlobalScratchBigNumA.Num, (void *)TEST_BIGNUM_2_DIFFERENCE.Num,
                                sizeof(u64)*TEST_BIGNUM_2_DIFFERENCE.SizeWords),
                   "Expected/actual mismatch in TestBigNumAdd!");
 
-    BigNumSubtract(&GlobalScratchBigNum, &GlobalScratchBigNum, &GlobalScratchBigNum);
+    BigNumSubtract(&GlobalScratchBigNumA, &GlobalScratchBigNumA, &GlobalScratchBigNumA);
 
-    MinUnitAssert(GlobalScratchBigNum.SizeWords == 0, "Expected (X - X) == 0 in TestBigNumSubtract!");
+    MinUnitAssert(GlobalScratchBigNumA.SizeWords == 0, "Expected (X - X) == 0 in TestBigNumSubtract!");
 }
 
 // TODO(bwd): Test case where A + B overflow 2^(W*t)
 internal MIN_UNIT_TEST_FUNC(TestBigNumAddModN)
 {
-    BigNumAddModN(&GlobalScratchBigNum, (bignum *)&TEST_BIGNUM_2_LEFT, (bignum *)&TEST_BIGNUM_2_RIGHT,
+    BigNumAddModN(&GlobalScratchBigNumA, (bignum *)&TEST_BIGNUM_2_LEFT, (bignum *)&TEST_BIGNUM_2_RIGHT,
                   (bignum *)&NIST_RFC_3526_PRIME_1536);
 
-    MinUnitAssert(GlobalScratchBigNum.SizeWords == TEST_BIGNUM_2_SUM_MOD_P.SizeWords,
+    MinUnitAssert(GlobalScratchBigNumA.SizeWords == TEST_BIGNUM_2_SUM_MOD_P.SizeWords,
                   "SizeWords incorrect in TestBigNumAddModN!");
-    MinUnitAssert(VectorsEqual(GlobalScratchBigNum.Num, (void *)TEST_BIGNUM_2_SUM_MOD_P.Num,
+    MinUnitAssert(VectorsEqual(GlobalScratchBigNumA.Num, (void *)TEST_BIGNUM_2_SUM_MOD_P.Num,
                                sizeof(u64)*TEST_BIGNUM_2_SUM_MOD_P.SizeWords),
                   "Expected/actual mismatch in TestBigNumAddModN!");
 }
 
+internal inline void
+GenRandBigNumModNUnchecked(bignum *A, bignum *N)
+{
+    GenRandUnchecked((u32 *)A->Num, 2*N->SizeWords);
+
+    while (!IsAGreaterThanB(N, A))
+    {
+        BigNumSubtract(A, A, N);
+    }
+
+    A->SizeWords = N->SizeWords;
+
+    AdjustSizeWordsDownUnchecked(A);
+}
+
+internal MIN_UNIT_TEST_FUNC(TestBigNumMultiplyModNOperandScanning)
+{
+    BigNumMultiplyModNOperandScanning((bignum *)&GlobalScratchBigNumA, (bignum *)&TEST_BIGNUM_2_LEFT,
+                                      (bignum *)&TEST_BIGNUM_2_RIGHT, (bignum *)&NIST_RFC_3526_PRIME_1536);
+}
+
 internal MIN_UNIT_TEST_FUNC(TestDiffieHellmanBigNum)
 {
+    GenRandBigNumModNUnchecked((bignum *)&GlobalScratchBigNumA, (bignum *)&NIST_RFC_3526_PRIME_1536);
+    GenRandBigNumModNUnchecked((bignum *)&GlobalScratchBigNumB, (bignum *)&NIST_RFC_3526_PRIME_1536);
 }
 
 internal MIN_UNIT_TEST_FUNC(AllTests)
@@ -212,6 +236,7 @@ internal MIN_UNIT_TEST_FUNC(AllTests)
 	MinUnitRunTest(TestBigNumAdd);
 	MinUnitRunTest(TestBigNumSubtract);
 	MinUnitRunTest(TestBigNumAddModN);
+	MinUnitRunTest(TestBigNumMultiplyModNOperandScanning);
 	MinUnitRunTest(TestDiffieHellmanBigNum);
 }
 
