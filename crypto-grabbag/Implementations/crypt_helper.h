@@ -1047,111 +1047,14 @@ BigNumCopyUnchecked(bignum *Dest, bignum *Source)
     memcpy(Dest->Num, Source->Num, Source->SizeWords*sizeof(Source->Num[0]));
 }
 
-internal inline b32
-IsEqualToUnityUnchecked(bignum *Num)
-{
-    b32 Result;
-
-    if ((Num->SizeWords == 1) && (Num->Num[0] == 1))
-    {
-        Result = true;
-    }
-    else
-    {
-        Result = false;
-    }
-
-    return Result;
-}
-
-internal inline void
-DivideByTwoUnchecked(bignum *Num)
-{
-    Num->Num[0] >>= 1;
-
-    for (u32 UIndex = 1;
-         UIndex < Num->SizeWords;
-         ++UIndex)
-    {
-        Num->Num[UIndex - 1] |= (Num->Num[UIndex] & 0x1) << (BITS_IN_BIGNUM_WORD - 1);
-        Num->Num[UIndex] >>= 1;
-    }
-}
-
-internal void
-DoInnerReduceToOddStep(bignum *UOrV, bignum *X1OrX2, bignum *P)
-{
-    while (IS_EVEN(UOrV->Num[0]))
-    {
-        DivideByTwoUnchecked(UOrV);
-
-        if (IS_EVEN(X1OrX2->Num[0]))
-        {
-            DivideByTwoUnchecked(X1OrX2);
-        }
-        else
-        {
-            BigNumAdd(X1OrX2, X1OrX2, P);
-
-            DivideByTwoUnchecked(X1OrX2);
-        }
-    }
-}
-
 // TODO(bwd): Montgomery inverse and reduction...
 
-#if 0
 internal void
-BigNumModInverse(bignum *A, bignum *P)
+MontReduce(bignum *Output, bignum *Input, bignum *N, bignum *R)
 {
-    Stopif((A == 0) || (P == 0), "Null input to BigNumModInverse!");
-
-    Stopif((A->SizeWords == 0) || (P->SizeWords == 0), "Invalid 0 parameter to BigNumModInverse!");
-
-    bignum U;
-    BigNumCopyUnchecked(&U, A);
-
-    bignum V;
-    BigNumCopyUnchecked(&V, P);
-
-    bignum X1;
-    X1.SizeWords = 1;
-    X1.Num[0] = 1;
-
-    bignum X2;
-    X2.SizeWords = 1;
-    X2.Num[0] = 0;
-
-    while (!IsEqualToUnityUnchecked(&U) && (!IsEqualToUnityUnchecked(&V)))
-    {
-        DoInnerReduceToOddStep(&U, &X1, P);
-
-        DoInnerReduceToOddStep(&V, &X2, P);
-
-        if (IsAGreaterThanOrEqualToB(&U, &V))
-        {
-            BigNumSubtract(&U, &U, &V);
-
-            BigNumSubtract(&X1, &X1, &X2);
-        }
-        else
-        {
-            BigNumSubtract(&V, &V, &U);
-
-            BigNumSubtract(&X2, &X2, &X1);
-        }
-    }
-
-    if (IsEqualToUnityUnchecked(&U))
-    {
-        BigNumCopyUnchecked(A, );
-    }
-    else
-    {
-        BigNumCopyUnchecked(A, );
-    }
+    // TODO(bwd): Hensel Lifting to calculate N-inverse mod R
+    bignum MinusNInverseModR;
 }
-#endif
 
 // INPUT: p, b >= 3, k = floor(log_b(p) + 1), 0 <= z <= b^(2k), and mu = floor(b^(2k) / p)
 // OUTPUT: z mod p
@@ -1165,7 +1068,8 @@ BigNumModReductionBarrett(bignum *Z, bignum *P)
 internal void
 BigNumMultiplyModNOperandScanning(bignum *SumABModN, bignum *A, bignum *B, bignum *N)
 {
-    Stopif((SumABModN == 0) || (A == 0) || (B == 0) || (N == 0), "Null input to BigNumMultiplyModNOperandScanning!");
+    Stopif((SumABModN == 0) || (A == 0) || (B == 0) || (N == 0),
+           "Null input to BigNumMultiplyModNOperandScanning!");
 
     u64 ProductScratch[2*MAX_BIGNUM_SIZE_WORDS] = {0};
 
@@ -1179,7 +1083,8 @@ BigNumMultiplyModNOperandScanning(bignum *SumABModN, bignum *A, bignum *B, bignu
              BIndex < B->SizeWords;
              ++BIndex)
         {
-            UV = ProductScratch[AIndex + BIndex] + ((u128)A->Num[AIndex])*((u128)B->Num[BIndex]) + (UV & MASK_64BIT);
+            UV = (ProductScratch[AIndex + BIndex] + ((u128)A->Num[AIndex])*((u128)B->Num[BIndex]) +
+                  (UV & MASK_64BIT));
 
             ProductScratch[AIndex + BIndex] = UV & MASK_64BIT;
         }
