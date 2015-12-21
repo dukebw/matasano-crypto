@@ -1048,33 +1048,40 @@ BigNumCopyUnchecked(bignum *Dest, bignum *Source)
 }
 
 internal void
-BigNumMultiplyOperandScanning(bignum *ProductAB, bignum *A, bignum *B)
+MultiplyOperandScanningUnchecked(u64 *ProductAB, u32 ProductABMaxLengthWords,
+                                 u64 *A, u32 ALengthWords, u64 *B, u32 BLengthWords)
 {
-    Stopif((ProductAB == 0) || (A == 0) || (B == 0), "Null input to BigNumMultiplyModNOperandScanning!");
-
-    memset(ProductAB, 0, sizeof(*ProductAB));
+    memset(ProductAB, 0, sizeof(u64)*ProductABMaxLengthWords);
 
     for (u32 AIndex = 0;
-         AIndex < A->SizeWords;
+         AIndex < ALengthWords;
          ++AIndex)
     {
         u128 UV = 0;
 
         for (u32 BIndex = 0;
-             (BIndex < B->SizeWords) && ((AIndex + BIndex) < MAX_BIGNUM_SIZE_WORDS);
+             (BIndex < BLengthWords) && ((AIndex + BIndex) < ProductABMaxLengthWords);
              ++BIndex)
         {
-            UV = (ProductAB->Num[AIndex + BIndex] + ((u128)A->Num[AIndex])*((u128)B->Num[BIndex]) +
-                  (UV >> BITS_IN_DWORD));
+            UV = (ProductAB[AIndex + BIndex] + ((u128)A[AIndex])*((u128)B[BIndex]) + (UV >> BITS_IN_DWORD));
 
-            ProductAB->Num[AIndex + BIndex] = UV & MASK_64BIT;
+            ProductAB[AIndex + BIndex] = UV & MASK_64BIT;
         }
 
-        if ((A->SizeWords + AIndex) < MAX_BIGNUM_SIZE_WORDS)
+        if ((ALengthWords + AIndex) < ProductABMaxLengthWords)
         {
-            ProductAB->Num[A->SizeWords + AIndex] = (UV >> BITS_IN_DWORD);
+            ProductAB[ALengthWords + AIndex] = (UV >> BITS_IN_DWORD);
         }
     }
+}
+
+internal void
+BigNumMultiplyOperandScanning(bignum *ProductAB, bignum *A, bignum *B)
+{
+    Stopif((ProductAB == 0) || (A == 0) || (B == 0), "Null input to BigNumMultiplyModNOperandScanning!");
+
+    MultiplyOperandScanningUnchecked(ProductAB->Num, MAX_BIGNUM_SIZE_WORDS,
+                                     A->Num, A->SizeWords, B->Num, B->SizeWords);
 
     ProductAB->SizeWords = 32;
     AdjustSizeWordsDownUnchecked(ProductAB);
@@ -1172,7 +1179,7 @@ FindNInverseModR(bignum *NInverseModR, bignum *N, bignum *R)
 }
 
 internal void
-MontReduce(bignum *Output, bignum *Input, bignum *N, bignum *R)
+MontModExp(bignum *Output, bignum *Input, bignum *N, bignum *R)
 {
 	Stopif((Output == 0) || (Input == 0) || (N == 0) || (R == 0), "Null input to MontReduce!");
 
@@ -1186,6 +1193,23 @@ MontReduce(bignum *Output, bignum *Input, bignum *N, bignum *R)
 
     bignum MinusNInverseModR;
     FindNInverseModR(&MinusNInverseModR, N, R);
+
+    BigNumSubtract(&MinusNInverseModR, R, &MinusNInverseModR);
+
+    // c := (z + (z*p' mod R)*p)/R
+    bignum InputDivRModP;
+    BigNumMultiplyOperandScanning(&InputDivRModP, Input, &MinusNInverseModR);
+
+    InputDivRModP.SizeWords = R->SizeWords;
+    InputDivRModP.Num[InputDivRModP.SizeWords - 1] &= (1 << __builtin_ctzl(R->Num[R->SizeWords - 1])) - 1;
+    AdjustSizeWordsDownUnchecked(&InputDivRModP);
+
+    // TODO(bwd): multiply by p, add z then divide by R
+    // if c >= p then c := c - p
+#if 0
+    MultiplyOperandScanningUnchecked(u64 *ProductAB, u32 ProductABMaxLengthWords,
+                                     u64 *A, u32 ALengthWords, u64 *B, u32 BLengthWords)
+#endif
 }
 
 #endif /* CRYPT_HELPER_H */
