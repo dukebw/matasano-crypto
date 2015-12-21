@@ -1047,31 +1047,12 @@ BigNumCopyUnchecked(bignum *Dest, bignum *Source)
     memcpy(Dest->Num, Source->Num, Source->SizeWords*sizeof(Source->Num[0]));
 }
 
-// TODO(bwd): Montgomery inverse and reduction...
-
 internal void
-MontReduce(bignum *Output, bignum *Input, bignum *N, bignum *R)
+BigNumMultiplyOperandScanning(bignum *ProductAB, bignum *A, bignum *B)
 {
-    // TODO(bwd): Hensel Lifting to calculate N-inverse mod R
-    bignum MinusNInverseModR;
-}
+    Stopif((ProductAB == 0) || (A == 0) || (B == 0), "Null input to BigNumMultiplyModNOperandScanning!");
 
-// INPUT: p, b >= 3, k = floor(log_b(p) + 1), 0 <= z <= b^(2k), and mu = floor(b^(2k) / p)
-// OUTPUT: z mod p
-// b := 2^64 (64-bit word size)
-internal void
-BigNumModReductionBarrett(bignum *Z, bignum *P)
-{
-    Stopif((P == 0) || (Z == 0), "Null input to BigNumModReductionBarrett!");
-}
-
-internal void
-BigNumMultiplyModNOperandScanning(bignum *SumABModN, bignum *A, bignum *B, bignum *N)
-{
-    Stopif((SumABModN == 0) || (A == 0) || (B == 0) || (N == 0),
-           "Null input to BigNumMultiplyModNOperandScanning!");
-
-    u64 ProductScratch[2*MAX_BIGNUM_SIZE_WORDS] = {0};
+    memset(ProductAB, 0, sizeof(*ProductAB));
 
     for (u32 AIndex = 0;
          AIndex < A->SizeWords;
@@ -1080,17 +1061,131 @@ BigNumMultiplyModNOperandScanning(bignum *SumABModN, bignum *A, bignum *B, bignu
         u128 UV = 0;
 
         for (u32 BIndex = 0;
-             BIndex < B->SizeWords;
+             (BIndex < B->SizeWords) && ((AIndex + BIndex) < MAX_BIGNUM_SIZE_WORDS);
              ++BIndex)
         {
-            UV = (ProductScratch[AIndex + BIndex] + ((u128)A->Num[AIndex])*((u128)B->Num[BIndex]) +
-                  (UV & MASK_64BIT));
+            UV = (ProductAB->Num[AIndex + BIndex] + ((u128)A->Num[AIndex])*((u128)B->Num[BIndex]) +
+                  (UV >> BITS_IN_DWORD));
 
-            ProductScratch[AIndex + BIndex] = UV & MASK_64BIT;
+            ProductAB->Num[AIndex + BIndex] = UV & MASK_64BIT;
         }
 
-        ProductScratch[MAX_BIGNUM_SIZE_WORDS + AIndex] = UV >> 64;
+        if ((A->SizeWords + AIndex) < MAX_BIGNUM_SIZE_WORDS)
+        {
+            ProductAB->Num[A->SizeWords + AIndex] = (UV >> BITS_IN_DWORD);
+        }
     }
+
+    ProductAB->SizeWords = 32;
+    AdjustSizeWordsDownUnchecked(ProductAB);
+}
+
+internal inline b32
+IsInverseOfNMod2PowerKUnchecked(bignum *BigNum, bignum *BigNumInverse, u32 PowerOf2)
+{
+    // TODO(bwd): copy BigNum mod 2^k and multiply with BigNum' mod 2^k to get BigNum*BigNum' mod 2^k
+    bignum ScratchProduct;
+    BigNumMultiplyOperandScanning(&ScratchProduct, BigNumInverse, BigNum);
+
+    u32 NextPowerOf2DWordIndex = PowerOf2 / BITS_IN_DWORD;
+    ScratchProduct.Num[NextPowerOf2DWordIndex] &= (((u64)1 << (PowerOf2 % BITS_IN_DWORD)) - (u64)1);
+
+    b32 NInverted = true;
+    for (u32 ProductIndex = NextPowerOf2DWordIndex;
+         ProductIndex > 0;
+         --ProductIndex)
+    {
+        if (ScratchProduct.Num[ProductIndex] != 0)
+        {
+            NInverted = false;
+            break;
+        }
+    }
+
+    if (NInverted && (ScratchProduct.Num[0] != 1))
+    {
+        NInverted = false;
+    }
+
+    return NInverted;
+}
+
+internal void
+FindNInverseModR(bignum *NInverseModR, bignum *N, bignum *R)
+{
+    Stopif((R->SizeWords == 0) ||
+           (R->Num[R->SizeWords - 1] & (R->Num[R->SizeWords - 1] - 1)) ||
+           (R->SizeWords > (MAX_BIGNUM_SIZE_WORDS)),
+           "Invalid R input to MontReduce!");
+
+    b32 IsRPowerOf2 = true;
+    for (u32 RIndex = 0;
+         RIndex < (R->SizeWords - 1);
+         ++RIndex)
+    {
+        if (R->Num[RIndex] != 0)
+        {
+            IsRPowerOf2 = false;
+            break;
+        }
+    }
+    Stopif(!IsRPowerOf2, "R must be power of 2 in MontReduce");
+
+    Stopif((N->SizeWords == 0) || (!(N->Num[0] & 0x1)), "gcd(N, R) must be 1 in MontReduce!");
+
+    // Hensel's Lemma to calculate 1/N mod R -- used to avoid explicit trial division
+
+    NInverseModR->SizeWords = 1;
+    NInverseModR->Num[0] = 1;
+
+    u32 NextPowerOf2 = 1;
+    u32 BitsInMostSignficantDWordR = ((BITS_IN_DWORD*(R->SizeWords - 1)) +
+                                      __builtin_ctzl(R->Num[R->SizeWords - 1]));
+    while (NextPowerOf2 < BitsInMostSignficantDWordR)
+    {
+        // To keep the invariant (NInverseModR * N) == 1 mod NextPowerOf2 ...
+        ++NextPowerOf2;
+
+        u32 NextPowerOf2Mod64 = (NextPowerOf2 % BITS_IN_DWORD);
+        if (NextPowerOf2Mod64 == 0)
+        {
+            NInverseModR->Num[NInverseModR->SizeWords] = 0;
+            ++NInverseModR->SizeWords;
+        }
+
+        if (!IsInverseOfNMod2PowerKUnchecked(N, NInverseModR, NextPowerOf2))
+        {
+            u32 NextPowerOf2DWordIndex = NextPowerOf2 / BITS_IN_DWORD;
+            if (NextPowerOf2Mod64 > 0)
+            {
+                NInverseModR->Num[NextPowerOf2DWordIndex] |= ((u64)1 << (NextPowerOf2Mod64 - 1));
+            }
+            else
+            {
+                NInverseModR->Num[NextPowerOf2DWordIndex - 1] |= ((u64)1 << (BITS_IN_DWORD - 1));
+            }
+        }
+    }
+
+    Stopif(!IsInverseOfNMod2PowerKUnchecked(N, NInverseModR, NextPowerOf2),
+           "1/N mod R not found in FindNInverseModR!");
+}
+
+internal void
+MontReduce(bignum *Output, bignum *Input, bignum *N, bignum *R)
+{
+	Stopif((Output == 0) || (Input == 0) || (N == 0) || (R == 0), "Null input to MontReduce!");
+
+	Stopif(IsAGreaterThanOrEqualToB(N, R), "Precondition N < R not met in MontReduce!");
+
+	// TODO(bwd): Input belongs to [0, R*N - 1] pre-condition
+
+	AdjustSizeWordsDownUnchecked(Input);
+	AdjustSizeWordsDownUnchecked(N);
+	AdjustSizeWordsDownUnchecked(R);
+
+    bignum MinusNInverseModR;
+    FindNInverseModR(&MinusNInverseModR, N, R);
 }
 
 #endif /* CRYPT_HELPER_H */

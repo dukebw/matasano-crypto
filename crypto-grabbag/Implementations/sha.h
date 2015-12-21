@@ -3,6 +3,7 @@
 #define MASK 0xf
 #define WORKING_VARS_COUNT 5
 #define SHA_1_HASH_LENGTH_BYTES 20
+#define BITS_IN_DWORD 64
 #define BITS_IN_WORD 32
 #define BITS_IN_BYTE 8
 
