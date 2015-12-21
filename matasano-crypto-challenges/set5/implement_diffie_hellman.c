@@ -20,7 +20,9 @@ const bignum NIST_RFC_3526_PRIME_1536 =
 const u32 NIST_RFC_3526_GEN = 2;
 
 global_variable bignum GlobalScratchBigNumA;
+#if 0
 global_variable bignum GlobalScratchBigNumB;
+#endif
 
 const bignum TEST_BIGNUM_0_LEFT =
 {
@@ -127,6 +129,21 @@ const bignum TEST_BIGNUM_2_DIFFERENCE =
     .SizeWords = 24
 };
 
+const bignum TEST_BIGNUM_2_PRODUCT =
+{
+    .Num =
+    {
+        0xCCA78E4B52068A0, 0xC7B0807EA66615EB, 0xBF7DAE630CBBC0EF, 0x37A9136098745A21, 0x5798E028B0810DD4,
+        0xC5C5E1F3CCD96BBB, 0x26278F265B8A3413, 0xA76C25D2A9D624C, 0x84A32738B9F5AD91, 0xE94132A37106C54D,
+        0x518DAD6D9D0CA900, 0xEE7564CAD07E930, 0x42A5395DFCA56228, 0xEF1423FC95DA214F, 0xE874584AD76F75D2,
+        0x6FAF4254F3F452E1, 0x3D0703FBEBC23119, 0xEDF68AB4EE213EFF, 0x5B0B89DFACF27484, 0x57F0BBC4F6AC5490,
+        0x44F8EC9417985BFF, 0x3CE7327A55851A8, 0x84CD19591D3D46E5, 0x93C7D6AA22746645, 0xE8A9EFE928A25617,
+        0x3A8DBB701EF00C8, 0xD68A185F14FF00F5, 0x399FC8C02C30CE60, 0x839610978A50E1E8, 0xB55F8EFF0FFEC7F5,
+        0x5D68C84B05F7A700, 0xDAEB39F375B24671,
+    },
+    .SizeWords = 32
+};
+
 internal u32
 NthPowerModP(u32 Value, u32 Power, u32 Prime)
 {
@@ -203,11 +220,22 @@ internal MIN_UNIT_TEST_FUNC(TestBigNumAddModN)
                   "Expected/actual mismatch in TestBigNumAddModN!");
 }
 
+internal MIN_UNIT_TEST_FUNC(TestBigNumMultiply)
+{
+    BigNumMultiplyOperandScanning(&GlobalScratchBigNumA,
+                                  (bignum *)&TEST_BIGNUM_2_LEFT, (bignum *)&TEST_BIGNUM_2_RIGHT);
+
+    MinUnitAssert(VectorsEqual(GlobalScratchBigNumA.Num, (void *)TEST_BIGNUM_2_PRODUCT.Num,
+                               sizeof(u64)*TEST_BIGNUM_2_PRODUCT.SizeWords),
+                  "Expected/actual mismatch in TestBigNumMultiply!");
+}
+
 internal inline void
 GenRandBigNumModNUnchecked(bignum *A, bignum *N)
 {
     GenRandUnchecked((u32 *)A->Num, 2*N->SizeWords);
 
+    // TODO(bwd): hangs; more efficient algorithm
     while (!IsAGreaterThanB(N, A))
     {
         BigNumSubtract(A, A, N);
@@ -218,16 +246,26 @@ GenRandBigNumModNUnchecked(bignum *A, bignum *N)
     AdjustSizeWordsDownUnchecked(A);
 }
 
-internal MIN_UNIT_TEST_FUNC(TestBigNumMultiplyModNOperandScanning)
+internal MIN_UNIT_TEST_FUNC(TestFindNInverseModR)
 {
-    BigNumMultiplyModNOperandScanning((bignum *)&GlobalScratchBigNumA, (bignum *)&TEST_BIGNUM_2_LEFT,
-                                      (bignum *)&TEST_BIGNUM_2_RIGHT, (bignum *)&NIST_RFC_3526_PRIME_1536);
+    bignum TwoPower1792;
+    memset(&TwoPower1792, 0, sizeof(TwoPower1792));
+
+    TwoPower1792.SizeWords = (1792/BITS_IN_DWORD) + 1;
+    TwoPower1792.Num[TwoPower1792.SizeWords - 1] = 1;
+
+    bignum NInverseModR;
+    FindNInverseModR(&NInverseModR, (bignum *)&NIST_RFC_3526_PRIME_1536, &TwoPower1792);
+    MinUnitAssert(IsInverseOfNMod2PowerKUnchecked((bignum *)&NIST_RFC_3526_PRIME_1536, &NInverseModR, 1792),
+                  "No NInverse found mod R in TestFindNInverseModR!");
 }
 
 internal MIN_UNIT_TEST_FUNC(TestDiffieHellmanBigNum)
 {
+#if 0
     GenRandBigNumModNUnchecked((bignum *)&GlobalScratchBigNumA, (bignum *)&NIST_RFC_3526_PRIME_1536);
     GenRandBigNumModNUnchecked((bignum *)&GlobalScratchBigNumB, (bignum *)&NIST_RFC_3526_PRIME_1536);
+#endif
 }
 
 internal MIN_UNIT_TEST_FUNC(AllTests)
@@ -236,7 +274,8 @@ internal MIN_UNIT_TEST_FUNC(AllTests)
 	MinUnitRunTest(TestBigNumAdd);
 	MinUnitRunTest(TestBigNumSubtract);
 	MinUnitRunTest(TestBigNumAddModN);
-	MinUnitRunTest(TestBigNumMultiplyModNOperandScanning);
+	MinUnitRunTest(TestBigNumMultiply);
+	MinUnitRunTest(TestFindNInverseModR);
 	MinUnitRunTest(TestDiffieHellmanBigNum);
 }
 
