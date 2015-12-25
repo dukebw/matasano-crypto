@@ -144,6 +144,19 @@ const bignum TEST_BIGNUM_2_PRODUCT =
     .SizeWords = 32
 };
 
+const bignum TEST_BIGNUM_2_POWER_MOD_P =
+{
+    .Num =
+    {
+        0xD844922820C7382A, 0xD643FD37BC77DCAB, 0x90D978088313006B, 0xA0B634AC6126AE23, 0xE498B9E01111CE08,
+        0x9490931257D58455, 0x416E3CB36A00C607, 0x3ACD5549326C9B0, 0x4F8D45F78C8F8D9D, 0x140071F846B860FC,
+        0xCCBC064D632C9C0A, 0xBACE5D459BCD2E58, 0xC80BB015D4BE63BF, 0xA5CC16DC13A77255, 0xE51A2DDADD6E86E2,
+        0xEE783E5292F498F0, 0x8ED9DE64CBD27EFF, 0xAB4E658E063F12C, 0x84E16F45A0BEBC9D, 0x395489445A037C8C,
+        0x4DA3FF1D0E2BC0D, 0x1E370933657E53C4, 0xAD7151FDB2A042AC, 0xF1CDBFF72779624C,
+    },
+    .SizeWords = 24
+};
+
 internal u32
 NthPowerModP(u32 Value, u32 Power, u32 Prime)
 {
@@ -248,16 +261,21 @@ GenRandBigNumModNUnchecked(bignum *A, bignum *N)
 
 internal MIN_UNIT_TEST_FUNC(TestFindNInverseModR)
 {
-    bignum TwoPower1792;
-    memset(&TwoPower1792, 0, sizeof(TwoPower1792));
-
-    TwoPower1792.SizeWords = (1792/BITS_IN_DWORD) + 1;
-    TwoPower1792.Num[TwoPower1792.SizeWords - 1] = 1;
-
     bignum NInverseModR;
-    FindNInverseModR(&NInverseModR, (bignum *)&NIST_RFC_3526_PRIME_1536, &TwoPower1792);
-    MinUnitAssert(IsInverseOfNMod2PowerKUnchecked((bignum *)&NIST_RFC_3526_PRIME_1536, &NInverseModR, 1792),
+    FindNInverseModR(&NInverseModR, (bignum *)&NIST_RFC_3526_PRIME_1536);
+    MinUnitAssert(IsInverseOfNMod2PowerKUnchecked((bignum *)&NIST_RFC_3526_PRIME_1536, &NInverseModR,
+                                                  R_POWER_OF_2),
                   "No NInverse found mod R in TestFindNInverseModR!");
+}
+
+internal MIN_UNIT_TEST_FUNC(TestMontModExp)
+{
+    MontModExp(&GlobalScratchBigNumA, (bignum *)&TEST_BIGNUM_2_LEFT, (bignum *)&TEST_BIGNUM_2_RIGHT,
+               (bignum *)&NIST_RFC_3526_PRIME_1536);
+
+    MinUnitAssert(VectorsEqual(GlobalScratchBigNumA.Num, (void *)TEST_BIGNUM_2_POWER_MOD_P.Num,
+                               sizeof(u64)*TEST_BIGNUM_2_POWER_MOD_P.SizeWords),
+                  "Expected/actual mismatch in TestMontModExp!");
 }
 
 internal MIN_UNIT_TEST_FUNC(TestDiffieHellmanBigNum)
@@ -276,6 +294,7 @@ internal MIN_UNIT_TEST_FUNC(AllTests)
 	MinUnitRunTest(TestBigNumAddModN);
 	MinUnitRunTest(TestBigNumMultiply);
 	MinUnitRunTest(TestFindNInverseModR);
+	MinUnitRunTest(TestMontModExp);
 	MinUnitRunTest(TestDiffieHellmanBigNum);
 }
 
