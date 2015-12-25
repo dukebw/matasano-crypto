@@ -816,8 +816,10 @@ HmacSha1(u8 *Hmac, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength)
 }
 
 #define BITS_IN_BIGNUM_WORD 64
-#define MAX_BIGNUM_SIZE_BYTES (2048/BITS_IN_BYTE)
-#define MAX_BIGNUM_SIZE_WORDS (MAX_BIGNUM_SIZE_BYTES/sizeof(u64))
+#define MAX_BIGNUM_SIZE_BITS    2048
+#define MAX_BIGNUM_SIZE_BYTES   (MAX_BIGNUM_SIZE_BITS/BITS_IN_BYTE)
+#define MAX_BIGNUM_SIZE_WORDS   (MAX_BIGNUM_SIZE_BYTES/sizeof(u64))
+#define R_POWER_OF_2            MAX_BIGNUM_SIZE_BITS
 typedef struct
 {
     u64 Num[MAX_BIGNUM_SIZE_WORDS];
@@ -909,25 +911,32 @@ BigNumAdd(bignum *SumAB, bignum *A, bignum *B)
     u32 Carry = 0;
 
     u32 SumABIndex = 0;
+    u64 AdditionOperand;
     do
     {
         if (SumABIndex >= A->SizeWords)
         {
+            AdditionOperand = B->Num[SumABIndex];
+
             SumAB->Num[SumABIndex] = B->Num[SumABIndex] + Carry;
 
-            Carry = CheckForCarry(SumAB->Num[SumABIndex], B->Num[SumABIndex]);
+            Carry = CheckForCarry(SumAB->Num[SumABIndex], AdditionOperand);
         }
         else if (SumABIndex >= B->SizeWords)
         {
+            AdditionOperand = A->Num[SumABIndex];
+
             SumAB->Num[SumABIndex] = A->Num[SumABIndex] + Carry;
 
-            Carry = CheckForCarry(SumAB->Num[SumABIndex], A->Num[SumABIndex]);
+            Carry = CheckForCarry(SumAB->Num[SumABIndex], AdditionOperand);
         }
         else
         {
+            AdditionOperand = A->Num[SumABIndex];
+
             SumAB->Num[SumABIndex] = A->Num[SumABIndex] + B->Num[SumABIndex] + Carry;
 
-            Carry = CheckForCarry(SumAB->Num[SumABIndex], A->Num[SumABIndex]);
+            Carry = CheckForCarry(SumAB->Num[SumABIndex], AdditionOperand);
         }
 
         ++SumABIndex;
@@ -943,6 +952,8 @@ BigNumAdd(bignum *SumAB, bignum *A, bignum *B)
     {
         SumAB->SizeWords = MaxSize;
     }
+
+    AdjustSizeWordsDownUnchecked(SumAB);
 
     return Carry;
 }
@@ -1118,27 +1129,10 @@ IsInverseOfNMod2PowerKUnchecked(bignum *BigNum, bignum *BigNumInverse, u32 Power
 }
 
 internal void
-FindNInverseModR(bignum *NInverseModR, bignum *N, bignum *R)
+FindNInverseModR(bignum *NInverseModR, bignum *N)
 {
-    Stopif((R->SizeWords == 0) ||
-           (R->Num[R->SizeWords - 1] & (R->Num[R->SizeWords - 1] - 1)) ||
-           (R->SizeWords > (MAX_BIGNUM_SIZE_WORDS)),
-           "Invalid R input to MontReduce!");
-
-    b32 IsRPowerOf2 = true;
-    for (u32 RIndex = 0;
-         RIndex < (R->SizeWords - 1);
-         ++RIndex)
-    {
-        if (R->Num[RIndex] != 0)
-        {
-            IsRPowerOf2 = false;
-            break;
-        }
-    }
-    Stopif(!IsRPowerOf2, "R must be power of 2 in MontReduce");
-
-    Stopif((N->SizeWords == 0) || (!(N->Num[0] & 0x1)), "gcd(N, R) must be 1 in MontReduce!");
+    Stopif((N->SizeWords > MAX_BIGNUM_SIZE_WORDS) || (N->SizeWords == 0) || (!(N->Num[0] & 0x1)),
+           "gcd(N, R) must be 1 in FindNInverseModR!");
 
     // Hensel's Lemma to calculate 1/N mod R -- used to avoid explicit trial division
 
@@ -1146,15 +1140,13 @@ FindNInverseModR(bignum *NInverseModR, bignum *N, bignum *R)
     NInverseModR->Num[0] = 1;
 
     u32 NextPowerOf2 = 1;
-    u32 BitsInMostSignficantDWordR = ((BITS_IN_DWORD*(R->SizeWords - 1)) +
-                                      __builtin_ctzl(R->Num[R->SizeWords - 1]));
-    while (NextPowerOf2 < BitsInMostSignficantDWordR)
+    while (NextPowerOf2 < R_POWER_OF_2)
     {
         // To keep the invariant (NInverseModR * N) == 1 mod NextPowerOf2 ...
         ++NextPowerOf2;
 
         u32 NextPowerOf2Mod64 = (NextPowerOf2 % BITS_IN_DWORD);
-        if (NextPowerOf2Mod64 == 0)
+        if ((NextPowerOf2Mod64 == 0) && (NInverseModR->SizeWords < MAX_BIGNUM_SIZE_WORDS))
         {
             NInverseModR->Num[NInverseModR->SizeWords] = 0;
             ++NInverseModR->SizeWords;
@@ -1172,31 +1164,45 @@ FindNInverseModR(bignum *NInverseModR, bignum *N, bignum *R)
                 NInverseModR->Num[NextPowerOf2DWordIndex - 1] |= ((u64)1 << (BITS_IN_DWORD - 1));
             }
         }
-    }
 
-    Stopif(!IsInverseOfNMod2PowerKUnchecked(N, NInverseModR, NextPowerOf2),
-           "1/N mod R not found in FindNInverseModR!");
+        Stopif(!IsInverseOfNMod2PowerKUnchecked(N, NInverseModR, NextPowerOf2),
+               "1/N mod R not found in FindNInverseModR!\nNextPowerOf2: %d", NextPowerOf2);
+    }
 }
 
 internal void
-MontModExp(bignum *Output, bignum *Input, bignum *N, bignum *R)
+MontModExp(bignum *Output, bignum *Input, bignum *Exponent, bignum *N)
 {
-	Stopif((Output == 0) || (Input == 0) || (N == 0) || (R == 0), "Null input to MontReduce!");
-
-	Stopif(IsAGreaterThanOrEqualToB(N, R), "Precondition N < R not met in MontReduce!");
+    Stopif((Output == 0) || (Input == 0) || (Exponent == 0) || (N == 0), "Null input to MontReduce!");
 
 	// TODO(bwd): Input belongs to [0, R*N - 1] pre-condition
 
-	AdjustSizeWordsDownUnchecked(Input);
-	AdjustSizeWordsDownUnchecked(N);
-	AdjustSizeWordsDownUnchecked(R);
-
     bignum MinusNInverseModR;
-    FindNInverseModR(&MinusNInverseModR, N, R);
+    FindNInverseModR(&MinusNInverseModR, N);
 
-    BigNumSubtract(&MinusNInverseModR, R, &MinusNInverseModR);
+    u32 Borrow = 0;
+
+    for (u32 MinusNInvIndex = 0;
+         MinusNInvIndex < MinusNInverseModR.SizeWords;
+         ++MinusNInvIndex)
+    {
+        MinusNInverseModR.Num[MinusNInvIndex] = -MinusNInverseModR.Num[MinusNInvIndex] - Borrow;
+
+        Borrow = CheckForBorrow(MinusNInverseModR.Num[MinusNInvIndex], 0);
+    }
+
+    // x~ := x*R mod p
+    bignum MontInput;
+    for (u32 InputIndex = 0;
+         InputIndex < Input->SizeWords;
+         ++InputIndex)
+    {
+    }
+
+    // A := R mod p
 
     // c := (z + (z*p' mod R)*p)/R
+#if 0
     bignum InputDivRModP;
     BigNumMultiplyOperandScanning(&InputDivRModP, Input, &MinusNInverseModR);
 
@@ -1206,7 +1212,6 @@ MontModExp(bignum *Output, bignum *Input, bignum *N, bignum *R)
 
     // TODO(bwd): multiply by p, add z then divide by R
     // if c >= p then c := c - p
-#if 0
     MultiplyOperandScanningUnchecked(u64 *ProductAB, u32 ProductABMaxLengthWords,
                                      u64 *A, u32 ALengthWords, u64 *B, u32 BLengthWords)
 #endif
