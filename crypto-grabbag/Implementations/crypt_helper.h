@@ -815,11 +815,15 @@ HmacSha1(u8 *Hmac, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength)
 	Sha1(Hmac, HmacScratch, SHA_1_BLOCK_SIZE + SHA_1_HASH_LENGTH_BYTES);
 }
 
-#define BITS_IN_BIGNUM_WORD 64
+#define BITS_IN_BIGNUM_WORD     64
 #define MAX_BIGNUM_SIZE_BITS    2048
 #define MAX_BIGNUM_SIZE_BYTES   (MAX_BIGNUM_SIZE_BITS/BITS_IN_BYTE)
 #define MAX_BIGNUM_SIZE_WORDS   (MAX_BIGNUM_SIZE_BYTES/sizeof(u64))
+#define MAX_BIT_IN_BIGNUM_WORD  (BITS_IN_BIGNUM_WORD - 1)
 #define R_POWER_OF_2            MAX_BIGNUM_SIZE_BITS
+
+#define GET_HIGHEST_BIGNUM_BIT(BigNum) ((BigNum) >> MAX_BIT_IN_BIGNUM_WORD)
+
 typedef struct
 {
     u64 Num[MAX_BIGNUM_SIZE_WORDS];
@@ -846,7 +850,7 @@ CheckForCarry(u64 Sum, u64 AdditionOperand)
 internal inline void
 AdjustSizeWordsDownUnchecked(bignum *BigNum)
 {
-	while (BigNum->SizeWords &&
+	while ((BigNum->SizeWords > 0) &&
 		   (BigNum->Num[BigNum->SizeWords - 1] == 0))
 	{
 		--BigNum->SizeWords;
@@ -868,7 +872,6 @@ IsAGreaterThanB(bignum *A, bignum *B)
 	{
 		Result = false;
 	}
-
 	else
 	{
 		for (i32 AIndex = (A->SizeWords - 1);
@@ -934,9 +937,16 @@ BigNumAdd(bignum *SumAB, bignum *A, bignum *B)
         {
             AdditionOperand = A->Num[SumABIndex];
 
-            SumAB->Num[SumABIndex] = A->Num[SumABIndex] + B->Num[SumABIndex] + Carry;
+            u64 RightOperand = B->Num[SumABIndex] + Carry;
 
-            Carry = CheckForCarry(SumAB->Num[SumABIndex], AdditionOperand);
+            Carry = CheckForCarry(RightOperand, B->Num[SumABIndex]);
+
+            SumAB->Num[SumABIndex] = A->Num[SumABIndex] + RightOperand;
+
+            if (Carry == 0)
+            {
+                Carry = CheckForCarry(SumAB->Num[SumABIndex], AdditionOperand);
+            }
         }
 
         ++SumABIndex;
@@ -1005,9 +1015,16 @@ BigNumSubtract(bignum *AMinusB, bignum *A, bignum *B)
         }
         else
         {
-            AMinusB->Num[AMinusBIndex] = LeftOperand - B->Num[AMinusBIndex] - Borrow;
+            u64 RightOperand = B->Num[AMinusBIndex] + Borrow;
 
-            Borrow = CheckForBorrow(AMinusB->Num[AMinusBIndex], LeftOperand);
+            Borrow = CheckForCarry(RightOperand, B->Num[AMinusBIndex]);
+
+            AMinusB->Num[AMinusBIndex] = LeftOperand - RightOperand;
+
+            if (Borrow == 0)
+            {
+                Borrow = CheckForBorrow(AMinusB->Num[AMinusBIndex], LeftOperand);
+            }
         }
 
         ++AMinusBIndex;
@@ -1060,7 +1077,8 @@ BigNumCopyUnchecked(bignum *Dest, bignum *Source)
 
 internal void
 MultiplyOperandScanningUnchecked(u64 *ProductAB, u32 ProductABMaxLengthWords,
-                                 u64 *A, u32 ALengthWords, u64 *B, u32 BLengthWords)
+                                 u64 *A, u32 ALengthWords,
+                                 u64 *B, u32 BLengthWords)
 {
     memset(ProductAB, 0, sizeof(u64)*ProductABMaxLengthWords);
 
@@ -1101,12 +1119,22 @@ BigNumMultiplyOperandScanning(bignum *ProductAB, bignum *A, bignum *B)
 internal inline b32
 IsInverseOfNMod2PowerKUnchecked(bignum *BigNum, bignum *BigNumInverse, u32 PowerOf2)
 {
+    Stopif(PowerOf2 > MAX_BIGNUM_SIZE_BITS, "Invalid PowerOf2 in IsInverseOfNMod2PowerKUnchecked!");
+
     // TODO(bwd): copy BigNum mod 2^k and multiply with BigNum' mod 2^k to get BigNum*BigNum' mod 2^k
     bignum ScratchProduct;
     BigNumMultiplyOperandScanning(&ScratchProduct, BigNumInverse, BigNum);
 
-    u32 NextPowerOf2DWordIndex = PowerOf2 / BITS_IN_DWORD;
-    ScratchProduct.Num[NextPowerOf2DWordIndex] &= (((u64)1 << (PowerOf2 % BITS_IN_DWORD)) - (u64)1);
+    u32 NextPowerOf2DWordIndex;
+    if (PowerOf2 < MAX_BIGNUM_SIZE_BITS)
+    {
+        NextPowerOf2DWordIndex = PowerOf2 / BITS_IN_DWORD;
+        ScratchProduct.Num[NextPowerOf2DWordIndex] &= (((u64)1 << (PowerOf2 % BITS_IN_DWORD)) - (u64)1);
+    }
+    else
+    {
+        NextPowerOf2DWordIndex = MAX_BIGNUM_SIZE_WORDS - 1;
+    }
 
     b32 NInverted = true;
     for (u32 ProductIndex = NextPowerOf2DWordIndex;
@@ -1171,50 +1199,152 @@ FindNInverseModR(bignum *NInverseModR, bignum *N)
 }
 
 internal void
-MontModExp(bignum *Output, bignum *Input, bignum *Exponent, bignum *N)
+MultiplyByRModP(bignum *Output, bignum *InputX, bignum *ModulusP)
 {
-    Stopif((Output == 0) || (Input == 0) || (Exponent == 0) || (N == 0), "Null input to MontReduce!");
+    Stopif((Output == 0) || (InputX == 0) || (ModulusP == 0), "Null InputX to MultiplyByRModP!");
 
-	// TODO(bwd): Input belongs to [0, R*N - 1] pre-condition
+    memcpy(Output, InputX, sizeof(*InputX));
 
-    bignum MinusNInverseModR;
-    FindNInverseModR(&MinusNInverseModR, N);
-
-    u32 Borrow = 0;
-
-    for (u32 MinusNInvIndex = 0;
-         MinusNInvIndex < MinusNInverseModR.SizeWords;
-         ++MinusNInvIndex)
+    for (u32 RPowerIndex = 0;
+         RPowerIndex < R_POWER_OF_2;
+         ++RPowerIndex)
     {
-        MinusNInverseModR.Num[MinusNInvIndex] = -MinusNInverseModR.Num[MinusNInvIndex] - Borrow;
+        u32 PrevMontInputWordHighBit = GET_HIGHEST_BIGNUM_BIT(Output->Num[0]);
 
-        Borrow = CheckForBorrow(MinusNInverseModR.Num[MinusNInvIndex], 0);
+        Output->Num[0] <<= 1;
+
+        for (u32 InputIndex = 1;
+             InputIndex < Output->SizeWords;
+             ++InputIndex)
+        {
+            u64 TempMontInputWord = Output->Num[InputIndex];
+
+            Output->Num[InputIndex] = (Output->Num[InputIndex] << 1) | PrevMontInputWordHighBit;
+
+            PrevMontInputWordHighBit = GET_HIGHEST_BIGNUM_BIT(TempMontInputWord);
+        }
+
+        if (InputX->SizeWords < MAX_BIGNUM_SIZE_WORDS)
+        {
+            Output->Num[InputX->SizeWords] = PrevMontInputWordHighBit;
+
+            if (PrevMontInputWordHighBit)
+            {
+                ++Output->SizeWords;
+            }
+        }
+
+        if (IsAGreaterThanB(Output, ModulusP))
+        {
+            BigNumSubtract(Output, Output, ModulusP);
+        }
+
+        Stopif(IsAGreaterThanOrEqualToB(Output, ModulusP),
+               "Output < ModulusP pre-condition broken for RPowerIndex %d in MultiplyByRModP!", RPowerIndex);
     }
+}
 
-    // x~ := x*R mod p
-    bignum MontInput;
-    for (u32 InputIndex = 0;
-         InputIndex < Input->SizeWords;
-         ++InputIndex)
-    {
-    }
+internal void
+MontInner(bignum *Output, bignum *XTimesRModP, bignum *YTimesRModP, bignum *ModulusP,
+          bignum *MinusPInverseModR)
+{
+    Stopif((Output == 0) ||
+           (XTimesRModP == 0) ||
+           (YTimesRModP == 0) ||
+           (ModulusP == 0) ||
+           (MinusPInverseModR == 0),
+           "Null input to MontInner!");
 
-    // A := R mod p
+    u64 ProductXY[2*MAX_BIGNUM_SIZE_WORDS];
+    MultiplyOperandScanningUnchecked(ProductXY, ARRAY_LENGTH(ProductXY),
+                                     XTimesRModP->Num, XTimesRModP->SizeWords,
+                                     YTimesRModP->Num, YTimesRModP->SizeWords);
 
     // c := (z + (z*p' mod R)*p)/R
-#if 0
-    bignum InputDivRModP;
-    BigNumMultiplyOperandScanning(&InputDivRModP, Input, &MinusNInverseModR);
+    bignum ProductXYModR;
+    memcpy(ProductXYModR.Num, ProductXY, sizeof(ProductXYModR.Num));
 
-    InputDivRModP.SizeWords = R->SizeWords;
-    InputDivRModP.Num[InputDivRModP.SizeWords - 1] &= (1 << __builtin_ctzl(R->Num[R->SizeWords - 1])) - 1;
-    AdjustSizeWordsDownUnchecked(&InputDivRModP);
+    ProductXYModR.SizeWords = MAX_BIGNUM_SIZE_WORDS;
+    AdjustSizeWordsDownUnchecked(&ProductXYModR);
 
-    // TODO(bwd): multiply by p, add z then divide by R
+    // Output := (z*p' mod R)
+    MultiplyByRModP(Output, &ProductXYModR, MinusPInverseModR);
+
+    u64 PTimesZPModR[2*MAX_BIGNUM_SIZE_WORDS];
+    MultiplyOperandScanningUnchecked(PTimesZPModR, ARRAY_LENGTH(PTimesZPModR),
+                                     Output->Num, Output->SizeWords,
+                                     ModulusP->Num, ModulusP->SizeWords);
+
+    memcpy(Output->Num, PTimesZPModR + MAX_BIGNUM_SIZE_WORDS, sizeof(Output->Num));
+
+    Output->SizeWords = MAX_BIGNUM_SIZE_WORDS;
+    AdjustSizeWordsDownUnchecked(Output);
+
     // if c >= p then c := c - p
-    MultiplyOperandScanningUnchecked(u64 *ProductAB, u32 ProductABMaxLengthWords,
-                                     u64 *A, u32 ALengthWords, u64 *B, u32 BLengthWords)
-#endif
+    if (IsAGreaterThanOrEqualToB(Output, ModulusP))
+    {
+        BigNumSubtract(Output, Output, ModulusP);
+    }
+}
+
+internal void
+MontModExp(bignum *OutputA, bignum *InputX, bignum *ExponentE, bignum *ModulusP)
+{
+    Stopif((OutputA == 0) || (InputX == 0) || (ExponentE == 0) || (ModulusP == 0), "Null InputX to MontReduce!");
+
+    Stopif(ModulusP->SizeWords == 0, "Invalid ModulusP in MontModExp!");
+
+	// TODO(bwd): InputX belongs to [0, R*ModulusP - 1] pre-condition
+    // TODO(bwd): return 0 for ModulusP == 1
+
+    if (InputX->SizeWords > 0)
+    {
+        bignum MinusPInverseModR;
+        FindNInverseModR(&MinusPInverseModR, ModulusP);
+
+        u32 Borrow = 0;
+
+        for (u32 MinusNInvIndex = 0;
+             MinusNInvIndex < MinusPInverseModR.SizeWords;
+             ++MinusNInvIndex)
+        {
+            MinusPInverseModR.Num[MinusNInvIndex] = -MinusPInverseModR.Num[MinusNInvIndex] - Borrow;
+
+            Borrow = CheckForBorrow(MinusPInverseModR.Num[MinusNInvIndex], 0);
+        }
+
+        // x~ := x*R mod p
+        bignum InputXTimesRModP;
+        MultiplyByRModP(&InputXTimesRModP, InputX, ModulusP);
+
+        // A := R mod p
+        OutputA->Num[0] = 1;
+        OutputA->SizeWords = 1;
+        MultiplyByRModP(OutputA, OutputA, ModulusP);
+
+        u32 BitCountExponentE = ((BITS_IN_DWORD*ExponentE->SizeWords) +
+                                 (BITS_IN_DWORD - __builtin_clzl(ExponentE->Num[ExponentE->SizeWords - 1])));
+        for (u32 BitCountEIndex = 0;
+             BitCountEIndex < BitCountExponentE;
+             ++BitCountEIndex)
+        {
+            MontInner(OutputA, OutputA, OutputA, ModulusP, &MinusPInverseModR);
+
+            if ((ExponentE->Num[BitCountEIndex/BITS_IN_DWORD] >> (BitCountEIndex % BITS_IN_DWORD)) & 0x1)
+            {
+                MontInner(OutputA, OutputA, &InputXTimesRModP, ModulusP, &MinusPInverseModR);
+            }
+        }
+
+        // return Mont(A, 1)
+        InputXTimesRModP.Num[0] = 1;
+        InputXTimesRModP.SizeWords = 1;
+        MontInner(OutputA, OutputA, &InputXTimesRModP, ModulusP, &MinusPInverseModR);
+    }
+    else
+    {
+        OutputA->SizeWords = 0;
+    }
 }
 
 #endif /* CRYPT_HELPER_H */
