@@ -268,6 +268,13 @@ internal MIN_UNIT_TEST_FUNC(TestFindNInverseModR)
                   "No NInverse found mod R in TestFindNInverseModR!");
 }
 
+// TODO(bwd): test case
+internal MIN_UNIT_TEST_FUNC(TestMontInner)
+{
+    MontInner(bignum *Output, bignum *XTimesRModP, bignum *YTimesRModP, bignum *ModulusP,
+              bignum *MinusPInverseModR);
+}
+
 internal MIN_UNIT_TEST_FUNC(TestMontModExp)
 {
     MontModExp(&GlobalScratchBigNumA, (bignum *)&TEST_BIGNUM_2_LEFT, (bignum *)&TEST_BIGNUM_2_RIGHT,
@@ -294,6 +301,7 @@ internal MIN_UNIT_TEST_FUNC(AllTests)
 	MinUnitRunTest(TestBigNumAddModN);
 	MinUnitRunTest(TestBigNumMultiply);
 	MinUnitRunTest(TestFindNInverseModR);
+	MinUnitRunTest(TestMontInner);
 	MinUnitRunTest(TestMontModExp);
 	MinUnitRunTest(TestDiffieHellmanBigNum);
 }
