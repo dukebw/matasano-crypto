@@ -1268,7 +1268,7 @@ MontInner(bignum *Output, bignum *XTimesRModP, bignum *YTimesRModP, bignum *Modu
     AdjustSizeWordsDownUnchecked(&ProductXYModR);
 
     // Output := (z*p' mod R)
-    MultiplyByRModP(Output, &ProductXYModR, MinusPInverseModR);
+    BigNumMultiplyOperandScanning(Output, &ProductXYModR, MinusPInverseModR);
 
     u64 PTimesZPModR[2*MAX_BIGNUM_SIZE_WORDS];
     MultiplyOperandScanningUnchecked(PTimesZPModR, ARRAY_LENGTH(PTimesZPModR),
@@ -1290,7 +1290,8 @@ MontInner(bignum *Output, bignum *XTimesRModP, bignum *YTimesRModP, bignum *Modu
 internal void
 MontModExp(bignum *OutputA, bignum *InputX, bignum *ExponentE, bignum *ModulusP)
 {
-    Stopif((OutputA == 0) || (InputX == 0) || (ExponentE == 0) || (ModulusP == 0), "Null InputX to MontReduce!");
+    Stopif((OutputA == 0) || (InputX == 0) || (ExponentE == 0) || (ModulusP == 0),
+           "Null InputX to MontReduce!");
 
     Stopif(ModulusP->SizeWords == 0, "Invalid ModulusP in MontModExp!");
 
