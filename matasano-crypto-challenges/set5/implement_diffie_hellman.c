@@ -157,6 +157,45 @@ const bignum TEST_BIGNUM_2_POWER_MOD_P =
     .SizeWords = 24
 };
 
+const bignum TEST_BIGNUM_2_XYR_MOD_P =
+{
+    .Num =
+    {
+        0x853CBFE5B62C2CE2, 0x7C710CE4D9542FAF, 0xDE34682834E6E3B9, 0xD8A03AC463DC949C, 0xF76D8AB33B47731F,
+        0xA2F5BAF358DAC4A3, 0x1F0E534BED3ADEDF, 0xE2277B8D63ADA407, 0x762F43420206AE33, 0x2CF6E5486039CA,
+        0xD4F1AEBE9A955510, 0x6917BAC6908D0FA7, 0xE4ECDF1F46CF6156, 0xA15BE1C3AF96E686, 0x2022594E4F555EB7,
+        0x72C1A33085A726BE, 0x318A7F3AB327F377, 0x3D3D90163C03A311, 0x3A855E0691E1F948, 0x4AE052E409BC5265,
+        0x3A3BEE0D9BCD4FB2, 0x3AEF29998A1ED6C1, 0xA7B7006C09ED47C7, 0x402D02DA61F086D8,
+    },
+    .SizeWords = 24
+};
+
+const bignum TEST_BIGNUM_2_XR_MOD_P =
+{
+    .Num =
+    {
+        0x4C54355D2C837EF8, 0x8241FB6BEC41FF62, 0x14403F57447765A3, 0xEA9829D177CD680D, 0x778C1A52FCAC46CD,
+        0xE00169B154DE647B, 0xEECEDC2C16B05ED3, 0x21E4CCEA54605DD5, 0x516E039754F2B1C9, 0xD216024D8614858D,
+        0x751F719BA2342A6C, 0x465E8A21213641AF, 0x2C471A23963FFAC9, 0x76713F87369FA7F4, 0xC3921055097AD8BA,
+        0xD85F8C9EAE2FFD35, 0x735C16FDA04DDB27, 0xD49D30FC7CEABCAA, 0xA000303E69640454, 0x2546B4B72A8FB65F,
+        0x90B2B4182B4EB355, 0x1340040A16A5FD7A, 0x171709A1259057B7, 0xFA6C68339F1F067E, 
+    },
+    .SizeWords = 24
+};
+
+const bignum TEST_BIGNUM_2_YR_MOD_P =
+{
+    .Num =
+    {
+        0x14A31F9413607407, 0xE2A725E2EEA61F7D, 0xD1D485A95562E7E8, 0xD748D44866623D30, 0x14D85E7F68952A85,
+        0xE8F918A0357C641B, 0x1A55C59E04176ED8, 0xB551668A15C5DE18, 0xC3DD2B4677B235C7, 0x32EC1F29C34FD3F,
+        0x598A3E1BBB386A2D, 0xE9607E32B34C2C6C, 0x59CD12CFE945FEDB, 0xB6AFBEABA1179842, 0xF2F5273AD3048F07,
+        0xE952C1F2AA770BC7, 0xF4033512B1D8612D, 0x98827772197808C3, 0x4380C154F158D324, 0xC30C52A22B4699F8,
+        0x60C063A7E7B89E62, 0xB2FDBE2F63603572, 0x55DC7FB1A10AB2DD, 0x3E7D2DF80306E01B, 
+    },
+    .SizeWords = 24
+};
+
 internal u32
 NthPowerModP(u32 Value, u32 Power, u32 Prime)
 {
@@ -183,7 +222,7 @@ internal MIN_UNIT_TEST_FUNC(TestDiffieHellmanWord)
     u32 SessionKeyA = NthPowerModP(GPowerBModP, A, DH_PRIME);
     u32 SessionKeyB = NthPowerModP(GPowerAModP, B, DH_PRIME);
 
-    MinUnitAssert(SessionKeyA == SessionKeyB, "Session-key mismatch in TestDiffieHellmanWord!");
+    MinUnitAssert(SessionKeyA == SessionKeyB, "Session-key mismatch in TestDiffieHellmanWord!\n");
 }
 
 internal MIN_UNIT_TEST_FUNC(TestIsAGreaterThanB)
@@ -191,7 +230,7 @@ internal MIN_UNIT_TEST_FUNC(TestIsAGreaterThanB)
     MinUnitAssert(IsAGreaterThanB((bignum *)&TEST_BIGNUM_0_SUM, (bignum *)&TEST_BIGNUM_0_RIGHT) &&
                   (!IsAGreaterThanB((bignum *)&TEST_BIGNUM_0_LEFT, (bignum *)&TEST_BIGNUM_0_SUM)) &&
                   (!IsAGreaterThanB((bignum *)&TEST_BIGNUM_1_A, (bignum *)&TEST_BIGNUM_1_B)),
-                  "Bad response in TestIsAGreaterThanB!");
+                  "Bad response in TestIsAGreaterThanB!\n");
 }
 
 internal MIN_UNIT_TEST_FUNC(TestBigNumAdd)
@@ -199,10 +238,10 @@ internal MIN_UNIT_TEST_FUNC(TestBigNumAdd)
     BigNumAdd(&GlobalScratchBigNumA, (bignum *)&TEST_BIGNUM_0_LEFT, (bignum *)&TEST_BIGNUM_0_RIGHT);
 
     MinUnitAssert(GlobalScratchBigNumA.SizeWords == TEST_BIGNUM_0_SUM.SizeWords,
-                  "SizeWords incorrect in TestBigNumAdd!");
+                  "SizeWords incorrect in TestBigNumAdd!\n");
     MinUnitAssert(VectorsEqual(GlobalScratchBigNumA.Num, (void *)TEST_BIGNUM_0_SUM.Num,
                                sizeof(u64)*TEST_BIGNUM_0_SUM.SizeWords),
-                  "Expected/actual mismatch in TestBigNumAdd!");
+                  "Expected/actual mismatch in TestBigNumAdd!\n");
 }
 
 internal MIN_UNIT_TEST_FUNC(TestBigNumSubtract)
@@ -210,14 +249,14 @@ internal MIN_UNIT_TEST_FUNC(TestBigNumSubtract)
     BigNumSubtract(&GlobalScratchBigNumA, (bignum *)&TEST_BIGNUM_2_LEFT, (bignum *)&TEST_BIGNUM_2_RIGHT);
 
     MinUnitAssert(GlobalScratchBigNumA.SizeWords == TEST_BIGNUM_2_DIFFERENCE.SizeWords,
-                  "SizeWords incorrect in TestBigNumAdd!");
+                  "SizeWords incorrect in TestBigNumAdd!\n");
     MinUnitAssert(VectorsEqual(GlobalScratchBigNumA.Num, (void *)TEST_BIGNUM_2_DIFFERENCE.Num,
                                sizeof(u64)*TEST_BIGNUM_2_DIFFERENCE.SizeWords),
-                  "Expected/actual mismatch in TestBigNumAdd!");
+                  "Expected/actual mismatch in TestBigNumAdd!\n");
 
     BigNumSubtract(&GlobalScratchBigNumA, &GlobalScratchBigNumA, &GlobalScratchBigNumA);
 
-    MinUnitAssert(GlobalScratchBigNumA.SizeWords == 0, "Expected (X - X) == 0 in TestBigNumSubtract!");
+    MinUnitAssert(GlobalScratchBigNumA.SizeWords == 0, "Expected (X - X) == 0 in TestBigNumSubtract!\n");
 }
 
 // TODO(bwd): Test case where A + B overflow 2^(W*t)
@@ -227,10 +266,10 @@ internal MIN_UNIT_TEST_FUNC(TestBigNumAddModN)
                   (bignum *)&NIST_RFC_3526_PRIME_1536);
 
     MinUnitAssert(GlobalScratchBigNumA.SizeWords == TEST_BIGNUM_2_SUM_MOD_P.SizeWords,
-                  "SizeWords incorrect in TestBigNumAddModN!");
+                  "SizeWords incorrect in TestBigNumAddModN!\n");
     MinUnitAssert(VectorsEqual(GlobalScratchBigNumA.Num, (void *)TEST_BIGNUM_2_SUM_MOD_P.Num,
                                sizeof(u64)*TEST_BIGNUM_2_SUM_MOD_P.SizeWords),
-                  "Expected/actual mismatch in TestBigNumAddModN!");
+                  "Expected/actual mismatch in TestBigNumAddModN!\n");
 }
 
 internal MIN_UNIT_TEST_FUNC(TestBigNumMultiply)
@@ -240,7 +279,7 @@ internal MIN_UNIT_TEST_FUNC(TestBigNumMultiply)
 
     MinUnitAssert(VectorsEqual(GlobalScratchBigNumA.Num, (void *)TEST_BIGNUM_2_PRODUCT.Num,
                                sizeof(u64)*TEST_BIGNUM_2_PRODUCT.SizeWords),
-                  "Expected/actual mismatch in TestBigNumMultiply!");
+                  "Expected/actual mismatch in TestBigNumMultiply!\n");
 }
 
 internal inline void
@@ -265,14 +304,34 @@ internal MIN_UNIT_TEST_FUNC(TestFindNInverseModR)
     FindNInverseModR(&NInverseModR, (bignum *)&NIST_RFC_3526_PRIME_1536);
     MinUnitAssert(IsInverseOfNMod2PowerKUnchecked((bignum *)&NIST_RFC_3526_PRIME_1536, &NInverseModR,
                                                   R_POWER_OF_2),
-                  "No NInverse found mod R in TestFindNInverseModR!");
+                  "No NInverse found mod R in TestFindNInverseModR!\n");
 }
 
-// TODO(bwd): test case
 internal MIN_UNIT_TEST_FUNC(TestMontInner)
 {
-    MontInner(bignum *Output, bignum *XTimesRModP, bignum *YTimesRModP, bignum *ModulusP,
-              bignum *MinusPInverseModR);
+    bignum XTimesRModP;
+    MultiplyByRModP(&XTimesRModP, (bignum *)&TEST_BIGNUM_2_LEFT, (bignum *)&NIST_RFC_3526_PRIME_1536);
+
+    MinUnitAssert(VectorsEqual(&XTimesRModP, (bignum *)&TEST_BIGNUM_2_XR_MOD_P,
+                               TEST_BIGNUM_2_XR_MOD_P.SizeWords),
+                               "X*R mod P mismatch in TestMontInner!\n");
+
+    bignum YTimesRModP;
+    MultiplyByRModP(&YTimesRModP, (bignum *)&TEST_BIGNUM_2_RIGHT, (bignum *)&NIST_RFC_3526_PRIME_1536);
+
+    MinUnitAssert(VectorsEqual(&YTimesRModP, (bignum *)&TEST_BIGNUM_2_YR_MOD_P,
+                               TEST_BIGNUM_2_YR_MOD_P.SizeWords),
+                               "Y*R mod P mismatch in TestMontInner!\n");
+
+    bignum MinusPInverseModR;
+    FindNInverseModR(&MinusPInverseModR, (bignum *)&NIST_RFC_3526_PRIME_1536);
+
+    bignum Output;
+    MontInner(&Output, &XTimesRModP, &YTimesRModP, (bignum *)&NIST_RFC_3526_PRIME_1536, &MinusPInverseModR);
+
+    MinUnitAssert(VectorsEqual(Output.Num, (void *)TEST_BIGNUM_2_XYR_MOD_P.Num,
+                               TEST_BIGNUM_2_XYR_MOD_P.SizeWords),
+                  "Expected/actual mismatch after MontInner in TestMontInner!\n");
 }
 
 internal MIN_UNIT_TEST_FUNC(TestMontModExp)
@@ -282,7 +341,7 @@ internal MIN_UNIT_TEST_FUNC(TestMontModExp)
 
     MinUnitAssert(VectorsEqual(GlobalScratchBigNumA.Num, (void *)TEST_BIGNUM_2_POWER_MOD_P.Num,
                                sizeof(u64)*TEST_BIGNUM_2_POWER_MOD_P.SizeWords),
-                  "Expected/actual mismatch in TestMontModExp!");
+                  "Expected/actual mismatch in TestMontModExp!\n");
 }
 
 internal MIN_UNIT_TEST_FUNC(TestDiffieHellmanBigNum)
