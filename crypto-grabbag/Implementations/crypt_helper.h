@@ -902,14 +902,12 @@ IsAGreaterThanOrEqualToB(bignum *A, bignum *B)
     return Result;
 }
 
-// IN: integers A, B in [0, 2^(W*t))
-// OUT: (eps, C) where C = A + B mod 2^(W*t), and eps is the carry bit
-internal u32 
-BigNumAdd(bignum *SumAB, bignum *A, bignum *B)
+internal u32
+MultiPrecisionAdd(u64 *SumAB, u32 *SumLengthWords,
+                  u64 *A, u32 ALengthWords,
+                  u64 *B, u32 BLengthWords)
 {
-    Stopif((SumAB == 0) || (A == 0) || (B == 0), "Null input to BigNumAdd!");
-
-    u32 MaxSize = Maximum(A->SizeWords, B->SizeWords);
+    u32 MaxSize = Maximum(ALengthWords, BLengthWords);
 
     u32 Carry = 0;
 
@@ -917,51 +915,66 @@ BigNumAdd(bignum *SumAB, bignum *A, bignum *B)
     u64 AdditionOperand;
     do
     {
-        if (SumABIndex >= A->SizeWords)
+        if (SumABIndex >= ALengthWords)
         {
-            AdditionOperand = B->Num[SumABIndex];
+            AdditionOperand = B[SumABIndex];
 
-            SumAB->Num[SumABIndex] = B->Num[SumABIndex] + Carry;
+            SumAB[SumABIndex] = B[SumABIndex] + Carry;
 
-            Carry = CheckForCarry(SumAB->Num[SumABIndex], AdditionOperand);
+            Carry = CheckForCarry(SumAB[SumABIndex], AdditionOperand);
         }
-        else if (SumABIndex >= B->SizeWords)
+        else if (SumABIndex >= BLengthWords)
         {
-            AdditionOperand = A->Num[SumABIndex];
+            AdditionOperand = A[SumABIndex];
 
-            SumAB->Num[SumABIndex] = A->Num[SumABIndex] + Carry;
+            SumAB[SumABIndex] = A[SumABIndex] + Carry;
 
-            Carry = CheckForCarry(SumAB->Num[SumABIndex], AdditionOperand);
+            Carry = CheckForCarry(SumAB[SumABIndex], AdditionOperand);
         }
         else
         {
-            AdditionOperand = A->Num[SumABIndex];
+            AdditionOperand = A[SumABIndex];
 
-            u64 RightOperand = B->Num[SumABIndex] + Carry;
+            u64 RightOperand = B[SumABIndex] + Carry;
 
-            Carry = CheckForCarry(RightOperand, B->Num[SumABIndex]);
+            Carry = CheckForCarry(RightOperand, B[SumABIndex]);
 
-            SumAB->Num[SumABIndex] = A->Num[SumABIndex] + RightOperand;
+            SumAB[SumABIndex] = A[SumABIndex] + RightOperand;
 
             if (Carry == 0)
             {
-                Carry = CheckForCarry(SumAB->Num[SumABIndex], AdditionOperand);
+                Carry = CheckForCarry(SumAB[SumABIndex], AdditionOperand);
             }
         }
 
         ++SumABIndex;
     } while (SumABIndex < MaxSize);
 
-    if (Carry && (MaxSize < MAX_BIGNUM_SIZE_WORDS))
+    if (Carry && (MaxSize < (*SumLengthWords)))
     {
         Carry = 0;
-        SumAB->Num[MaxSize] = 1;
-        SumAB->SizeWords = MaxSize + 1;
+        SumAB[MaxSize] = 1;
+        *SumLengthWords = MaxSize + 1;
     }
     else
     {
-        SumAB->SizeWords = MaxSize;
+        *SumLengthWords = MaxSize;
     }
+
+    return Carry;
+}
+
+// IN: integers A, B in [0, 2^(W*t))
+// OUT: (eps, C) where C = A + B mod 2^(W*t), and eps is the carry bit
+internal u32 
+BigNumAdd(bignum *SumAB, bignum *A, bignum *B)
+{
+    Stopif((SumAB == 0) || (A == 0) || (B == 0), "Null input to BigNumAdd!");
+
+    SumAB->SizeWords = MAX_BIGNUM_SIZE_WORDS;
+    u32 Carry = MultiPrecisionAdd(SumAB->Num, &SumAB->SizeWords,
+                                  A->Num, A->SizeWords,
+                                  B->Num, B->SizeWords);
 
     AdjustSizeWordsDownUnchecked(SumAB);
 
@@ -1279,6 +1292,8 @@ MontInner(bignum *Output, bignum *XTimesRModP, bignum *YTimesRModP, bignum *Modu
 
     Output->SizeWords = MAX_BIGNUM_SIZE_WORDS;
     AdjustSizeWordsDownUnchecked(Output);
+
+    // TODO(bwd): z + ASDF
 
     // if c >= p then c := c - p
     if (IsAGreaterThanOrEqualToB(Output, ModulusP))
