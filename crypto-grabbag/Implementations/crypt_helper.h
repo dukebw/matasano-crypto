@@ -907,6 +907,8 @@ MultiPrecisionAdd(u64 *SumAB, u32 *SumLengthWords,
                   u64 *A, u32 ALengthWords,
                   u64 *B, u32 BLengthWords)
 {
+    Stopif((SumAB == 0) || (SumLengthWords == 0) || (A == 0) || (B == 0), "Null input to MultiPrecisionAdd!");
+
     u32 MaxSize = Maximum(ALengthWords, BLengthWords);
 
     u32 Carry = 0;
@@ -1268,32 +1270,37 @@ MontInner(bignum *Output, bignum *XTimesRModP, bignum *YTimesRModP, bignum *Modu
            (MinusPInverseModR == 0),
            "Null input to MontInner!");
 
-    u64 ProductXY[2*MAX_BIGNUM_SIZE_WORDS];
-    MultiplyOperandScanningUnchecked(ProductXY, ARRAY_LENGTH(ProductXY),
+    // c := (z + (z*p' mod R)*p)/R
+
+    // DoubleBignumScratch := z ( == (x*R mod P)*(y*R mod P))
+    u64 DoubleBignumScratch[2*MAX_BIGNUM_SIZE_WORDS];
+
+    // TODO(bwd): Return size here to avoid overflow
+    MultiplyOperandScanningUnchecked(DoubleBignumScratch, ARRAY_LENGTH(DoubleBignumScratch),
                                      XTimesRModP->Num, XTimesRModP->SizeWords,
                                      YTimesRModP->Num, YTimesRModP->SizeWords);
 
-    // c := (z + (z*p' mod R)*p)/R
-    bignum ProductXYModR;
-    memcpy(ProductXYModR.Num, ProductXY, sizeof(ProductXYModR.Num));
-
-    ProductXYModR.SizeWords = MAX_BIGNUM_SIZE_WORDS;
-    AdjustSizeWordsDownUnchecked(&ProductXYModR);
-
     // Output := (z*p' mod R)
-    BigNumMultiplyOperandScanning(Output, &ProductXYModR, MinusPInverseModR);
+    MultiplyOperandScanningUnchecked(Output->Num, MAX_BIGNUM_SIZE_WORDS,
+                                     DoubleBignumScratch, ARRAY_LENGTH(DoubleBignumScratch),
+                                     ModulusP->Num, ModulusP->SizeWords);
 
+    // PTimesZPModR := (z*p' mod R)*p 
     u64 PTimesZPModR[2*MAX_BIGNUM_SIZE_WORDS];
     MultiplyOperandScanningUnchecked(PTimesZPModR, ARRAY_LENGTH(PTimesZPModR),
                                      Output->Num, Output->SizeWords,
                                      ModulusP->Num, ModulusP->SizeWords);
 
-    memcpy(Output->Num, PTimesZPModR + MAX_BIGNUM_SIZE_WORDS, sizeof(Output->Num));
+    // DoubleBignumScratch := (z + (z*p' mod R)*p)
+    u32 NumeratorSumLength = ARRAY_LENGTH(DoubleBignumScratch);
+    MultiPrecisionAdd(DoubleBignumScratch, &NumeratorSumLength,
+                      DoubleBignumScratch, ARRAY_LENGTH(DoubleBignumScratch),
+                      PTimesZPModR, ARRAY_LENGTH(PTimesZPModR));
+
+    memcpy(Output->Num, DoubleBignumScratch + MAX_BIGNUM_SIZE_WORDS, sizeof(Output->Num));
 
     Output->SizeWords = MAX_BIGNUM_SIZE_WORDS;
     AdjustSizeWordsDownUnchecked(Output);
-
-    // TODO(bwd): z + ASDF
 
     // if c >= p then c := c - p
     if (IsAGreaterThanOrEqualToB(Output, ModulusP))
