@@ -307,6 +307,7 @@ internal MIN_UNIT_TEST_FUNC(TestFindNInverseModR)
                   "No NInverse found mod R in TestFindNInverseModR!\n");
 }
 
+// TODO(bwd): Test with simple inputs first
 internal MIN_UNIT_TEST_FUNC(TestMontInner)
 {
     bignum XTimesRModP;
