@@ -1090,7 +1090,8 @@ BigNumCopyUnchecked(bignum *Dest, bignum *Source)
     memcpy(Dest->Num, Source->Num, Source->SizeWords*sizeof(Source->Num[0]));
 }
 
-internal void
+// TODO(bwd): Bug when BLengthWords != t (bignum buffer length) -- follow alg. from Menezes
+internal u32
 MultiplyOperandScanningUnchecked(u64 *ProductAB, u32 ProductABMaxLengthWords,
                                  u64 *A, u32 ALengthWords,
                                  u64 *B, u32 BLengthWords)
@@ -1112,11 +1113,24 @@ MultiplyOperandScanningUnchecked(u64 *ProductAB, u32 ProductABMaxLengthWords,
             ProductAB[AIndex + BIndex] = UV & MASK_64BIT;
         }
 
-        if ((ALengthWords + AIndex) < ProductABMaxLengthWords)
+        if ((BLengthWords + AIndex) < ProductABMaxLengthWords)
         {
-            ProductAB[ALengthWords + AIndex] = (UV >> BITS_IN_DWORD);
+            ProductAB[BLengthWords + AIndex] = (UV >> BITS_IN_DWORD);
         }
     }
+
+    u32 ResultLength;
+    u32 ProductABHighestPossibleIndex = (ALengthWords + BLengthWords);
+    if (ProductABHighestPossibleIndex < ProductABMaxLengthWords)
+    {
+        ResultLength = ProductABHighestPossibleIndex;
+    }
+    else
+    {
+        ResultLength = ProductABMaxLengthWords;
+    }
+
+    return ResultLength;
 }
 
 internal void
@@ -1275,29 +1289,29 @@ MontInner(bignum *Output, bignum *XTimesRModP, bignum *YTimesRModP, bignum *Modu
     // DoubleBignumScratch := z ( == (x*R mod P)*(y*R mod P))
     u64 DoubleBignumScratch[2*MAX_BIGNUM_SIZE_WORDS];
 
-    // TODO(bwd): Return size here to avoid overflow
-    MultiplyOperandScanningUnchecked(DoubleBignumScratch, ARRAY_LENGTH(DoubleBignumScratch),
-                                     XTimesRModP->Num, XTimesRModP->SizeWords,
-                                     YTimesRModP->Num, YTimesRModP->SizeWords);
+    u32 ProductLength = MultiplyOperandScanningUnchecked(DoubleBignumScratch, ARRAY_LENGTH(DoubleBignumScratch),
+                                                         XTimesRModP->Num, XTimesRModP->SizeWords,
+                                                         YTimesRModP->Num, YTimesRModP->SizeWords);
 
     // Output := (z*p' mod R)
-    MultiplyOperandScanningUnchecked(Output->Num, MAX_BIGNUM_SIZE_WORDS,
-                                     DoubleBignumScratch, ARRAY_LENGTH(DoubleBignumScratch),
-                                     ModulusP->Num, ModulusP->SizeWords);
+    Output->SizeWords = MultiplyOperandScanningUnchecked(Output->Num, MAX_BIGNUM_SIZE_WORDS,
+                                                         DoubleBignumScratch, ProductLength,
+                                                         ModulusP->Num, ModulusP->SizeWords);
 
     // PTimesZPModR := (z*p' mod R)*p 
     u64 PTimesZPModR[2*MAX_BIGNUM_SIZE_WORDS];
-    MultiplyOperandScanningUnchecked(PTimesZPModR, ARRAY_LENGTH(PTimesZPModR),
-                                     Output->Num, Output->SizeWords,
-                                     ModulusP->Num, ModulusP->SizeWords);
+    ProductLength = MultiplyOperandScanningUnchecked(PTimesZPModR, ARRAY_LENGTH(PTimesZPModR),
+                                                     Output->Num, Output->SizeWords,
+                                                     ModulusP->Num, ModulusP->SizeWords);
 
     // DoubleBignumScratch := (z + (z*p' mod R)*p)
-    u32 NumeratorSumLength = ARRAY_LENGTH(DoubleBignumScratch);
-    MultiPrecisionAdd(DoubleBignumScratch, &NumeratorSumLength,
+    u32 NumeratorLength = ARRAY_LENGTH(DoubleBignumScratch);
+    MultiPrecisionAdd(DoubleBignumScratch, &NumeratorLength,
                       DoubleBignumScratch, ARRAY_LENGTH(DoubleBignumScratch),
-                      PTimesZPModR, ARRAY_LENGTH(PTimesZPModR));
+                      PTimesZPModR, ProductLength);
 
-    memcpy(Output->Num, DoubleBignumScratch + MAX_BIGNUM_SIZE_WORDS, sizeof(Output->Num));
+    memcpy(Output->Num, DoubleBignumScratch + MAX_BIGNUM_SIZE_WORDS,
+           sizeof(u64)*(NumeratorLength - MAX_BIGNUM_SIZE_WORDS));
 
     Output->SizeWords = MAX_BIGNUM_SIZE_WORDS;
     AdjustSizeWordsDownUnchecked(Output);
