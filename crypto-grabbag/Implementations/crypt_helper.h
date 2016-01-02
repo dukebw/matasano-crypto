@@ -21,6 +21,7 @@ CASSERT(RAND_MAX <= UINT32_MAX, crypt_helper_h);
 #define EXPECTED_PUNCT_FREQUENCY 0.025f
 
 #define SHIFT_TO_MASK(Shift) ((1 << (Shift)) - 1)
+#define BITMASK_MOD_DWORD(Bits) (((u64)1 << ((Bits) % BITS_IN_DWORD)) - 1)
 
 #define MASK_64BIT 0xFFFFFFFFFFFFFFFFull
 
@@ -820,7 +821,6 @@ HmacSha1(u8 *Hmac, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength)
 #define MAX_BIGNUM_SIZE_BYTES   (MAX_BIGNUM_SIZE_BITS/BITS_IN_BYTE)
 #define MAX_BIGNUM_SIZE_WORDS   (MAX_BIGNUM_SIZE_BYTES/sizeof(u64))
 #define MAX_BIT_IN_BIGNUM_WORD  (BITS_IN_BIGNUM_WORD - 1)
-#define R_POWER_OF_2            MAX_BIGNUM_SIZE_BITS
 
 #define GET_HIGHEST_BIGNUM_BIT(BigNum) ((BigNum) >> MAX_BIT_IN_BIGNUM_WORD)
 
@@ -1090,12 +1090,14 @@ BigNumCopyUnchecked(bignum *Dest, bignum *Source)
     memcpy(Dest->Num, Source->Num, Source->SizeWords*sizeof(Source->Num[0]));
 }
 
-// TODO(bwd): Bug when BLengthWords != t (bignum buffer length) -- follow alg. from Menezes
 internal u32
 MultiplyOperandScanningUnchecked(u64 *ProductAB, u32 ProductABMaxLengthWords,
                                  u64 *A, u32 ALengthWords,
                                  u64 *B, u32 BLengthWords)
 {
+    Stopif((A[ALengthWords - 1] == 0) || (B[BLengthWords - 1] == 0),
+           "Invalid LengthWords parameter in MultiplyOperandScanningUnchecked!");
+
     memset(ProductAB, 0, sizeof(u64)*ProductABMaxLengthWords);
 
     for (u32 AIndex = 0;
@@ -1120,14 +1122,14 @@ MultiplyOperandScanningUnchecked(u64 *ProductAB, u32 ProductABMaxLengthWords,
     }
 
     u32 ResultLength;
-    u32 ProductABHighestPossibleIndex = (ALengthWords + BLengthWords);
-    if (ProductABHighestPossibleIndex < ProductABMaxLengthWords)
-    {
-        ResultLength = ProductABHighestPossibleIndex;
-    }
-    else
+    ResultLength = (ALengthWords + BLengthWords);
+    if (ResultLength > ProductABMaxLengthWords)
     {
         ResultLength = ProductABMaxLengthWords;
+    }
+    else if (ProductAB[ResultLength - 1] == 0)
+    {
+        --ResultLength;
     }
 
     return ResultLength;
@@ -1158,7 +1160,7 @@ IsInverseOfNMod2PowerKUnchecked(bignum *BigNum, bignum *BigNumInverse, u32 Power
     if (PowerOf2 < MAX_BIGNUM_SIZE_BITS)
     {
         NextPowerOf2DWordIndex = PowerOf2 / BITS_IN_DWORD;
-        ScratchProduct.Num[NextPowerOf2DWordIndex] &= (((u64)1 << (PowerOf2 % BITS_IN_DWORD)) - (u64)1);
+        ScratchProduct.Num[NextPowerOf2DWordIndex] &= BITMASK_MOD_DWORD(PowerOf2);
     }
     else
     {
@@ -1186,10 +1188,14 @@ IsInverseOfNMod2PowerKUnchecked(bignum *BigNum, bignum *BigNumInverse, u32 Power
 }
 
 internal void
-FindNInverseModR(bignum *NInverseModR, bignum *N)
+FindNInverseModR(bignum *NInverseModR, bignum *N, u32 RPowerOf2)
 {
     Stopif((N->SizeWords > MAX_BIGNUM_SIZE_WORDS) || (N->SizeWords == 0) || (!(N->Num[0] & 0x1)),
            "gcd(N, R) must be 1 in FindNInverseModR!");
+
+    Stopif(RPowerOf2 > MAX_BIGNUM_SIZE_BITS, "RPowerOf2 too large in FindNInverseModR!");
+
+    Stopif(RPowerOf2 % BITS_IN_DWORD, "RPowerOf2 not multiple of 64 in FindNInverseModR!");
 
     // Hensel's Lemma to calculate 1/N mod R -- used to avoid explicit trial division
 
@@ -1197,21 +1203,21 @@ FindNInverseModR(bignum *NInverseModR, bignum *N)
     NInverseModR->Num[0] = 1;
 
     u32 NextPowerOf2 = 1;
-    while (NextPowerOf2 < R_POWER_OF_2)
+    while (NextPowerOf2 < RPowerOf2)
     {
         // To keep the invariant (NInverseModR * N) == 1 mod NextPowerOf2 ...
         ++NextPowerOf2;
 
+        u32 NextPowerOf2DWordIndex = NextPowerOf2 / BITS_IN_DWORD;
         u32 NextPowerOf2Mod64 = (NextPowerOf2 % BITS_IN_DWORD);
-        if ((NextPowerOf2Mod64 == 0) && (NInverseModR->SizeWords < MAX_BIGNUM_SIZE_WORDS))
+        b32 NoOverflow = (NextPowerOf2DWordIndex < MAX_BIGNUM_SIZE_WORDS);
+        if ((NextPowerOf2Mod64 == 0) && NoOverflow)
         {
-            NInverseModR->Num[NInverseModR->SizeWords] = 0;
-            ++NInverseModR->SizeWords;
+            NInverseModR->Num[NextPowerOf2DWordIndex] = 0;
         }
 
         if (!IsInverseOfNMod2PowerKUnchecked(N, NInverseModR, NextPowerOf2))
         {
-            u32 NextPowerOf2DWordIndex = NextPowerOf2 / BITS_IN_DWORD;
             if (NextPowerOf2Mod64 > 0)
             {
                 NInverseModR->Num[NextPowerOf2DWordIndex] |= ((u64)1 << (NextPowerOf2Mod64 - 1));
@@ -1222,20 +1228,31 @@ FindNInverseModR(bignum *NInverseModR, bignum *N)
             }
         }
 
+        if (NoOverflow)
+        {
+            NInverseModR->SizeWords = NextPowerOf2DWordIndex + 1;
+        }
+        else
+        {
+            NInverseModR->SizeWords = NextPowerOf2DWordIndex;
+        }
+
+        AdjustSizeWordsDownUnchecked(NInverseModR);
+
         Stopif(!IsInverseOfNMod2PowerKUnchecked(N, NInverseModR, NextPowerOf2),
                "1/N mod R not found in FindNInverseModR!\nNextPowerOf2: %d", NextPowerOf2);
     }
 }
 
 internal void
-MultiplyByRModP(bignum *Output, bignum *InputX, bignum *ModulusP)
+MultiplyByRModP(bignum *Output, bignum *InputX, bignum *ModulusP, u32 RPowerOf2)
 {
     Stopif((Output == 0) || (InputX == 0) || (ModulusP == 0), "Null InputX to MultiplyByRModP!");
 
     memcpy(Output, InputX, sizeof(*InputX));
 
     for (u32 RPowerIndex = 0;
-         RPowerIndex < R_POWER_OF_2;
+         RPowerIndex < RPowerOf2;
          ++RPowerIndex)
     {
         u32 PrevMontInputWordHighBit = GET_HIGHEST_BIGNUM_BIT(Output->Num[0]);
@@ -1275,7 +1292,7 @@ MultiplyByRModP(bignum *Output, bignum *InputX, bignum *ModulusP)
 
 internal void
 MontInner(bignum *Output, bignum *XTimesRModP, bignum *YTimesRModP, bignum *ModulusP,
-          bignum *MinusPInverseModR)
+          bignum *MinusPInverseModR, u32 RPowerOf2)
 {
     Stopif((Output == 0) ||
            (XTimesRModP == 0) ||
@@ -1284,36 +1301,77 @@ MontInner(bignum *Output, bignum *XTimesRModP, bignum *YTimesRModP, bignum *Modu
            (MinusPInverseModR == 0),
            "Null input to MontInner!");
 
+    Stopif((RPowerOf2 & (RPowerOf2 - 1)) != 0, "R not power of 2 in MontInner!");
+
     // c := (z + (z*p' mod R)*p)/R
 
     // DoubleBignumScratch := z ( == (x*R mod P)*(y*R mod P))
     u64 DoubleBignumScratch[2*MAX_BIGNUM_SIZE_WORDS];
 
-    u32 ProductLength = MultiplyOperandScanningUnchecked(DoubleBignumScratch, ARRAY_LENGTH(DoubleBignumScratch),
+    u32 ZLengthDWords = MultiplyOperandScanningUnchecked(DoubleBignumScratch, ARRAY_LENGTH(DoubleBignumScratch),
                                                          XTimesRModP->Num, XTimesRModP->SizeWords,
                                                          YTimesRModP->Num, YTimesRModP->SizeWords);
 
     // Output := (z*p' mod R)
-    Output->SizeWords = MultiplyOperandScanningUnchecked(Output->Num, MAX_BIGNUM_SIZE_WORDS,
-                                                         DoubleBignumScratch, ProductLength,
-                                                         ModulusP->Num, ModulusP->SizeWords);
+    u32 MaxDWordsModR;
+    u32 RPowerOf2ModDWord = (RPowerOf2 % BITS_IN_DWORD);
+    if (RPowerOf2ModDWord)
+    {
+        MaxDWordsModR = RPowerOf2/BITS_IN_DWORD + 1;
+    }
+    else
+    {
+        MaxDWordsModR = RPowerOf2/BITS_IN_DWORD;
+    }
+
+    Output->SizeWords = MultiplyOperandScanningUnchecked(Output->Num, MaxDWordsModR,
+                                                         DoubleBignumScratch, ZLengthDWords,
+                                                         MinusPInverseModR->Num, MinusPInverseModR->SizeWords);
+
+    u64 RBitmaskMod2Pow64 = BITMASK_MOD_DWORD(RPowerOf2);
+    if (RBitmaskMod2Pow64)
+    {
+        Output->Num[Output->SizeWords - 1] &= RBitmaskMod2Pow64;
+    }
 
     // PTimesZPModR := (z*p' mod R)*p 
     u64 PTimesZPModR[2*MAX_BIGNUM_SIZE_WORDS];
-    ProductLength = MultiplyOperandScanningUnchecked(PTimesZPModR, ARRAY_LENGTH(PTimesZPModR),
-                                                     Output->Num, Output->SizeWords,
-                                                     ModulusP->Num, ModulusP->SizeWords);
+    u32 PZModRLengthDWords = MultiplyOperandScanningUnchecked(PTimesZPModR, ARRAY_LENGTH(PTimesZPModR),
+                                                              Output->Num, Output->SizeWords,
+                                                              ModulusP->Num, ModulusP->SizeWords);
 
     // DoubleBignumScratch := (z + (z*p' mod R)*p)
     u32 NumeratorLength = ARRAY_LENGTH(DoubleBignumScratch);
     MultiPrecisionAdd(DoubleBignumScratch, &NumeratorLength,
-                      DoubleBignumScratch, ARRAY_LENGTH(DoubleBignumScratch),
-                      PTimesZPModR, ProductLength);
+                      DoubleBignumScratch, ZLengthDWords,
+                      PTimesZPModR, PZModRLengthDWords);
 
-    memcpy(Output->Num, DoubleBignumScratch + MAX_BIGNUM_SIZE_WORDS,
-           sizeof(u64)*(NumeratorLength - MAX_BIGNUM_SIZE_WORDS));
+    // Output := (z + (z*p' mod R)*p)/R
+    u32 TruncatedStartIndex;
+    if (RPowerOf2ModDWord)
+    {
+        TruncatedStartIndex = MaxDWordsModR - 1;
+    }
+    else
+    {
+        TruncatedStartIndex = MaxDWordsModR;
+    }
 
-    Output->SizeWords = MAX_BIGNUM_SIZE_WORDS;
+    Output->SizeWords = NumeratorLength - TruncatedStartIndex;
+    memcpy(Output->Num, DoubleBignumScratch + TruncatedStartIndex, sizeof(u64)*Output->SizeWords);
+
+    Stopif(Output->Num[Output->SizeWords - 1] == 0, "Invalid SizeWords in MontInner!");
+
+    if (RPowerOf2ModDWord)
+    {
+        for (u32 OutputIndex = 0;
+             OutputIndex < Output->SizeWords;
+             ++OutputIndex)
+        {
+            Output->Num[OutputIndex] >>= RPowerOf2ModDWord;
+        }
+    }
+
     AdjustSizeWordsDownUnchecked(Output);
 
     // if c >= p then c := c - p
@@ -1324,7 +1382,27 @@ MontInner(bignum *Output, bignum *XTimesRModP, bignum *YTimesRModP, bignum *Modu
 }
 
 internal void
-MontModExp(bignum *OutputA, bignum *InputX, bignum *ExponentE, bignum *ModulusP)
+FindMinusNInverseModR(bignum *MinusPInverseModR, bignum *ModulusP, u32 RPowerOf2)
+{
+    Stopif(RPowerOf2 % BITS_IN_DWORD, "Non-DWord aligned R not supported in FindMinusNInverseModR!");
+
+    FindNInverseModR(MinusPInverseModR, ModulusP, RPowerOf2);
+
+    u32 Borrow = 0;
+
+    // TODO(bwd): SizeWords -> R size in DWords
+    for (u32 MinusNInvIndex = 0;
+         MinusNInvIndex < MinusPInverseModR->SizeWords;
+         ++MinusNInvIndex)
+    {
+        MinusPInverseModR->Num[MinusNInvIndex] = -MinusPInverseModR->Num[MinusNInvIndex] - Borrow;
+
+        Borrow = CheckForBorrow(MinusPInverseModR->Num[MinusNInvIndex], 0);
+    }
+}
+
+internal void
+MontModExp(bignum *OutputA, bignum *InputX, bignum *ExponentE, bignum *ModulusP, u32 RPowerOf2)
 {
     Stopif((OutputA == 0) || (InputX == 0) || (ExponentE == 0) || (ModulusP == 0),
            "Null InputX to MontReduce!");
@@ -1337,46 +1415,35 @@ MontModExp(bignum *OutputA, bignum *InputX, bignum *ExponentE, bignum *ModulusP)
     if (InputX->SizeWords > 0)
     {
         bignum MinusPInverseModR;
-        FindNInverseModR(&MinusPInverseModR, ModulusP);
-
-        u32 Borrow = 0;
-
-        for (u32 MinusNInvIndex = 0;
-             MinusNInvIndex < MinusPInverseModR.SizeWords;
-             ++MinusNInvIndex)
-        {
-            MinusPInverseModR.Num[MinusNInvIndex] = -MinusPInverseModR.Num[MinusNInvIndex] - Borrow;
-
-            Borrow = CheckForBorrow(MinusPInverseModR.Num[MinusNInvIndex], 0);
-        }
+        FindMinusNInverseModR(&MinusPInverseModR, ModulusP, RPowerOf2);
 
         // x~ := x*R mod p
         bignum InputXTimesRModP;
-        MultiplyByRModP(&InputXTimesRModP, InputX, ModulusP);
+        MultiplyByRModP(&InputXTimesRModP, InputX, ModulusP, RPowerOf2);
 
         // A := R mod p
         OutputA->Num[0] = 1;
         OutputA->SizeWords = 1;
-        MultiplyByRModP(OutputA, OutputA, ModulusP);
+        MultiplyByRModP(OutputA, OutputA, ModulusP, RPowerOf2);
 
-        u32 BitCountExponentE = ((BITS_IN_DWORD*ExponentE->SizeWords) +
+        u32 BitCountExponentE = ((BITS_IN_DWORD*(ExponentE->SizeWords - 1)) +
                                  (BITS_IN_DWORD - __builtin_clzl(ExponentE->Num[ExponentE->SizeWords - 1])));
-        for (u32 BitCountEIndex = 0;
-             BitCountEIndex < BitCountExponentE;
-             ++BitCountEIndex)
+        for (i32 BitCountEIndex = (BitCountExponentE - 1);
+             BitCountEIndex >= 0;
+             --BitCountEIndex)
         {
-            MontInner(OutputA, OutputA, OutputA, ModulusP, &MinusPInverseModR);
+            MontInner(OutputA, OutputA, OutputA, ModulusP, &MinusPInverseModR, RPowerOf2);
 
             if ((ExponentE->Num[BitCountEIndex/BITS_IN_DWORD] >> (BitCountEIndex % BITS_IN_DWORD)) & 0x1)
             {
-                MontInner(OutputA, OutputA, &InputXTimesRModP, ModulusP, &MinusPInverseModR);
+                MontInner(OutputA, OutputA, &InputXTimesRModP, ModulusP, &MinusPInverseModR, RPowerOf2);
             }
         }
 
         // return Mont(A, 1)
         InputXTimesRModP.Num[0] = 1;
         InputXTimesRModP.SizeWords = 1;
-        MontInner(OutputA, OutputA, &InputXTimesRModP, ModulusP, &MinusPInverseModR);
+        MontInner(OutputA, OutputA, &InputXTimesRModP, ModulusP, &MinusPInverseModR, RPowerOf2);
     }
     else
     {
