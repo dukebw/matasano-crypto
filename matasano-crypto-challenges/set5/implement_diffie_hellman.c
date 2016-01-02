@@ -301,34 +301,53 @@ GenRandBigNumModNUnchecked(bignum *A, bignum *N)
 internal MIN_UNIT_TEST_FUNC(TestFindNInverseModR)
 {
     bignum NInverseModR;
-    FindNInverseModR(&NInverseModR, (bignum *)&NIST_RFC_3526_PRIME_1536);
+    FindNInverseModR(&NInverseModR, (bignum *)&NIST_RFC_3526_PRIME_1536, MAX_BIGNUM_SIZE_BITS);
     MinUnitAssert(IsInverseOfNMod2PowerKUnchecked((bignum *)&NIST_RFC_3526_PRIME_1536, &NInverseModR,
-                                                  R_POWER_OF_2),
+                                                  MAX_BIGNUM_SIZE_BITS),
                   "No NInverse found mod R in TestFindNInverseModR!\n");
 }
 
-// TODO(bwd): Test with simple inputs first
 internal MIN_UNIT_TEST_FUNC(TestMontInner)
 {
     bignum XTimesRModP;
-    MultiplyByRModP(&XTimesRModP, (bignum *)&TEST_BIGNUM_2_LEFT, (bignum *)&NIST_RFC_3526_PRIME_1536);
+    bignum YTimesRModP;
+    bignum MinusPInverseModR;
+    bignum Output;
+    bignum TestP;
+
+    XTimesRModP.SizeWords = 1;
+    XTimesRModP.Num[0] = 2;
+
+    YTimesRModP.SizeWords = 1;
+    YTimesRModP.Num[0] = 6;
+
+    MinusPInverseModR.SizeWords = 1;
+    MinusPInverseModR.Num[0] = 13;
+
+    TestP.SizeWords = 1;
+    TestP.Num[0] = 11;
+
+    MontInner(&Output, &XTimesRModP, &YTimesRModP, &TestP, &MinusPInverseModR, 4);
+
+    MinUnitAssert((Output.SizeWords == 1) && (Output.Num[0] == 9), "Simple case failed in TestMontInner!\n");
+
+    MultiplyByRModP(&XTimesRModP, (bignum *)&TEST_BIGNUM_2_LEFT, (bignum *)&NIST_RFC_3526_PRIME_1536,
+                    MAX_BIGNUM_SIZE_BITS);
 
     MinUnitAssert(VectorsEqual(&XTimesRModP, (bignum *)&TEST_BIGNUM_2_XR_MOD_P,
                                TEST_BIGNUM_2_XR_MOD_P.SizeWords),
                                "X*R mod P mismatch in TestMontInner!\n");
 
-    bignum YTimesRModP;
-    MultiplyByRModP(&YTimesRModP, (bignum *)&TEST_BIGNUM_2_RIGHT, (bignum *)&NIST_RFC_3526_PRIME_1536);
+    MultiplyByRModP(&YTimesRModP, (bignum *)&TEST_BIGNUM_2_RIGHT, (bignum *)&NIST_RFC_3526_PRIME_1536,
+                    MAX_BIGNUM_SIZE_BITS);
 
     MinUnitAssert(VectorsEqual(&YTimesRModP, (bignum *)&TEST_BIGNUM_2_YR_MOD_P,
                                TEST_BIGNUM_2_YR_MOD_P.SizeWords),
                                "Y*R mod P mismatch in TestMontInner!\n");
 
-    bignum MinusPInverseModR;
-    FindNInverseModR(&MinusPInverseModR, (bignum *)&NIST_RFC_3526_PRIME_1536);
+    FindMinusNInverseModR(&MinusPInverseModR, (bignum *)&NIST_RFC_3526_PRIME_1536, MAX_BIGNUM_SIZE_BITS);
 
-    bignum Output;
-    MontInner(&Output, &XTimesRModP, &YTimesRModP, (bignum *)&NIST_RFC_3526_PRIME_1536, &MinusPInverseModR);
+    MontInner(&Output, &XTimesRModP, &YTimesRModP, (bignum *)&NIST_RFC_3526_PRIME_1536, &MinusPInverseModR, MAX_BIGNUM_SIZE_BITS);
 
     MinUnitAssert(VectorsEqual(Output.Num, (void *)TEST_BIGNUM_2_XYR_MOD_P.Num,
                                TEST_BIGNUM_2_XYR_MOD_P.SizeWords),
@@ -338,7 +357,7 @@ internal MIN_UNIT_TEST_FUNC(TestMontInner)
 internal MIN_UNIT_TEST_FUNC(TestMontModExp)
 {
     MontModExp(&GlobalScratchBigNumA, (bignum *)&TEST_BIGNUM_2_LEFT, (bignum *)&TEST_BIGNUM_2_RIGHT,
-               (bignum *)&NIST_RFC_3526_PRIME_1536);
+               (bignum *)&NIST_RFC_3526_PRIME_1536, MAX_BIGNUM_SIZE_BITS);
 
     MinUnitAssert(VectorsEqual(GlobalScratchBigNumA.Num, (void *)TEST_BIGNUM_2_POWER_MOD_P.Num,
                                sizeof(u64)*TEST_BIGNUM_2_POWER_MOD_P.SizeWords),
