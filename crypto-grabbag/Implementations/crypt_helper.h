@@ -1467,6 +1467,13 @@ MontModExp(bignum *OutputA, bignum *InputX, bignum *ExponentE, bignum *ModulusP,
 
     Stopif(ModulusP->SizeWords == 0, "Invalid ModulusP in MontModExp!");
 
+    if (IsAGreaterThanOrEqualToB(InputX, ModulusP))
+    {
+        BigNumSubtract(InputX, InputX, ModulusP);
+    }
+
+    Stopif(IsAGreaterThanOrEqualToB(InputX, ModulusP), "InputX >= 2*P in MontModExp!");
+
 	// TODO(bwd): InputX belongs to [0, R*ModulusP - 1] pre-condition
     // TODO(bwd): return 0 for ModulusP == 1
 
@@ -1507,6 +1514,12 @@ MontModExp(bignum *OutputA, bignum *InputX, bignum *ExponentE, bignum *ModulusP,
     {
         OutputA->SizeWords = 0;
     }
+}
+
+internal void
+MontModExpRBigNumMax(bignum *OutputA, bignum *InputX, bignum *ExponentE, bignum *ModulusP)
+{
+    MontModExp(OutputA, InputX, ExponentE, ModulusP, MAX_BIGNUM_SIZE_BITS);
 }
 
 #endif /* CRYPT_HELPER_H */
