@@ -20,9 +20,7 @@ const bignum NIST_RFC_3526_PRIME_1536 =
 const u32 NIST_RFC_3526_GEN = 2;
 
 global_variable bignum GlobalScratchBigNumA;
-#if 0
 global_variable bignum GlobalScratchBigNumB;
-#endif
 
 const bignum TEST_BIGNUM_0_LEFT =
 {
@@ -287,15 +285,25 @@ GenRandBigNumModNUnchecked(bignum *A, bignum *N)
 {
     GenRandUnchecked((u32 *)A->Num, 2*N->SizeWords);
 
-    // TODO(bwd): hangs; more efficient algorithm
-    while (!IsAGreaterThanB(N, A))
+    u32 BitCountNHighestDWord = BIT_COUNT_DWORD(N->Num[N->SizeWords - 1]);
+
+    Stopif((BitCountNHighestDWord == 0) || (BitCountNHighestDWord > BITS_IN_DWORD),
+           "Invalid N->SizeWords in GenRandBigNumModNUnchecked!\n");
+
+    if (BitCountNHighestDWord < BITS_IN_DWORD)
+    {
+        A->Num[N->SizeWords - 1] &= MaskBitcount(BitCountNHighestDWord);
+    }
+
+    A->SizeWords = N->SizeWords;
+    AdjustSizeWordsDownUnchecked(A);
+
+    if (!IsAGreaterThanB(N, A))
     {
         BigNumSubtract(A, A, N);
     }
 
-    A->SizeWords = N->SizeWords;
-
-    AdjustSizeWordsDownUnchecked(A);
+    Stopif(!IsAGreaterThanB(N, A), "Invalid RandBigNum output in GenRandBigNumModNUnchecked!");
 }
 
 internal MIN_UNIT_TEST_FUNC(TestFindNInverseModR)
@@ -366,10 +374,32 @@ internal MIN_UNIT_TEST_FUNC(TestMontModExp)
 
 internal MIN_UNIT_TEST_FUNC(TestDiffieHellmanBigNum)
 {
-#if 0
-    GenRandBigNumModNUnchecked((bignum *)&GlobalScratchBigNumA, (bignum *)&NIST_RFC_3526_PRIME_1536);
+    // TODO(bwd): debug
+    bignum DhGenerator;
+    DhGenerator.SizeWords = 1;
+    DhGenerator.Num[0] = 2;
+
+    GenRandBigNumModNUnchecked(&GlobalScratchBigNumA, (bignum *)&NIST_RFC_3526_PRIME_1536);
+
+    bignum GPowerAModP;
+    MontModExp(&GPowerAModP, &DhGenerator, &GlobalScratchBigNumA, (bignum *)&NIST_RFC_3526_PRIME_1536,
+               MAX_BIGNUM_SIZE_BITS);
+
     GenRandBigNumModNUnchecked((bignum *)&GlobalScratchBigNumB, (bignum *)&NIST_RFC_3526_PRIME_1536);
-#endif
+    bignum GPowerBModP;
+    MontModExp(&GPowerBModP, &DhGenerator, &GlobalScratchBigNumB, (bignum *)&NIST_RFC_3526_PRIME_1536,
+               MAX_BIGNUM_SIZE_BITS);
+
+    bignum SessionKeyA;
+    MontModExp(&SessionKeyA, &GPowerBModP, &GlobalScratchBigNumA, (bignum *)&NIST_RFC_3526_PRIME_1536,
+               MAX_BIGNUM_SIZE_BITS);
+
+    bignum SessionKeyB;
+    MontModExp(&SessionKeyB, &GPowerAModP, &GlobalScratchBigNumB, (bignum *)&NIST_RFC_3526_PRIME_1536,
+               MAX_BIGNUM_SIZE_BITS);
+
+    MinUnitAssert(VectorsEqual(SessionKeyA.Num, SessionKeyB.Num, sizeof(u64)*NIST_RFC_3526_PRIME_1536.SizeWords),
+                  "Mismatch in TestDiffieHellmanBigNum!\n");
 }
 
 internal MIN_UNIT_TEST_FUNC(AllTests)

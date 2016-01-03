@@ -7,7 +7,7 @@ internal void
 Mt19937StreamCipher(u8 *Output, u8 *Input, u32 InputLength, mersenne_twister *Mt, u32 Seed)
 {
 	Stopif((Output == 0) || (Input == 0) || (Mt == 0), "Null input to Mt19937StreamCipher!");
-	Stopif(Seed & (~SHIFT_TO_MASK(MT19937_STREAM_SEED_BITS)), "Seed must be 16 bits for Mt19937StreamCipher");
+	Stopif(Seed & (~MaskBitcount(MT19937_STREAM_SEED_BITS)), "Seed must be 16 bits for Mt19937StreamCipher");
 
 	MtSeed(Mt, Seed);
 	u32 NextKeystreamWord;
