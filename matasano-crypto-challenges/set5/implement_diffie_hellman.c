@@ -323,8 +323,8 @@ internal MIN_UNIT_TEST_FUNC(TestMontInner)
 
 internal MIN_UNIT_TEST_FUNC(TestMontModExp)
 {
-    MontModExp(&GlobalScratchBigNumA, (bignum *)&TEST_BIGNUM_2_LEFT, (bignum *)&TEST_BIGNUM_2_RIGHT,
-               (bignum *)&NIST_RFC_3526_PRIME_1536, MAX_BIGNUM_SIZE_BITS);
+    MontModExpRBigNumMax(&GlobalScratchBigNumA, (bignum *)&TEST_BIGNUM_2_LEFT, (bignum *)&TEST_BIGNUM_2_RIGHT,
+                         (bignum *)&NIST_RFC_3526_PRIME_1536);
 
     MinUnitAssert(VectorsEqual(GlobalScratchBigNumA.Num, (void *)TEST_BIGNUM_2_POWER_MOD_P.Num,
                                sizeof(u64)*TEST_BIGNUM_2_POWER_MOD_P.SizeWords),
@@ -340,21 +340,17 @@ internal MIN_UNIT_TEST_FUNC(TestDiffieHellmanBigNum)
     GenRandBigNumModNUnchecked(&GlobalScratchBigNumA, (bignum *)&NIST_RFC_3526_PRIME_1536);
 
     bignum GPowerAModP;
-    MontModExp(&GPowerAModP, &DhGenerator, &GlobalScratchBigNumA, (bignum *)&NIST_RFC_3526_PRIME_1536,
-               MAX_BIGNUM_SIZE_BITS);
+    MontModExpRBigNumMax(&GPowerAModP, &DhGenerator, &GlobalScratchBigNumA, (bignum *)&NIST_RFC_3526_PRIME_1536);
 
     GenRandBigNumModNUnchecked((bignum *)&GlobalScratchBigNumB, (bignum *)&NIST_RFC_3526_PRIME_1536);
     bignum GPowerBModP;
-    MontModExp(&GPowerBModP, &DhGenerator, &GlobalScratchBigNumB, (bignum *)&NIST_RFC_3526_PRIME_1536,
-               MAX_BIGNUM_SIZE_BITS);
+    MontModExpRBigNumMax(&GPowerBModP, &DhGenerator, &GlobalScratchBigNumB, (bignum *)&NIST_RFC_3526_PRIME_1536);
 
     bignum SessionKeyA;
-    MontModExp(&SessionKeyA, &GPowerBModP, &GlobalScratchBigNumA, (bignum *)&NIST_RFC_3526_PRIME_1536,
-               MAX_BIGNUM_SIZE_BITS);
+    MontModExpRBigNumMax(&SessionKeyA, &GPowerBModP, &GlobalScratchBigNumA, (bignum *)&NIST_RFC_3526_PRIME_1536);
 
     bignum SessionKeyB;
-    MontModExp(&SessionKeyB, &GPowerAModP, &GlobalScratchBigNumB, (bignum *)&NIST_RFC_3526_PRIME_1536,
-               MAX_BIGNUM_SIZE_BITS);
+    MontModExpRBigNumMax(&SessionKeyB, &GPowerAModP, &GlobalScratchBigNumB, (bignum *)&NIST_RFC_3526_PRIME_1536);
 
     MinUnitAssert(VectorsEqual(SessionKeyA.Num, SessionKeyB.Num, sizeof(u64)*NIST_RFC_3526_PRIME_1536.SizeWords),
                   "Mismatch in TestDiffieHellmanBigNum!\n");
