@@ -4,21 +4,6 @@
 #define DH_GENERATOR 5
 
 // TODO(bwd): implementation with allocator
-// Little-endian
-const bignum NIST_RFC_3526_PRIME_1536 =
-{
-    .Num =
-    {
-        0xFFFFFFFFFFFFFFFF, 0xF1746C08CA237327, 0x670C354E4ABC9804, 0x9ED529077096966D, 0x1C62F356208552BB,
-        0x83655D23DCA3AD96, 0x69163FA8FD24CF5F, 0x98DA48361C55D39A, 0xC2007CB8A163BF05, 0x49286651ECE45B3D,
-        0xAE9F24117C4B1FE6, 0xEE386BFB5A899FA5, 0xBFF5CB6F406B7ED, 0xF44C42E9A637ED6B, 0xE485B576625E7EC6,
-        0x4FE1356D6D51C245, 0x302B0A6DF25F1437, 0xEF9519B3CD3A431B, 0x514A08798E3404DD, 0x20BBEA63B139B22,
-        0x29024E088A67CC74, 0xC4C6628B80DC1CD1, 0xC90FDAA22168C234, 0xFFFFFFFFFFFFFFFF,
-    },
-    .SizeWords = 24
-};
-const u32 NIST_RFC_3526_GEN = 2;
-
 global_variable bignum GlobalScratchBigNumA;
 global_variable bignum GlobalScratchBigNumB;
 
@@ -280,32 +265,6 @@ internal MIN_UNIT_TEST_FUNC(TestBigNumMultiply)
                   "Expected/actual mismatch in TestBigNumMultiply!\n");
 }
 
-internal inline void
-GenRandBigNumModNUnchecked(bignum *A, bignum *N)
-{
-    GenRandUnchecked((u32 *)A->Num, 2*N->SizeWords);
-
-    u32 BitCountNHighestDWord = BIT_COUNT_DWORD(N->Num[N->SizeWords - 1]);
-
-    Stopif((BitCountNHighestDWord == 0) || (BitCountNHighestDWord > BITS_IN_DWORD),
-           "Invalid N->SizeWords in GenRandBigNumModNUnchecked!\n");
-
-    if (BitCountNHighestDWord < BITS_IN_DWORD)
-    {
-        A->Num[N->SizeWords - 1] &= MaskBitcount(BitCountNHighestDWord);
-    }
-
-    A->SizeWords = N->SizeWords;
-    AdjustSizeWordsDownUnchecked(A);
-
-    if (!IsAGreaterThanB(N, A))
-    {
-        BigNumSubtract(A, A, N);
-    }
-
-    Stopif(!IsAGreaterThanB(N, A), "Invalid RandBigNum output in GenRandBigNumModNUnchecked!");
-}
-
 internal MIN_UNIT_TEST_FUNC(TestFindNInverseModR)
 {
     bignum NInverseModR;
@@ -374,10 +333,9 @@ internal MIN_UNIT_TEST_FUNC(TestMontModExp)
 
 internal MIN_UNIT_TEST_FUNC(TestDiffieHellmanBigNum)
 {
-    // TODO(bwd): debug
     bignum DhGenerator;
     DhGenerator.SizeWords = 1;
-    DhGenerator.Num[0] = 2;
+    DhGenerator.Num[0] = NIST_RFC_3526_GEN;
 
     GenRandBigNumModNUnchecked(&GlobalScratchBigNumA, (bignum *)&NIST_RFC_3526_PRIME_1536);
 
