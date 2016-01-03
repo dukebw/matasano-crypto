@@ -20,8 +20,9 @@ CASSERT(RAND_MAX <= UINT32_MAX, crypt_helper_h);
 #define EXPECTED_SPACE_FREQUENCY 0.15f
 #define EXPECTED_PUNCT_FREQUENCY 0.025f
 
-#define SHIFT_TO_MASK(Shift) ((1 << (Shift)) - 1)
 #define BITMASK_MOD_DWORD(Bits) (((u64)1 << ((Bits) % BITS_IN_DWORD)) - 1)
+
+#define BIT_COUNT_DWORD(DWordValue) (BITS_IN_DWORD - __builtin_clzl(DWordValue))
 
 #define MASK_64BIT 0xFFFFFFFFFFFFFFFFull
 
@@ -41,6 +42,13 @@ const r32 EXPECTED_LETTER_FREQUENCY[] =
     0.00095, 0.05987, 0.06327, 0.09056, 0.02758, 0.00978, 0.02361, 0.00150,
     0.01974, 0.00074
 };
+
+internal inline u64
+MaskBitcount(u32 Bitcount)
+{
+    u64 Result = (1ull << Bitcount) - 1ull;
+    return Result;
+}
 
 internal inline u32
 Maximum(u32 A, u32 B)
@@ -670,7 +678,7 @@ MtUntemperStep(u32 TemperedValue, u32 Shift, u32 Mask)
 		 (MaskShiftIndex*Shift) < BITS_IN_WORD;
 		 ++MaskShiftIndex)
 	{
-		u32 ShiftedMask = (SHIFT_TO_MASK(Shift) << (MaskShiftIndex*Shift));
+		u32 ShiftedMask = (MaskBitcount(Shift) << (MaskShiftIndex*Shift));
 		Result |= ((TemperedValue ^ ((Result << Shift) & Mask)) & ShiftedMask);
 	}
 
@@ -688,7 +696,7 @@ MtUntemper(u32 TemperedState)
 
 	Result = MtUntemperStep(Result, MT19937_S, MT19937_B);
 
-	u32 InitialMask = SHIFT_TO_MASK(MT19937_U) << (BITS_IN_WORD - MT19937_U);
+	u32 InitialMask = MaskBitcount(MT19937_U) << (BITS_IN_WORD - MT19937_U);
 	u32 Temp = 0;
 	for (u32 MaskShiftIndex = 0;
 		 (MaskShiftIndex*MT19937_U) < BITS_IN_WORD;
@@ -1249,7 +1257,8 @@ MultiplyByRModP(bignum *Output, bignum *InputX, bignum *ModulusP, u32 RPowerOf2)
 {
     Stopif((Output == 0) || (InputX == 0) || (ModulusP == 0), "Null InputX to MultiplyByRModP!");
 
-    memcpy(Output, InputX, sizeof(*InputX));
+    memcpy(Output->Num, InputX->Num, sizeof(u64)*InputX->SizeWords);
+    Output->SizeWords = InputX->SizeWords;
 
     for (u32 RPowerIndex = 0;
          RPowerIndex < RPowerOf2;
@@ -1270,9 +1279,9 @@ MultiplyByRModP(bignum *Output, bignum *InputX, bignum *ModulusP, u32 RPowerOf2)
             PrevMontInputWordHighBit = GET_HIGHEST_BIGNUM_BIT(TempMontInputWord);
         }
 
-        if (InputX->SizeWords < MAX_BIGNUM_SIZE_WORDS)
+        if (Output->SizeWords < MAX_BIGNUM_SIZE_WORDS)
         {
-            Output->Num[InputX->SizeWords] = PrevMontInputWordHighBit;
+            Output->Num[Output->SizeWords] = PrevMontInputWordHighBit;
 
             if (PrevMontInputWordHighBit)
             {
@@ -1427,7 +1436,7 @@ MontModExp(bignum *OutputA, bignum *InputX, bignum *ExponentE, bignum *ModulusP,
         MultiplyByRModP(OutputA, OutputA, ModulusP, RPowerOf2);
 
         u32 BitCountExponentE = ((BITS_IN_DWORD*(ExponentE->SizeWords - 1)) +
-                                 (BITS_IN_DWORD - __builtin_clzl(ExponentE->Num[ExponentE->SizeWords - 1])));
+                                 BIT_COUNT_DWORD(ExponentE->Num[ExponentE->SizeWords - 1]));
         for (i32 BitCountEIndex = (BitCountExponentE - 1);
              BitCountEIndex >= 0;
              --BitCountEIndex)
