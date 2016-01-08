@@ -1,10 +1,11 @@
 #include "crypt_helper.h"
 
-// TODO(bwd): use pthreads so the threads can share data/heap to communicate
 internal MIN_UNIT_TEST_FUNC(TestDhNegotiatedGroups)
 {
-    i32 ChildPid = fork();
-    Stopif(ChildPid < 0, "fork() failed in TestDhNegotiatedGroups!");
+    pthread_t *MasterThread;
+
+    i32 Status = pthread_create(&MasterThread, 0, void *(*)(void *), void *);
+    Stopif(Status != 0, "pthread_create failed in TestDhNegotiatedGroups!");
 
     if (ChildPid == 0)
     {
