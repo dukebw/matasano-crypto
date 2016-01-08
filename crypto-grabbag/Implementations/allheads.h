@@ -16,6 +16,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <limits.h>
+#include <pthread.h>
 #include "stopif.h"
 
 #define internal static
