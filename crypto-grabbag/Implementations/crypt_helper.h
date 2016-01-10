@@ -9,6 +9,8 @@
 
 CASSERT(RAND_MAX <= UINT32_MAX, crypt_helper_h);
 
+typedef struct timespec timespec;
+
 #pragma GCC diagnostic ignored "-Wunused-function"
 
 #define INVALID_CODE_PATH Stopif(true, "Invalid code path!")
@@ -1201,7 +1203,7 @@ BigNumMultiplyOperandScanning(bignum *ProductAB, bignum *A, bignum *B)
     MultiplyOperandScanningUnchecked(ProductAB->Num, MAX_BIGNUM_SIZE_WORDS,
                                      A->Num, A->SizeWords, B->Num, B->SizeWords);
 
-    ProductAB->SizeWords = 32;
+    ProductAB->SizeWords = MAX_BIGNUM_SIZE_WORDS;
     AdjustSizeWordsDownUnchecked(ProductAB);
 }
 
@@ -1477,6 +1479,9 @@ MontModExp(bignum *OutputA, bignum *InputX, bignum *ExponentE, bignum *ModulusP,
 	// TODO(bwd): InputX belongs to [0, R*ModulusP - 1] pre-condition
     // TODO(bwd): return 0 for ModulusP == 1
 
+    // Calculate result locally in case OutputA and one of the inputs are the same
+    bignum LocalResult;
+
     if (InputX->SizeWords > 0)
     {
         bignum MinusPInverseModR;
@@ -1487,9 +1492,9 @@ MontModExp(bignum *OutputA, bignum *InputX, bignum *ExponentE, bignum *ModulusP,
         MultiplyByRModP(&InputXTimesRModP, InputX, ModulusP, RPowerOf2);
 
         // A := R mod p
-        OutputA->Num[0] = 1;
-        OutputA->SizeWords = 1;
-        MultiplyByRModP(OutputA, OutputA, ModulusP, RPowerOf2);
+        LocalResult.Num[0] = 1;
+        LocalResult.SizeWords = 1;
+        MultiplyByRModP(&LocalResult, &LocalResult, ModulusP, RPowerOf2);
 
         u32 BitCountExponentE = ((BITS_IN_DWORD*(ExponentE->SizeWords - 1)) +
                                  BIT_COUNT_DWORD(ExponentE->Num[ExponentE->SizeWords - 1]));
@@ -1497,23 +1502,26 @@ MontModExp(bignum *OutputA, bignum *InputX, bignum *ExponentE, bignum *ModulusP,
              BitCountEIndex >= 0;
              --BitCountEIndex)
         {
-            MontInner(OutputA, OutputA, OutputA, ModulusP, &MinusPInverseModR, RPowerOf2);
+            MontInner(&LocalResult, &LocalResult, &LocalResult, ModulusP, &MinusPInverseModR, RPowerOf2);
 
             if ((ExponentE->Num[BitCountEIndex/BITS_IN_DWORD] >> (BitCountEIndex % BITS_IN_DWORD)) & 0x1)
             {
-                MontInner(OutputA, OutputA, &InputXTimesRModP, ModulusP, &MinusPInverseModR, RPowerOf2);
+                MontInner(&LocalResult, &LocalResult, &InputXTimesRModP, ModulusP, &MinusPInverseModR,
+                          RPowerOf2);
             }
         }
 
         // return Mont(A, 1)
         InputXTimesRModP.Num[0] = 1;
         InputXTimesRModP.SizeWords = 1;
-        MontInner(OutputA, OutputA, &InputXTimesRModP, ModulusP, &MinusPInverseModR, RPowerOf2);
+        MontInner(&LocalResult, &LocalResult, &InputXTimesRModP, ModulusP, &MinusPInverseModR, RPowerOf2);
     }
     else
     {
-        OutputA->SizeWords = 0;
+        LocalResult.SizeWords = 0;
     }
+
+    BigNumCopyUnchecked(OutputA, &LocalResult);
 }
 
 internal void
