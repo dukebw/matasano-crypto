@@ -1,5 +1,14 @@
 #include "crypt_helper.h"
 
+#define DH_MALICIOUS_G_MAX_PLAINTEXT_SIZE_BYTES (4*AES_128_BLOCK_LENGTH_BYTES)
+
+typedef struct
+{
+    u8 *Ciphertext;
+    u32 CtSizeBytes;
+    u8 *Iv;
+} ciphertext_iv_payload;
+
 typedef struct
 {
     void *Message;
@@ -116,7 +125,44 @@ SlaveEntryPoint(void *Arg)
     bignum SessionKeyB;
     GenRandKeyAndGPowerRandKeyUnchecked(&LittleB, &SessionKeyB, SlaveP, G);
 
+    u8 SlavePlaintext[DH_MALICIOUS_G_MAX_PLAINTEXT_SIZE_BYTES] = "Slave: This is my message... Mwahaha you can't crack it!\n";
+    u32 SlaveCiphertextSizeBytes = strlen((char *)SlavePlaintext);
+    u8 SlaveCiphertext[sizeof(SlavePlaintext)];
+    u8 SlaveIv[AES_128_BLOCK_LENGTH_BYTES];
+    u8 SessionSymmetricKey[SHA_1_HASH_LENGTH_BYTES];
+
+    HashSessionKeyGenIvAndEncrypt(SlaveCiphertext,
+                                  SlaveIv,
+                                  (u8 *)SessionKeyB.Num,
+                                  sizeof(u64)*SessionKeyB.SizeWords,
+                                  SlavePlaintext,
+                                  SlaveCiphertextSizeBytes,
+                                  SessionSymmetricKey);
+
+    ciphertext_iv_payload *MasterPayload = ReceiveMessage(&GlobalMasterMailbox);
+
+    u8 DecryptedMasterPt[DH_MALICIOUS_G_MAX_PLAINTEXT_SIZE_BYTES];
+
+    Stopif(MasterPayload->CtSizeBytes > sizeof(DecryptedMasterPt),
+           "Received ciphertext too large in SlaveEntryPoint!");
+
+    AesCbcDecrypt(DecryptedMasterPt,
+                  MasterPayload->Ciphertext,
+                  MasterPayload->CtSizeBytes,
+                  SessionSymmetricKey,
+                  SlaveIv);
+
+    AckMessage(&GlobalMasterMailbox);
+
     SendMessage(&GlobalMasterMailbox, (void *)&SessionKeyB);
+
+    ciphertext_iv_payload SlavePayload =
+    {
+        .Ciphertext = SlaveCiphertext,
+        .CtSizeBytes = SlaveCiphertextSizeBytes,
+        .Iv = SlaveIv,
+    };
+    SendMessage(&GlobalMasterMailbox, (void *)&SlavePayload);
 
     return (void *)0;
 }
@@ -152,6 +198,43 @@ internal MIN_UNIT_TEST_FUNC(TestDhNegotiatedGroups)
     AckMessage(&GlobalMasterMailbox);
 
     MontModExpRBigNumMax(&SessionKeyA, &BigB, &LittleA, (bignum *)&NIST_RFC_3526_PRIME_1536);
+
+    u8 MasterPlaintext[DH_MALICIOUS_G_MAX_PLAINTEXT_SIZE_BYTES] = "Master: This is my message!\nYou decrypted it!\n";
+    u32 MasterCiphertextSizeBytes = strlen((char *)MasterPlaintext);
+    u8 MasterCiphertext[sizeof(MasterPlaintext)];
+    u8 MasterIv[AES_128_BLOCK_LENGTH_BYTES];
+    u8 SessionSymmetricKey[SHA_1_HASH_LENGTH_BYTES];
+
+    HashSessionKeyGenIvAndEncrypt(MasterCiphertext,
+                                  MasterIv,
+                                  (u8 *)SessionKeyA.Num,
+                                  sizeof(u64)*SessionKeyA.SizeWords,
+                                  MasterPlaintext,
+                                  MasterCiphertextSizeBytes,
+                                  SessionSymmetricKey);
+
+    ciphertext_iv_payload MasterPayload =
+    {
+        .Ciphertext = MasterCiphertext,
+        .CtSizeBytes = MasterCiphertextSizeBytes,
+        .Iv = MasterIv,
+    };
+    SendMessage(&GlobalSlaveMailbox, (void *)&MasterPayload);
+
+    ciphertext_iv_payload *SlavePayload = ReceiveMessage(&GlobalMasterMailbox);
+
+    u8 DecryptedSlavePt[DH_MALICIOUS_G_MAX_PLAINTEXT_SIZE_BYTES];
+
+    Stopif(SlavePayload->CtSizeBytes > sizeof(DecryptedSlavePt),
+           "Received ciphertext too large in SlaveEntryPoint!");
+
+    AesCbcDecrypt(DecryptedSlavePt,
+                  SlavePayload->Ciphertext,
+                  SlavePayload->CtSizeBytes,
+                  SessionSymmetricKey,
+                  MasterIv);
+
+    AckMessage(&GlobalMasterMailbox);
 
     void *Result;
     Status = pthread_join(SlaveThread, &Result);

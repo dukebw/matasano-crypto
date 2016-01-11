@@ -36,17 +36,13 @@ internal MIN_UNIT_TEST_FUNC(TestMitmKeyFixingAttack)
                   "SessionKey mismatch in TestMitmKeyFixingAttack!");
 
     // Send AES-CBC(SHA1(s)[0:16], iv=random(16), msg) + iv
-    u8 SessionSymmetricKey[SHA_1_HASH_LENGTH_BYTES];
-    Sha1(SessionSymmetricKey, (u8 *)SessionKeyA.Num, sizeof(u64)*SessionKeyA.SizeWords);
-
-    u8 IvA[AES_128_BLOCK_LENGTH_BYTES];
-    GenRandUnchecked((u32 *)IvA, sizeof(IvA)/sizeof(u32));
-
     u8 Message[sizeof(DH_MITM_TEST_MSG_A) + AES_128_BLOCK_LENGTH_BYTES];
     memcpy(Message, DH_MITM_TEST_MSG_A, sizeof(DH_MITM_TEST_MSG_A));
 
-    AesCbcEncrypt(GlobalExchangeBuffer, Message, STR_LEN(DH_MITM_TEST_MSG_A), SessionSymmetricKey,
-                  IvA);
+    u8 IvA[AES_128_BLOCK_LENGTH_BYTES];
+    u8 SessionSymmetricKey[SHA_1_HASH_LENGTH_BYTES];
+    HashSessionKeyGenIvAndEncrypt(GlobalExchangeBuffer, IvA, (u8 *)SessionKeyA.Num, sizeof(u64)*SessionKeyA.SizeWords,
+                                  Message, STR_LEN(DH_MITM_TEST_MSG_A), SessionSymmetricKey);
 
     AesCbcDecrypt(Message, GlobalExchangeBuffer, STR_LEN(DH_MITM_TEST_MSG_A), SessionSymmetricKey, IvA);
 
@@ -58,6 +54,7 @@ internal MIN_UNIT_TEST_FUNC(TestMitmKeyFixingAttack)
 
     // B/A get fake session key
     MontModExpRBigNumMax(&SessionKeyA, (bignum *)GlobalExchangeBuffer, &A, (bignum *)&NIST_RFC_3526_PRIME_1536);
+
     Sha1(SessionSymmetricKey, (u8 *)SessionKeyA.Num, sizeof(u64)*SessionKeyA.SizeWords);
 
     u8 EveGuessedSymmetricKey[SHA_1_HASH_LENGTH_BYTES];
