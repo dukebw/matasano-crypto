@@ -1530,4 +1530,18 @@ MontModExpRBigNumMax(bignum *OutputA, bignum *InputX, bignum *ExponentE, bignum 
     MontModExp(OutputA, InputX, ExponentE, ModulusP, MAX_BIGNUM_SIZE_BITS);
 }
 
+internal void
+HashSessionKeyGenIvAndEncrypt(u8 *OutputBuffer, u8 *OutputIv, u8 *SessionKey, u32 SessionKeySizeBytes,
+                              u8 *Message, u32 MessageLengthBytes, u8 *SessionSymmetricKey)
+{
+    Stopif((OutputBuffer == 0) || (OutputIv == 0) || (SessionKey == 0) || (SessionSymmetricKey == 0),
+           "Null input to HashSessionKeyGenIvAndEncrypt!");
+
+    Sha1(SessionSymmetricKey, SessionKey, SessionKeySizeBytes);
+
+    GenRandUnchecked((u32 *)OutputIv, AES_128_BLOCK_LENGTH_WORDS);
+
+    AesCbcEncrypt(OutputBuffer, Message, MessageLengthBytes, SessionSymmetricKey, OutputIv);
+}
+
 #endif /* CRYPT_HELPER_H */
