@@ -1192,6 +1192,12 @@ MultiplyOperandScanningUnchecked(u64 *ProductAB, u32 ProductABMaxLengthWords,
         --ResultLength;
     }
 
+	while ((ResultLength > 0) &&
+		   (ProductAB[ResultLength - 1] == 0))
+	{
+		--ResultLength;
+	}
+
     return ResultLength;
 }
 
@@ -1476,52 +1482,60 @@ MontModExp(bignum *OutputA, bignum *InputX, bignum *ExponentE, bignum *ModulusP,
 
     Stopif(IsAGreaterThanOrEqualToB(InputX, ModulusP), "InputX >= 2*P in MontModExp!");
 
-	// TODO(bwd): InputX belongs to [0, R*ModulusP - 1] pre-condition
+    // TODO(bwd): InputX belongs to [0, R*ModulusP - 1] pre-condition
     // TODO(bwd): return 0 for ModulusP == 1
 
-    // Calculate result locally in case OutputA and one of the inputs are the same
-    bignum LocalResult;
-
-    if (InputX->SizeWords > 0)
+    if ((InputX->Num[0] == 1) && (InputX->SizeWords == 1))
     {
-        bignum MinusPInverseModR;
-        FindMinusNInverseModR(&MinusPInverseModR, ModulusP, RPowerOf2);
-
-        // x~ := x*R mod p
-        bignum InputXTimesRModP;
-        MultiplyByRModP(&InputXTimesRModP, InputX, ModulusP, RPowerOf2);
-
-        // A := R mod p
-        LocalResult.Num[0] = 1;
-        LocalResult.SizeWords = 1;
-        MultiplyByRModP(&LocalResult, &LocalResult, ModulusP, RPowerOf2);
-
-        u32 BitCountExponentE = ((BITS_IN_DWORD*(ExponentE->SizeWords - 1)) +
-                                 BIT_COUNT_DWORD(ExponentE->Num[ExponentE->SizeWords - 1]));
-        for (i32 BitCountEIndex = (BitCountExponentE - 1);
-             BitCountEIndex >= 0;
-             --BitCountEIndex)
-        {
-            MontInner(&LocalResult, &LocalResult, &LocalResult, ModulusP, &MinusPInverseModR, RPowerOf2);
-
-            if ((ExponentE->Num[BitCountEIndex/BITS_IN_DWORD] >> (BitCountEIndex % BITS_IN_DWORD)) & 0x1)
-            {
-                MontInner(&LocalResult, &LocalResult, &InputXTimesRModP, ModulusP, &MinusPInverseModR,
-                          RPowerOf2);
-            }
-        }
-
-        // return Mont(A, 1)
-        InputXTimesRModP.Num[0] = 1;
-        InputXTimesRModP.SizeWords = 1;
-        MontInner(&LocalResult, &LocalResult, &InputXTimesRModP, ModulusP, &MinusPInverseModR, RPowerOf2);
+        OutputA->Num[0] = 1;
+        OutputA->SizeWords = 1;
     }
     else
     {
-        LocalResult.SizeWords = 0;
-    }
+        // Calculate result locally in case OutputA and one of the inputs are the same
+        bignum LocalResult;
 
-    BigNumCopyUnchecked(OutputA, &LocalResult);
+        if (InputX->SizeWords > 0)
+        {
+            bignum MinusPInverseModR;
+            FindMinusNInverseModR(&MinusPInverseModR, ModulusP, RPowerOf2);
+
+            // x~ := x*R mod p
+            bignum InputXTimesRModP;
+            MultiplyByRModP(&InputXTimesRModP, InputX, ModulusP, RPowerOf2);
+
+            // A := R mod p
+            LocalResult.Num[0] = 1;
+            LocalResult.SizeWords = 1;
+            MultiplyByRModP(&LocalResult, &LocalResult, ModulusP, RPowerOf2);
+
+            u32 BitCountExponentE = ((BITS_IN_DWORD*(ExponentE->SizeWords - 1)) +
+                                     BIT_COUNT_DWORD(ExponentE->Num[ExponentE->SizeWords - 1]));
+            for (i32 BitCountEIndex = (BitCountExponentE - 1);
+                 BitCountEIndex >= 0;
+                 --BitCountEIndex)
+            {
+                MontInner(&LocalResult, &LocalResult, &LocalResult, ModulusP, &MinusPInverseModR, RPowerOf2);
+
+                if ((ExponentE->Num[BitCountEIndex/BITS_IN_DWORD] >> (BitCountEIndex % BITS_IN_DWORD)) & 0x1)
+                {
+                    MontInner(&LocalResult, &LocalResult, &InputXTimesRModP, ModulusP, &MinusPInverseModR,
+                              RPowerOf2);
+                }
+            }
+
+            // return Mont(A, 1)
+            InputXTimesRModP.Num[0] = 1;
+            InputXTimesRModP.SizeWords = 1;
+            MontInner(&LocalResult, &LocalResult, &InputXTimesRModP, ModulusP, &MinusPInverseModR, RPowerOf2);
+        }
+        else
+        {
+            LocalResult.SizeWords = 0;
+        }
+
+        BigNumCopyUnchecked(OutputA, &LocalResult);
+    }
 }
 
 internal void
