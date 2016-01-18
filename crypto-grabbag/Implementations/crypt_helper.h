@@ -70,9 +70,9 @@ Maximum(u32 A, u32 B)
 }
 
 internal b32
-VectorsEqual(void *A, void *B, u32 Length)
+AreVectorsEqual(void *A, void *B, u32 Length)
 {
-	Stopif((A == 0) || (B == 0), "Null input to VectorsEqual");
+	Stopif((A == 0) || (B == 0), "Null input to AreVectorsEqual\n");
 	u32 Result = true;
 	u8 *AByteVec = (u8 *)A;
 	u8 *BByteVec = (u8 *)B;
@@ -97,7 +97,7 @@ ShiftChar(u32 ToShiftChar, u32 ShiftAmount)
     // TODO(brendan): more checking
     Stopif(!(((ToShiftChar <= 'Z') && (ToShiftChar >= 'A')) ||
              ((ToShiftChar <= 'z') && (ToShiftChar >= 'a'))),
-           "Bad input char");
+           "Bad input char\n");
     u32 Result;
     u32 PreModChar = tolower(ToShiftChar) + ShiftAmount;
     if (PreModChar <= 'z')
@@ -173,16 +173,16 @@ Base64ToUInt(u8 Base64Digit)
     {
         return 63;
     }
-    Stopif(true, "Bad Base64Digit passed to Base64ToUint");
+    Stopif(true, "Bad Base64Digit passed to Base64ToUint\n");
 }
 
 internal u32
 Base64ToAscii(u8 *AsciiString, u8 *Base64String, u32 Base64StringLength)
 {
-	Stopif((AsciiString == 0) || (Base64String == 0), "Null input to Base64ToAscii");
-	Stopif((Base64StringLength % 4) == 1, "Bad Base64StringLength (ends in 6 bits)");
+	Stopif((AsciiString == 0) || (Base64String == 0), "Null input to Base64ToAscii\n");
+	Stopif((Base64StringLength % 4) == 1, "Bad Base64StringLength (ends in 6 bits)\n");
 	// TODO(bwd): fix so target can == source
-	Stopif(AsciiString == Base64String, "Equal Source/Dest not supported yet in Base64ToAscii");
+	Stopif(AsciiString == Base64String, "Equal Source/Dest not supported yet in Base64ToAscii\n");
 
 	// 10101010 1010_1010 1010_1010
 	// 101010
@@ -321,7 +321,7 @@ Base16ToInteger(i32 Value)
     }
 	else
 	{
-        Stopif(true, "Bad char passed to Base16ToInteger");
+        Stopif(true, "Bad char passed to Base16ToInteger\n");
     }
 	return Result;
 }
@@ -331,7 +331,7 @@ Base16ToInteger(i32 Value)
 internal void
 HexStringToByteArray(u8 *Result, char *HexString, u32 Length)
 {
-	Stopif(Length % 2, "Length input to HexStringToByteArray must be multiple of 2");
+	Stopif(Length % 2, "Length input to HexStringToByteArray must be multiple of 2\n");
 
     char TempString[2];
     for (u32 ResultIndex = 0;
@@ -348,10 +348,10 @@ HexStringToByteArray(u8 *Result, char *HexString, u32 Length)
 internal u32
 FileRead(u8 *OutputBuffer, char *FileName, u32 MaxLength)
 {
-	Stopif((OutputBuffer == 0) || (FileName == 0), "Null inputs to FileReadIgnoreSpace()");
+	Stopif((OutputBuffer == 0) || (FileName == 0), "Null inputs to FileReadIgnoreSpace()\n");
 
     FILE *InputFile = fopen(FileName, "r");
-    Stopif(!InputFile, "FileRead: No such file");
+    Stopif(!InputFile, "FileRead: No such file\n");
 
 	u32 ResultSize = fread(OutputBuffer, 1, MaxLength, InputFile);
 
@@ -363,9 +363,9 @@ FileRead(u8 *OutputBuffer, char *FileName, u32 MaxLength)
 internal u32
 FileReadIgnoreSpace(u8 *OutputBuffer, char *FileName, u32 MaxLength)
 {
-	Stopif((OutputBuffer == 0) || (FileName == 0), "Null inputs to FileReadIgnoreSpace()");
+	Stopif((OutputBuffer == 0) || (FileName == 0), "Null inputs to FileReadIgnoreSpace()\n");
     FILE *InputFile = fopen(FileName, "r");
-    Stopif(!InputFile, "FileReadIgnoreSpace: No such file");
+    Stopif(!InputFile, "FileReadIgnoreSpace: No such file\n");
 
     u32 OutBuffIndex = 0;
     for (u8 InputChar;
@@ -403,7 +403,7 @@ GenRandBytesUnchecked(u8 *RandOut, u32 LengthInBytes)
 
 	u32 WordsInRandOutByteLength = sizeof(u32)*WordsInRandOut ;
 	u32 RemainingBytes = LengthInBytes - WordsInRandOutByteLength;
-	Stopif(RemainingBytes >= sizeof(u32), "Invalid remaining bytes GenRandBytesUnchecked");
+	Stopif(RemainingBytes >= sizeof(u32), "Invalid remaining bytes GenRandBytesUnchecked\n");
 
 	for (u32 RandOutByteIndex = 0;
 		 RandOutByteIndex < RemainingBytes;
@@ -418,7 +418,7 @@ CipherIsEcbEncryptedBlock(u8 *Cipher, u32 BlockCount)
 {
 	b32 Result = false;
 
-	Stopif(Cipher == 0, "Null input to CipherIsEcbEncrypted");
+	Stopif(Cipher == 0, "Null input to CipherIsEcbEncrypted\n");
 
 	for (u32 FirstBlockIndex = 0;
 		 FirstBlockIndex < (BlockCount - 1);
@@ -446,7 +446,7 @@ CipherIsEcbEncrypted(u8 *Cipher, u32 CipherLength)
 {
 	b32 Result;
 
-	Stopif(Cipher == 0, "Null input to CipherIsEcbEncrypted");
+	Stopif(Cipher == 0, "Null input to CipherIsEcbEncrypted\n");
 
 	Result = CipherIsEcbEncryptedBlock(Cipher, CipherLength/AES_128_BLOCK_LENGTH_BYTES);
 
@@ -459,10 +459,10 @@ internal u8 *
 StripPkcs7GetStrippedLength(u8 *PaddedString, u32 *StrippedStringLengthOut, u32 PaddedStringLength)
 {
 	u8 *Result = 0;
-	Stopif(PaddedString == 0, "Null input to StripPkcs7Padding");
+	Stopif(PaddedString == 0, "Null input to StripPkcs7Padding\n");
 	Stopif((PaddedStringLength % AES_128_BLOCK_LENGTH_BYTES) != 0,
-		   "Bad padded length passed to StripPkcs7GetStrippedLength");
-	Stopif(PaddedStringLength == 0, "Invalid zero string length passed to StripPkcs7GetStrippedLength");
+		   "Bad padded length passed to StripPkcs7GetStrippedLength\n");
+	Stopif(PaddedStringLength == 0, "Invalid zero string length passed to StripPkcs7GetStrippedLength\n");
 
 	u8 PaddingBytes = PaddedString[PaddedStringLength - 1];
 
@@ -507,8 +507,8 @@ StripPkcs7Padding(u8 *PaddedString, u32 PaddedStringLength)
 internal r32
 ScoreString(u8 *DecodedString, u32 Length)
 {
-	Stopif((DecodedString == 0), "Null input to ScoreString");
-	Stopif(Length == 0, "Invalid input (zero length) to ScoreString");
+	Stopif((DecodedString == 0), "Null input to ScoreString\n");
+	Stopif(Length == 0, "Invalid input (zero length) to ScoreString\n");
 
     u32 LetterCount[ALPHABET_SIZE] = {0};
 	u32 SpacesCount = 0;
@@ -620,7 +620,7 @@ MtInitUnchecked(mersenne_twister *Mt)
 internal void
 MtSeed(mersenne_twister *Mt, u32 Seed)
 {
-	Stopif(Mt == 0, "Null input to MtSeed");
+	Stopif(Mt == 0, "Null input to MtSeed\n");
 
 	Mt->Index = MT19937_N;
 	Mt->State[0] = Seed;
@@ -639,8 +639,8 @@ MtExtractNumber(mersenne_twister *Mt)
 {
 	u32 Result;
 
-	Stopif(Mt == 0, "Null input to MtExtractNumber");
-	Stopif(Mt->Index > MT19937_N, "Generator was never seeded");
+	Stopif(Mt == 0, "Null input to MtExtractNumber\n");
+	Stopif(Mt->Index > MT19937_N, "Generator was never seeded\n");
 
 	if (Mt->Index == MT19937_N)
 	{
@@ -724,7 +724,7 @@ CASSERT(ADMIN_TRUE_STR_LENGTH < (PREPEND_LENGTH - AES_128_BLOCK_LENGTH_BYTES), c
 internal u32
 GenRandInputAppendPrepend(u8 *RandAppendPrependInput, u32 RandInputLength)
 {
-	Stopif(RandAppendPrependInput == 0, "Null input to GenRandInputAppendPrepend");
+	Stopif(RandAppendPrependInput == 0, "Null input to GenRandInputAppendPrepend\n");
 
 	u8 RandValue[RandInputLength - PREPEND_LENGTH - APPEND_LENGTH];
 	memcpy(RandAppendPrependInput, PREPEND_STRING, PREPEND_LENGTH);
@@ -747,7 +747,7 @@ GenRandInputAppendPrepend(u8 *RandAppendPrependInput, u32 RandInputLength)
 	}
 	memcpy(RandAppendPrependInput + ScratchInputIndex, APPEND_STRING, APPEND_LENGTH);
 	u32 TotalInputLength = (ScratchInputIndex + APPEND_LENGTH);
-	Stopif(TotalInputLength > RandInputLength, "Overflowed RandAppendPrependInput");
+	Stopif(TotalInputLength > RandInputLength, "Overflowed RandAppendPrependInput\n");
 
 	return TotalInputLength;
 }
@@ -755,11 +755,11 @@ GenRandInputAppendPrepend(u8 *RandAppendPrependInput, u32 RandInputLength)
 internal void
 Sha1KeyedMac(u8 *KeyedMac, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength)
 {
-	Stopif((KeyedMac == 0) || (Message == 0) || (Key == 0), "Null input to Sha1KeyedMac");
+	Stopif((KeyedMac == 0) || (Message == 0) || (Key == 0), "Null input to Sha1KeyedMac\n");
 
 	u8 KeyConcatMessage[SHA_1_KEYED_MAC_MAX_MSG_SIZE];
 	u32 TotalHmacInputSize = (MessageLength + KeyLength);
-	Stopif(TotalHmacInputSize > sizeof(KeyConcatMessage), "Message + Key lengths too long in Sha1KeyedMac");
+	Stopif(TotalHmacInputSize > sizeof(KeyConcatMessage), "Message + Key lengths too long in Sha1KeyedMac\n");
 
 	memcpy(KeyConcatMessage, Key, KeyLength);
 	memcpy(KeyConcatMessage + KeyLength, Message, MessageLength);
@@ -783,9 +783,9 @@ const char SIG_PREFIX[] = "signature=";
 internal void
 HmacSha1(u8 *Hmac, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength)
 {
-	Stopif((Hmac == 0) || (Message == 0) || (Key == 0), "Null input to HmacSha1");
+	Stopif((Hmac == 0) || (Message == 0) || (Key == 0), "Null input to HmacSha1\n");
 	u32 TotalHashedInputSize = (SHA_1_BLOCK_SIZE + MessageLength);
-	Stopif(TotalHashedInputSize > SHA_1_HMAC_MAX_HASH_INPUT_LENGTH, "Buffer overflow in HmacSha1");
+	Stopif(TotalHashedInputSize > SHA_1_HMAC_MAX_HASH_INPUT_LENGTH, "Buffer overflow in HmacSha1\n");
 
 	u8 KeyScratch[SHA_1_BLOCK_SIZE];
 	u8 *K_0;
@@ -896,7 +896,7 @@ IsAGreaterThanB(bignum *A, bignum *B)
 {
 	b32 Result = false;
 
-	Stopif((A == 0) || (B == 0), "Null input to IsAGreaterThanB");
+	Stopif((A == 0) || (B == 0), "Null input to IsAGreaterThanB\n");
 
 	if (A->SizeWords > B->SizeWords)
 	{
@@ -941,7 +941,7 @@ MultiPrecisionAdd(u64 *SumAB, u32 *SumLengthWords,
                   u64 *A, u32 ALengthWords,
                   u64 *B, u32 BLengthWords)
 {
-    Stopif((SumAB == 0) || (SumLengthWords == 0) || (A == 0) || (B == 0), "Null input to MultiPrecisionAdd!");
+    Stopif((SumAB == 0) || (SumLengthWords == 0) || (A == 0) || (B == 0), "Null input to MultiPrecisionAdd!\n");
 
     u32 MaxSize = Maximum(ALengthWords, BLengthWords);
 
@@ -1005,7 +1005,7 @@ MultiPrecisionAdd(u64 *SumAB, u32 *SumLengthWords,
 internal u32 
 BigNumAdd(bignum *SumAB, bignum *A, bignum *B)
 {
-    Stopif((SumAB == 0) || (A == 0) || (B == 0), "Null input to BigNumAdd!");
+    Stopif((SumAB == 0) || (A == 0) || (B == 0), "Null input to BigNumAdd!\n");
 
     SumAB->SizeWords = MAX_BIGNUM_SIZE_WORDS;
     u32 Carry = MultiPrecisionAdd(SumAB->Num, &SumAB->SizeWords,
@@ -1037,9 +1037,9 @@ CheckForBorrow(u64 Difference, u64 LeftOperand)
 internal u32 
 BigNumSubtract(bignum *AMinusB, bignum *A, bignum *B)
 {
-    Stopif((AMinusB == 0) || (A == 0) || (B == 0), "Null input to BigNumSubtract!");
+    Stopif((AMinusB == 0) || (A == 0) || (B == 0), "Null input to BigNumSubtract!\n");
 
-    Stopif(IsAGreaterThanB(B, A), "No support for negative numbers yet! (BigNumSubtract)");
+    Stopif(IsAGreaterThanB(B, A), "No support for negative numbers yet! (BigNumSubtract)\n");
 
     u32 Borrow = 0;
 
@@ -1079,7 +1079,7 @@ BigNumSubtract(bignum *AMinusB, bignum *A, bignum *B)
         ++AMinusBIndex;
     } while (AMinusBIndex < A->SizeWords);
 
-    Stopif(Borrow, "Negative numbers currently not supported.");
+    Stopif(Borrow, "Negative numbers currently not supported.\n");
 
     AMinusB->SizeWords = A->SizeWords;
     AdjustSizeWordsDownUnchecked(AMinusB);
@@ -1110,13 +1110,13 @@ GenRandBigNumModNUnchecked(bignum *A, bignum *N)
         BigNumSubtract(A, A, N);
     }
 
-    Stopif(!IsAGreaterThanB(N, A), "Invalid RandBigNum output in GenRandBigNumModNUnchecked!");
+    Stopif(!IsAGreaterThanB(N, A), "Invalid RandBigNum output in GenRandBigNumModNUnchecked!\n");
 }
 
 internal void 
 BigNumAddModN(bignum *SumABModN, bignum *A, bignum *B, bignum *N)
 {
-	Stopif((SumABModN == 0) || (A == 0) || (B == 0) || (N == 0), "Null input to BigNumAdd!");
+	Stopif((SumABModN == 0) || (A == 0) || (B == 0) || (N == 0), "Null input to BigNumAdd!\n");
 
     u32 Carry = BigNumAdd(SumABModN, A, B);
 
@@ -1156,7 +1156,7 @@ MultiplyOperandScanningUnchecked(u64 *ProductAB, u32 ProductABMaxLengthWords,
                                  u64 *B, u32 BLengthWords)
 {
     Stopif((A[ALengthWords - 1] == 0) || (B[BLengthWords - 1] == 0),
-           "Invalid LengthWords parameter in MultiplyOperandScanningUnchecked!");
+           "Invalid LengthWords parameter in MultiplyOperandScanningUnchecked!\n");
 
     memset(ProductAB, 0, sizeof(u64)*ProductABMaxLengthWords);
 
@@ -1204,10 +1204,15 @@ MultiplyOperandScanningUnchecked(u64 *ProductAB, u32 ProductABMaxLengthWords,
 internal void
 BigNumMultiplyOperandScanning(bignum *ProductAB, bignum *A, bignum *B)
 {
-    Stopif((ProductAB == 0) || (A == 0) || (B == 0), "Null input to BigNumMultiplyModNOperandScanning!");
+    Stopif((ProductAB == 0) || (A == 0) || (B == 0), "Null input to BigNumMultiplyModNOperandScanning!\n");
 
-    MultiplyOperandScanningUnchecked(ProductAB->Num, MAX_BIGNUM_SIZE_WORDS,
-                                     A->Num, A->SizeWords, B->Num, B->SizeWords);
+    bignum TempProductAB;
+
+    MultiplyOperandScanningUnchecked(TempProductAB.Num, MAX_BIGNUM_SIZE_WORDS,
+                                     A->Num, A->SizeWords,
+                                     B->Num, B->SizeWords);
+
+    memcpy(ProductAB, &TempProductAB, sizeof(TempProductAB));
 
     ProductAB->SizeWords = MAX_BIGNUM_SIZE_WORDS;
     AdjustSizeWordsDownUnchecked(ProductAB);
@@ -1216,7 +1221,7 @@ BigNumMultiplyOperandScanning(bignum *ProductAB, bignum *A, bignum *B)
 internal inline b32
 IsInverseOfNMod2PowerKUnchecked(bignum *BigNum, bignum *BigNumInverse, u32 PowerOf2)
 {
-    Stopif(PowerOf2 > MAX_BIGNUM_SIZE_BITS, "Invalid PowerOf2 in IsInverseOfNMod2PowerKUnchecked!");
+    Stopif(PowerOf2 > MAX_BIGNUM_SIZE_BITS, "Invalid PowerOf2 in IsInverseOfNMod2PowerKUnchecked!\n");
 
     // TODO(bwd): copy BigNum mod 2^k and multiply with BigNum' mod 2^k to get BigNum*BigNum' mod 2^k
     bignum ScratchProduct;
@@ -1257,11 +1262,11 @@ internal void
 FindNInverseModR(bignum *NInverseModR, bignum *N, u32 RPowerOf2)
 {
     Stopif((N->SizeWords > MAX_BIGNUM_SIZE_WORDS) || (N->SizeWords == 0) || (!(N->Num[0] & 0x1)),
-           "gcd(N, R) must be 1 in FindNInverseModR!");
+           "gcd(N, R) must be 1 in FindNInverseModR!\n");
 
-    Stopif(RPowerOf2 > MAX_BIGNUM_SIZE_BITS, "RPowerOf2 too large in FindNInverseModR!");
+    Stopif(RPowerOf2 > MAX_BIGNUM_SIZE_BITS, "RPowerOf2 too large in FindNInverseModR!\n");
 
-    Stopif(RPowerOf2 % BITS_IN_DWORD, "RPowerOf2 not multiple of 64 in FindNInverseModR!");
+    Stopif(RPowerOf2 % BITS_IN_DWORD, "RPowerOf2 not multiple of 64 in FindNInverseModR!\n");
 
     // Hensel's Lemma to calculate 1/N mod R -- used to avoid explicit trial division
 
@@ -1306,14 +1311,14 @@ FindNInverseModR(bignum *NInverseModR, bignum *N, u32 RPowerOf2)
         AdjustSizeWordsDownUnchecked(NInverseModR);
 
         Stopif(!IsInverseOfNMod2PowerKUnchecked(N, NInverseModR, NextPowerOf2),
-               "1/N mod R not found in FindNInverseModR!\nNextPowerOf2: %d", NextPowerOf2);
+               "1/N mod R not found in FindNInverseModR!\nNextPowerOf2: %d\n", NextPowerOf2);
     }
 }
 
 internal void
 MultiplyByRModP(bignum *Output, bignum *InputX, bignum *ModulusP, u32 RPowerOf2)
 {
-    Stopif((Output == 0) || (InputX == 0) || (ModulusP == 0), "Null InputX to MultiplyByRModP!");
+    Stopif((Output == 0) || (InputX == 0) || (ModulusP == 0), "Null InputX to MultiplyByRModP!\n");
 
     BigNumCopyUnchecked(Output, InputX);
 
@@ -1352,31 +1357,21 @@ MultiplyByRModP(bignum *Output, bignum *InputX, bignum *ModulusP, u32 RPowerOf2)
         }
 
         Stopif(IsAGreaterThanOrEqualToB(Output, ModulusP),
-               "Output < ModulusP pre-condition broken for RPowerIndex %d in MultiplyByRModP!", RPowerIndex);
+               "Output < ModulusP pre-condition broken for RPowerIndex %d in MultiplyByRModP!\n", RPowerIndex);
     }
 }
 
 internal void
-MontInner(bignum *Output, bignum *XTimesRModP, bignum *YTimesRModP, bignum *ModulusP,
-          bignum *MinusPInverseModR, u32 RPowerOf2)
+GetZRInverseModP(bignum *Output, u64 *InputZ, u32 ZLengthDWords,
+                 bignum *ModulusP, bignum *MinusPInverseModR, u32 RPowerOf2)
 {
     Stopif((Output == 0) ||
-           (XTimesRModP == 0) ||
-           (YTimesRModP == 0) ||
+           (InputZ == 0) ||
            (ModulusP == 0) ||
            (MinusPInverseModR == 0),
-           "Null input to MontInner!");
-
-    Stopif((RPowerOf2 & (RPowerOf2 - 1)) != 0, "R not power of 2 in MontInner!");
+           "Null input to GetZRInverseModP!\n");
 
     // c := (z + (z*p' mod R)*p)/R
-
-    // DoubleBignumScratch := z ( == (x*R mod P)*(y*R mod P))
-    u64 DoubleBignumScratch[2*MAX_BIGNUM_SIZE_WORDS];
-
-    u32 ZLengthDWords = MultiplyOperandScanningUnchecked(DoubleBignumScratch, ARRAY_LENGTH(DoubleBignumScratch),
-                                                         XTimesRModP->Num, XTimesRModP->SizeWords,
-                                                         YTimesRModP->Num, YTimesRModP->SizeWords);
 
     // Output := (z*p' mod R)
     u32 MaxDWordsModR;
@@ -1391,7 +1386,7 @@ MontInner(bignum *Output, bignum *XTimesRModP, bignum *YTimesRModP, bignum *Modu
     }
 
     Output->SizeWords = MultiplyOperandScanningUnchecked(Output->Num, MaxDWordsModR,
-                                                         DoubleBignumScratch, ZLengthDWords,
+                                                         InputZ, ZLengthDWords,
                                                          MinusPInverseModR->Num, MinusPInverseModR->SizeWords);
 
     u64 RBitmaskMod2Pow64 = BITMASK_MOD_DWORD(RPowerOf2);
@@ -1407,9 +1402,10 @@ MontInner(bignum *Output, bignum *XTimesRModP, bignum *YTimesRModP, bignum *Modu
                                                               ModulusP->Num, ModulusP->SizeWords);
 
     // DoubleBignumScratch := (z + (z*p' mod R)*p)
+    u64 DoubleBignumScratch[2*MAX_BIGNUM_SIZE_WORDS];
     u32 NumeratorLength = ARRAY_LENGTH(DoubleBignumScratch);
     MultiPrecisionAdd(DoubleBignumScratch, &NumeratorLength,
-                      DoubleBignumScratch, ZLengthDWords,
+                      InputZ, ZLengthDWords,
                       PTimesZPModR, PZModRLengthDWords);
 
     // Output := (z + (z*p' mod R)*p)/R
@@ -1426,7 +1422,7 @@ MontInner(bignum *Output, bignum *XTimesRModP, bignum *YTimesRModP, bignum *Modu
     Output->SizeWords = NumeratorLength - TruncatedStartIndex;
     memcpy(Output->Num, DoubleBignumScratch + TruncatedStartIndex, sizeof(u64)*Output->SizeWords);
 
-    Stopif(Output->Num[Output->SizeWords - 1] == 0, "Invalid SizeWords in MontInner!");
+    Stopif(Output->Num[Output->SizeWords - 1] == 0, "Invalid SizeWords in MontInner!\n");
 
     if (RPowerOf2ModDWord)
     {
@@ -1448,9 +1444,32 @@ MontInner(bignum *Output, bignum *XTimesRModP, bignum *YTimesRModP, bignum *Modu
 }
 
 internal void
+MontInner(bignum *Output, bignum *XTimesRModP, bignum *YTimesRModP, bignum *ModulusP,
+          bignum *MinusPInverseModR, u32 RPowerOf2)
+{
+    Stopif((Output == 0) ||
+           (XTimesRModP == 0) ||
+           (YTimesRModP == 0) ||
+           (ModulusP == 0) ||
+           (MinusPInverseModR == 0),
+           "Null input to MontInner!\n");
+
+    Stopif((RPowerOf2 & (RPowerOf2 - 1)) != 0, "R not power of 2 in MontInner!\n");
+
+    // DoubleBignumScratch := z ( == (x*R mod P)*(y*R mod P))
+    u64 DoubleBignumScratch[2*MAX_BIGNUM_SIZE_WORDS];
+
+    u32 ZLengthDWords = MultiplyOperandScanningUnchecked(DoubleBignumScratch, ARRAY_LENGTH(DoubleBignumScratch),
+                                                         XTimesRModP->Num, XTimesRModP->SizeWords,
+                                                         YTimesRModP->Num, YTimesRModP->SizeWords);
+
+    GetZRInverseModP(Output, DoubleBignumScratch, ZLengthDWords, ModulusP, MinusPInverseModR, RPowerOf2);
+}
+
+internal void
 FindMinusNInverseModR(bignum *MinusPInverseModR, bignum *ModulusP, u32 RPowerOf2)
 {
-    Stopif(RPowerOf2 % BITS_IN_DWORD, "Non-DWord aligned R not supported in FindMinusNInverseModR!");
+    Stopif(RPowerOf2 % BITS_IN_DWORD, "Non-DWord aligned R not supported in FindMinusNInverseModR!\n");
 
     FindNInverseModR(MinusPInverseModR, ModulusP, RPowerOf2);
 
@@ -1471,16 +1490,16 @@ internal void
 MontModExp(bignum *OutputA, bignum *InputX, bignum *ExponentE, bignum *ModulusP, u32 RPowerOf2)
 {
     Stopif((OutputA == 0) || (InputX == 0) || (ExponentE == 0) || (ModulusP == 0),
-           "Null InputX to MontReduce!");
+           "Null InputX to MontModExp!\n");
 
-    Stopif(ModulusP->SizeWords == 0, "Invalid ModulusP in MontModExp!");
+    Stopif(ModulusP->SizeWords == 0, "Invalid ModulusP in MontModExp!\n");
 
     if (IsAGreaterThanOrEqualToB(InputX, ModulusP))
     {
         BigNumSubtract(InputX, InputX, ModulusP);
     }
 
-    Stopif(IsAGreaterThanOrEqualToB(InputX, ModulusP), "InputX >= 2*P in MontModExp!");
+    Stopif(IsAGreaterThanOrEqualToB(InputX, ModulusP), "InputX >= 2*P in MontModExp!\n");
 
     // TODO(bwd): InputX belongs to [0, R*ModulusP - 1] pre-condition
     // TODO(bwd): return 0 for ModulusP == 1
@@ -1549,7 +1568,7 @@ HashSessionKeyGenIvAndEncrypt(u8 *OutputBuffer, u8 *OutputIv, u8 *SessionKey, u3
                               u8 *Message, u32 MessageLengthBytes, u8 *SessionSymmetricKey)
 {
     Stopif((OutputBuffer == 0) || (OutputIv == 0) || (SessionKey == 0) || (SessionSymmetricKey == 0),
-           "Null input to HashSessionKeyGenIvAndEncrypt!");
+           "Null input to HashSessionKeyGenIvAndEncrypt!\n");
 
     Sha1(SessionSymmetricKey, SessionKey, SessionKeySizeBytes);
 
