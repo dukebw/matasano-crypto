@@ -16,7 +16,7 @@ internal MIN_UNIT_TEST_FUNC(TestCtrMode)
 
 	CtPtScratch[CiphertextLength] = 0;
 	u8 ExpectedPlaintext[] = "Yo, VIP Let's kick it Ice, Ice, baby Ice, Ice, baby";
-	MinUnitAssert(VectorsEqual(CtPtScratch, ExpectedPlaintext, STR_LEN(ExpectedPlaintext)),
+	MinUnitAssert(AreVectorsEqual(CtPtScratch, ExpectedPlaintext, STR_LEN(ExpectedPlaintext)),
 				  "Expected/Unexpected mismatch in TestCtrMode");
 }
 

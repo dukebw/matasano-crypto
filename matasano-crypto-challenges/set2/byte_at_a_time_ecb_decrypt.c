@@ -57,7 +57,7 @@ int main()
 		 BlockSizeGuess += 8)
 	{
 		OracleFunction(Cipher, UnpaddedPlaintext, sizeof(UnpaddedPlaintext));
-		if (VectorsEqual(Cipher, Cipher + BlockSizeGuess, BlockSizeGuess))
+		if (AreVectorsEqual(Cipher, Cipher + BlockSizeGuess, BlockSizeGuess))
 		{
 			BlockSizeFound = true;
 			break;
@@ -133,9 +133,9 @@ int main()
 			 DictionaryIndex < POSSIBLE_BYTE_COUNT;
 			 ++DictionaryIndex)
 		{
-			if (VectorsEqual(CipherTargetBytesStart + CipherBlockIndex*AES_128_BLOCK_LENGTH_BYTES,
-							 OracleByteDictionary + DictionaryIndex*AES_128_BLOCK_LENGTH_BYTES,
-							 AES_128_BLOCK_LENGTH_BYTES))
+            if (AreVectorsEqual(CipherTargetBytesStart + CipherBlockIndex*AES_128_BLOCK_LENGTH_BYTES,
+                                OracleByteDictionary + DictionaryIndex*AES_128_BLOCK_LENGTH_BYTES,
+                                AES_128_BLOCK_LENGTH_BYTES))
 			{
 				AttackPlaintext[CipherIndex] = DictionaryIndex;
 				DictionaryMessage[sizeof(DictionaryMessage) - 1] = DictionaryIndex;
@@ -158,7 +158,7 @@ int main()
 	}
 	Stopif(strlen((char *)AttackPlaintext) != strlen((char *)UnpaddedPlaintext),
 		   "AttackPlaintext not equal length to UnpaddedPlaintext");
-	Stopif(!VectorsEqual(AttackPlaintext, UnpaddedPlaintext, strlen((char *)AttackPlaintext)),
+	Stopif(!AreVectorsEqual(AttackPlaintext, UnpaddedPlaintext, strlen((char *)AttackPlaintext)),
 		   "AttackPlaintext and UnpaddedPlaintext unequal!")
 	printf("%s", AttackPlaintext);
 }

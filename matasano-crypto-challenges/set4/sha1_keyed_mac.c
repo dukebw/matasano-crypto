@@ -154,7 +154,7 @@ Sha1KeyedMacAuthenticate(u8 *Message, u32 MessageLength, u8 *MacSignature)
 	u8 Hmac[SHA_1_HASH_LENGTH_BYTES];
 	Sha1KeyedMac(Hmac, Message, MessageLength, (u8 *)SHA_1_KEYED_MAC_SECRET_KEY, SHA_1_MAC_KEY_LENGTH);
 
-	Authenticated = VectorsEqual(Hmac, MacSignature, sizeof(Hmac));
+	Authenticated = AreVectorsEqual(Hmac, MacSignature, sizeof(Hmac));
 
 	return Authenticated;
 }
@@ -195,7 +195,7 @@ internal MIN_UNIT_TEST_FUNC(TestSha1)
 		 ++TestVecIndex)
 	{
 		Sha1(Hash, (u8 *)SHA_1_TEST_VECTORS[TestVecIndex].Message, SHA_1_TEST_VECTORS[TestVecIndex].MessageLength);
-		MinUnitAssert(VectorsEqual(Hash, (void *)SHA_1_TEST_VECTORS[TestVecIndex].Hash, sizeof(Hash)),
+		MinUnitAssert(AreVectorsEqual(Hash, (void *)SHA_1_TEST_VECTORS[TestVecIndex].Hash, sizeof(Hash)),
 					  "Hash/expected hash mismatch in TestSha1! TestVecIndex: %d\n", TestVecIndex);
 	}
 }

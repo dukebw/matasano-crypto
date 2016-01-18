@@ -39,7 +39,7 @@ internal MIN_UNIT_TEST_FUNC(TestBreakSha1KeyedMacLengthExtension)
 
 	u8 ExpectedHmac[SHA_1_HASH_LENGTH_BYTES];
 	Sha1KeyedMac(ExpectedHmac, TotalForgedInput, TotalForgedInputLength, (u8 *)TEST_KEY, STR_LEN(TEST_KEY));
-	MinUnitAssert(VectorsEqual(ExpectedHmac, ScratchHmac, sizeof(ExpectedHmac)),
+	MinUnitAssert(AreVectorsEqual(ExpectedHmac, ScratchHmac, sizeof(ExpectedHmac)),
 				  "Expected HMAC vs. actual HMAC mismatch in TestBreakSha1KeyedMacLengthExtension");
 }
 

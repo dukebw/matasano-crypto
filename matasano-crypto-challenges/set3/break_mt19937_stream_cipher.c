@@ -36,11 +36,11 @@ internal MIN_UNIT_TEST_FUNC(TestMt19937StreamCipher)
 
 	u8 TestScratch[TestLength];
 	Mt19937StreamCipher(TestScratch, TestOutput, TestLength, &Mt, 0xABCD);
-	MinUnitAssert(VectorsEqual(TestScratch, TestInput, TestLength),
+	MinUnitAssert(AreVectorsEqual(TestScratch, TestInput, TestLength),
 				  "Positive test failure in TestMt19937StreamCipher");
 
 	Mt19937StreamCipher(TestScratch, TestOutput, TestLength, &Mt, 0xABCE);
-	MinUnitAssert(!VectorsEqual(TestScratch, TestInput, TestLength),
+	MinUnitAssert(!AreVectorsEqual(TestScratch, TestInput, TestLength),
 				  "Negative test failure in TestMt19937StreamCipher");
 }
 

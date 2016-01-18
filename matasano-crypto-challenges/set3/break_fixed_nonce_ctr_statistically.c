@@ -122,7 +122,7 @@ internal MIN_UNIT_TEST_FUNC(TestBreakFixedNonceCtr)
 		Base64ToAscii(AsciiPlaintextScratch, (u8 *)PLAINTEXT_ARRAY[DecryptedPtIndex],
 					  PLAINTEXT_LENGTH_ARRAY[DecryptedPtIndex]);
 
-		MinUnitAssert(VectorsEqual((void *)AsciiPlaintextScratch, (void *)NextDecryptedPt, SmallestPtLength),
+		MinUnitAssert(AreVectorsEqual((void *)AsciiPlaintextScratch, (void *)NextDecryptedPt, SmallestPtLength),
 					  "Expected: %s\nActual: %s\n"
 					  "Plaintext/Decrypted ciphertext mismatch in TestBreakFixedNonceCtr at Vector %u\n",
 					  AsciiPlaintextScratch, NextDecryptedPt, DecryptedPtIndex);

@@ -47,7 +47,7 @@ internal MIN_UNIT_TEST_FUNC(TestHmacSha1)
 	u8 HmacScratch[SHA_1_HASH_LENGTH_BYTES];
 	HmacSha1(HmacScratch, (u8 *)HMAC_SHA_1_MSG_0, sizeof(HMAC_SHA_1_MSG_0),
 			 (u8 *)HMAC_SHA_1_KEY_0, sizeof(HMAC_SHA_1_KEY_0));
-	MinUnitAssert(VectorsEqual(HmacScratch, (u8 *)HMAC_SHA_1_EXPECTED_HASH_0,
+	MinUnitAssert(AreVectorsEqual(HmacScratch, (u8 *)HMAC_SHA_1_EXPECTED_HASH_0,
                                sizeof(HMAC_SHA_1_EXPECTED_HASH_0)),
 				  "Expected HMAC mismatch in TestBreakHmacSha1TimingLeak!");
 }

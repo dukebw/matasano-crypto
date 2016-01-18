@@ -77,14 +77,14 @@ internal MIN_UNIT_TEST_FUNC(TestBreakRandomAccessRwAesCtr)
 	{
 		EditAndDecryptBlock(GuessedPlaintext, EditedCiphertext, Ciphertext, Key, CiphertextIndex,
 							AES_128_BLOCK_LENGTH_BYTES);
-		MinUnitAssert(VectorsEqual(GuessedPlaintext + CiphertextIndex, Plaintext + CiphertextIndex, AES_128_BLOCK_LENGTH_BYTES),
+		MinUnitAssert(AreVectorsEqual(GuessedPlaintext + CiphertextIndex, Plaintext + CiphertextIndex, AES_128_BLOCK_LENGTH_BYTES),
 					  "Guessed Plaintext mismatch in TestBreakRandomAccessRwAesCtr! CiphertextIndex: %d\n", CiphertextIndex);
 	}
 	u32 CtLengthMod16 = CiphertextLength % AES_128_BLOCK_LENGTH_BYTES;
 	u32 LastAligned16CtIndex = (CiphertextLength/AES_128_BLOCK_LENGTH_BYTES)*AES_128_BLOCK_LENGTH_BYTES;
 	EditAndDecryptBlock(GuessedPlaintext, EditedCiphertext, Ciphertext, Key, LastAligned16CtIndex, CtLengthMod16);
 
-	MinUnitAssert(VectorsEqual(GuessedPlaintext, Plaintext, CiphertextLength),
+	MinUnitAssert(AreVectorsEqual(GuessedPlaintext, Plaintext, CiphertextLength),
 				  "Guessed Plaintext mismatch in TestBreakRandomAccessRwAesCtr!\n");
 }
 
@@ -110,7 +110,7 @@ internal MIN_UNIT_TEST_FUNC(TestCtrEdit)
 
 	CtrEdit(EditTestBuffer, Key, Offset, NewPlaintext, NewPtLength);
 
-	MinUnitAssert(VectorsEqual(EditTestBuffer, ExpectedCiphertext, EditTestBuffLength),
+	MinUnitAssert(AreVectorsEqual(EditTestBuffer, ExpectedCiphertext, EditTestBuffLength),
 				  "EditTestBuffer changed by CtrEdit in TestCtrEdit!\n");
 }
 

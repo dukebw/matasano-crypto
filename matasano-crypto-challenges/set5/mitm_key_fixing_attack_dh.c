@@ -31,7 +31,7 @@ internal MIN_UNIT_TEST_FUNC(TestMitmKeyFixingAttack)
     bignum SessionKeyA;
     MontModExpRBigNumMax(&SessionKeyA, (bignum *)GlobalExchangeBuffer, &A, (bignum *)&NIST_RFC_3526_PRIME_1536);
 
-    MinUnitAssert(VectorsEqual(SessionKeyA.Num, SessionKeyB.Num,
+    MinUnitAssert(AreVectorsEqual(SessionKeyA.Num, SessionKeyB.Num,
                                sizeof(u64)*NIST_RFC_3526_PRIME_1536.SizeWords),
                   "SessionKey mismatch in TestMitmKeyFixingAttack!");
 
@@ -46,7 +46,7 @@ internal MIN_UNIT_TEST_FUNC(TestMitmKeyFixingAttack)
 
     AesCbcDecrypt(Message, GlobalExchangeBuffer, STR_LEN(DH_MITM_TEST_MSG_A), SessionSymmetricKey, IvA);
 
-    MinUnitAssert(VectorsEqual(Message, (u8 *)DH_MITM_TEST_MSG_A, STR_LEN(DH_MITM_TEST_MSG_A)),
+    MinUnitAssert(AreVectorsEqual(Message, (u8 *)DH_MITM_TEST_MSG_A, STR_LEN(DH_MITM_TEST_MSG_A)),
                   "Message mismatch in TestMitmKeyFixingAttack!");
 
     // M -> B/A (sends fake p)
@@ -60,7 +60,7 @@ internal MIN_UNIT_TEST_FUNC(TestMitmKeyFixingAttack)
     u8 EveGuessedSymmetricKey[SHA_1_HASH_LENGTH_BYTES];
     Sha1(EveGuessedSymmetricKey, (u8 *)"", 0);
 
-    MinUnitAssert(VectorsEqual(EveGuessedSymmetricKey, SessionSymmetricKey, SHA_1_HASH_LENGTH_BYTES),
+    MinUnitAssert(AreVectorsEqual(EveGuessedSymmetricKey, SessionSymmetricKey, SHA_1_HASH_LENGTH_BYTES),
                   "Guessed symmetric-key mismatch in TestMitmKeyFixingAttack!");
 }
 

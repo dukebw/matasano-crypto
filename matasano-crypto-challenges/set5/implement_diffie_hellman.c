@@ -222,8 +222,8 @@ internal MIN_UNIT_TEST_FUNC(TestBigNumAdd)
 
     MinUnitAssert(GlobalScratchBigNumA.SizeWords == TEST_BIGNUM_0_SUM.SizeWords,
                   "SizeWords incorrect in TestBigNumAdd!\n");
-    MinUnitAssert(VectorsEqual(GlobalScratchBigNumA.Num, (void *)TEST_BIGNUM_0_SUM.Num,
-                               sizeof(u64)*TEST_BIGNUM_0_SUM.SizeWords),
+    MinUnitAssert(AreVectorsEqual(GlobalScratchBigNumA.Num, (void *)TEST_BIGNUM_0_SUM.Num,
+                                  sizeof(u64)*TEST_BIGNUM_0_SUM.SizeWords),
                   "Expected/actual mismatch in TestBigNumAdd!\n");
 }
 
@@ -233,8 +233,8 @@ internal MIN_UNIT_TEST_FUNC(TestBigNumSubtract)
 
     MinUnitAssert(GlobalScratchBigNumA.SizeWords == TEST_BIGNUM_2_DIFFERENCE.SizeWords,
                   "SizeWords incorrect in TestBigNumAdd!\n");
-    MinUnitAssert(VectorsEqual(GlobalScratchBigNumA.Num, (void *)TEST_BIGNUM_2_DIFFERENCE.Num,
-                               sizeof(u64)*TEST_BIGNUM_2_DIFFERENCE.SizeWords),
+    MinUnitAssert(AreVectorsEqual(GlobalScratchBigNumA.Num, (void *)TEST_BIGNUM_2_DIFFERENCE.Num,
+                                  sizeof(u64)*TEST_BIGNUM_2_DIFFERENCE.SizeWords),
                   "Expected/actual mismatch in TestBigNumAdd!\n");
 
     BigNumSubtract(&GlobalScratchBigNumA, &GlobalScratchBigNumA, &GlobalScratchBigNumA);
@@ -250,8 +250,8 @@ internal MIN_UNIT_TEST_FUNC(TestBigNumAddModN)
 
     MinUnitAssert(GlobalScratchBigNumA.SizeWords == TEST_BIGNUM_2_SUM_MOD_P.SizeWords,
                   "SizeWords incorrect in TestBigNumAddModN!\n");
-    MinUnitAssert(VectorsEqual(GlobalScratchBigNumA.Num, (void *)TEST_BIGNUM_2_SUM_MOD_P.Num,
-                               sizeof(u64)*TEST_BIGNUM_2_SUM_MOD_P.SizeWords),
+    MinUnitAssert(AreVectorsEqual(GlobalScratchBigNumA.Num, (void *)TEST_BIGNUM_2_SUM_MOD_P.Num,
+                                  sizeof(u64)*TEST_BIGNUM_2_SUM_MOD_P.SizeWords),
                   "Expected/actual mismatch in TestBigNumAddModN!\n");
 }
 
@@ -260,8 +260,8 @@ internal MIN_UNIT_TEST_FUNC(TestBigNumMultiply)
     BigNumMultiplyOperandScanning(&GlobalScratchBigNumA,
                                   (bignum *)&TEST_BIGNUM_2_LEFT, (bignum *)&TEST_BIGNUM_2_RIGHT);
 
-    MinUnitAssert(VectorsEqual(GlobalScratchBigNumA.Num, (void *)TEST_BIGNUM_2_PRODUCT.Num,
-                               sizeof(u64)*TEST_BIGNUM_2_PRODUCT.SizeWords),
+    MinUnitAssert(AreVectorsEqual(GlobalScratchBigNumA.Num, (void *)TEST_BIGNUM_2_PRODUCT.Num,
+                                  sizeof(u64)*TEST_BIGNUM_2_PRODUCT.SizeWords),
                   "Expected/actual mismatch in TestBigNumMultiply!\n");
 }
 
@@ -301,23 +301,23 @@ internal MIN_UNIT_TEST_FUNC(TestMontInner)
     MultiplyByRModP(&XTimesRModP, (bignum *)&TEST_BIGNUM_2_LEFT, (bignum *)&NIST_RFC_3526_PRIME_1536,
                     MAX_BIGNUM_SIZE_BITS);
 
-    MinUnitAssert(VectorsEqual(&XTimesRModP, (bignum *)&TEST_BIGNUM_2_XR_MOD_P,
-                               TEST_BIGNUM_2_XR_MOD_P.SizeWords),
-                               "X*R mod P mismatch in TestMontInner!\n");
+    MinUnitAssert(AreVectorsEqual(&XTimesRModP, (bignum *)&TEST_BIGNUM_2_XR_MOD_P,
+                                  TEST_BIGNUM_2_XR_MOD_P.SizeWords),
+                  "X*R mod P mismatch in TestMontInner!\n");
 
     MultiplyByRModP(&YTimesRModP, (bignum *)&TEST_BIGNUM_2_RIGHT, (bignum *)&NIST_RFC_3526_PRIME_1536,
                     MAX_BIGNUM_SIZE_BITS);
 
-    MinUnitAssert(VectorsEqual(&YTimesRModP, (bignum *)&TEST_BIGNUM_2_YR_MOD_P,
-                               TEST_BIGNUM_2_YR_MOD_P.SizeWords),
-                               "Y*R mod P mismatch in TestMontInner!\n");
+    MinUnitAssert(AreVectorsEqual(&YTimesRModP, (bignum *)&TEST_BIGNUM_2_YR_MOD_P,
+                                  TEST_BIGNUM_2_YR_MOD_P.SizeWords),
+                  "Y*R mod P mismatch in TestMontInner!\n");
 
     FindMinusNInverseModR(&MinusPInverseModR, (bignum *)&NIST_RFC_3526_PRIME_1536, MAX_BIGNUM_SIZE_BITS);
 
     MontInner(&Output, &XTimesRModP, &YTimesRModP, (bignum *)&NIST_RFC_3526_PRIME_1536, &MinusPInverseModR, MAX_BIGNUM_SIZE_BITS);
 
-    MinUnitAssert(VectorsEqual(Output.Num, (void *)TEST_BIGNUM_2_XYR_MOD_P.Num,
-                               TEST_BIGNUM_2_XYR_MOD_P.SizeWords),
+    MinUnitAssert(AreVectorsEqual(Output.Num, (void *)TEST_BIGNUM_2_XYR_MOD_P.Num,
+                                  TEST_BIGNUM_2_XYR_MOD_P.SizeWords),
                   "Expected/actual mismatch after MontInner in TestMontInner!\n");
 }
 
@@ -326,8 +326,8 @@ internal MIN_UNIT_TEST_FUNC(TestMontModExp)
     MontModExpRBigNumMax(&GlobalScratchBigNumA, (bignum *)&TEST_BIGNUM_2_LEFT, (bignum *)&TEST_BIGNUM_2_RIGHT,
                          (bignum *)&NIST_RFC_3526_PRIME_1536);
 
-    MinUnitAssert(VectorsEqual(GlobalScratchBigNumA.Num, (void *)TEST_BIGNUM_2_POWER_MOD_P.Num,
-                               sizeof(u64)*TEST_BIGNUM_2_POWER_MOD_P.SizeWords),
+    MinUnitAssert(AreVectorsEqual(GlobalScratchBigNumA.Num, (void *)TEST_BIGNUM_2_POWER_MOD_P.Num,
+                                  sizeof(u64)*TEST_BIGNUM_2_POWER_MOD_P.SizeWords),
                   "Expected/actual mismatch in TestMontModExp!\n");
 }
 
@@ -352,7 +352,7 @@ internal MIN_UNIT_TEST_FUNC(TestDiffieHellmanBigNum)
     bignum SessionKeyB;
     MontModExpRBigNumMax(&SessionKeyB, &GPowerAModP, &GlobalScratchBigNumB, (bignum *)&NIST_RFC_3526_PRIME_1536);
 
-    MinUnitAssert(VectorsEqual(SessionKeyA.Num, SessionKeyB.Num, sizeof(u64)*NIST_RFC_3526_PRIME_1536.SizeWords),
+    MinUnitAssert(AreVectorsEqual(SessionKeyA.Num, SessionKeyB.Num, sizeof(u64)*NIST_RFC_3526_PRIME_1536.SizeWords),
                   "Mismatch in TestDiffieHellmanBigNum!\n");
 }
 
