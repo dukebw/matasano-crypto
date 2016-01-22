@@ -299,7 +299,6 @@ internal MIN_UNIT_TEST_FUNC(TestImplementSrpTestVec)
     // BigNumScratch := k * g^x
     BigNumMultiplyOperandScanning(&BigNumScratch, &LittleKBigNum, &BigNumScratch);
 
-    // TODO(bwd): debug seg-fault (A where ALengthWords == 0)
     // Reduce k*g^x mod P to satisfy BigNumSubtract function
     bignum MinusPInverseModR;
     FindMinusNInverseModR(&MinusPInverseModR, (bignum *)&RFC_5054_NIST_PRIME_1024, MAX_BIGNUM_SIZE_BITS);
@@ -309,6 +308,7 @@ internal MIN_UNIT_TEST_FUNC(TestImplementSrpTestVec)
 
     MultiplyByRModP(&BigNumScratch, &BigNumScratch, (bignum *)&RFC_5054_NIST_PRIME_1024, MAX_BIGNUM_SIZE_BITS);
 
+    // TODO(bwd): Write Subtract Mod P to deal with case where X < Y in X - Y (X, Y in [0, P))
     // BigNumScratch := (B - (k * g^x))
     BigNumSubtract(&BigNumScratch, (bignum *)&RFC_5054_TEST_BIG_B, &BigNumScratch);
 
@@ -323,7 +323,10 @@ internal MIN_UNIT_TEST_FUNC(TestImplementSrpTestVec)
     BigNumAdd(&BigNumScratchExponent, (bignum *)&RFC_5054_TEST_LITTLE_A, &BigNumScratchExponent);
 
     // BigNumScratch := <premaster secret>
-    MontModExpRBigNumMax(&BigNumScratch, &BigNumScratch, &BigNumScratchExponent, (bignum *)&RFC_5054_NIST_PRIME_1024);
+    MontModExpRBigNumMax(&BigNumScratch,
+                         &BigNumScratch,
+                         &BigNumScratchExponent,
+                         (bignum *)&RFC_5054_NIST_PRIME_1024);
 
     MinUnitAssert(AreVectorsEqual(BigNumScratch.Num,
                                   (void *)RFC_5054_TEST_PREMASTER_SECRET.Num,
