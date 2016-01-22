@@ -1088,6 +1088,16 @@ BigNumSubtract(bignum *AMinusB, bignum *A, bignum *B)
 }
 
 internal void
+BigNumSubtractModP(bignum *AMinusBModP, bignum *AModP, bignum *BModP, bignum *P)
+{
+    Stopif((AMinusBModP == 0) || (AModP == 0) || (BModP == 0) || (P == 0),
+           "Null input to BigNumSubtractModP!");
+
+    Stopif(IsAGreaterThanOrEqualToB(AModP, P) || IsAGreaterThanOrEqualToB(BModP, P),
+           "Inputs to BigNumSubtractModP must be in [0, P)!");
+}
+
+internal void
 GenRandBigNumModNUnchecked(bignum *A, bignum *N)
 {
     GenRandUnchecked((u32 *)A->Num, 2*N->SizeWords);
@@ -1371,6 +1381,8 @@ GetZRInverseModP(bignum *Output, u64 *InputZ, u32 ZLengthDWords,
            (MinusPInverseModR == 0),
            "Null input to GetZRInverseModP!\n");
 
+    bignum LocalOutput;
+
     // c := (z + (z*p' mod R)*p)/R
 
     // Output := (z*p' mod R)
@@ -1385,20 +1397,21 @@ GetZRInverseModP(bignum *Output, u64 *InputZ, u32 ZLengthDWords,
         MaxDWordsModR = RPowerOf2/BITS_IN_DWORD;
     }
 
-    Output->SizeWords = MultiplyOperandScanningUnchecked(Output->Num, MaxDWordsModR,
-                                                         InputZ, ZLengthDWords,
-                                                         MinusPInverseModR->Num, MinusPInverseModR->SizeWords);
+    LocalOutput.SizeWords =
+        MultiplyOperandScanningUnchecked(LocalOutput.Num, MaxDWordsModR,
+                                         InputZ, ZLengthDWords,
+                                         MinusPInverseModR->Num, MinusPInverseModR->SizeWords);
 
     u64 RBitmaskMod2Pow64 = BITMASK_MOD_DWORD(RPowerOf2);
     if (RBitmaskMod2Pow64)
     {
-        Output->Num[Output->SizeWords - 1] &= RBitmaskMod2Pow64;
+        LocalOutput.Num[LocalOutput.SizeWords - 1] &= RBitmaskMod2Pow64;
     }
 
     // PTimesZPModR := (z*p' mod R)*p 
     u64 PTimesZPModR[2*MAX_BIGNUM_SIZE_WORDS];
     u32 PZModRLengthDWords = MultiplyOperandScanningUnchecked(PTimesZPModR, ARRAY_LENGTH(PTimesZPModR),
-                                                              Output->Num, Output->SizeWords,
+                                                              LocalOutput.Num, LocalOutput.SizeWords,
                                                               ModulusP->Num, ModulusP->SizeWords);
 
     // DoubleBignumScratch := (z + (z*p' mod R)*p)
@@ -1419,28 +1432,30 @@ GetZRInverseModP(bignum *Output, u64 *InputZ, u32 ZLengthDWords,
         TruncatedStartIndex = MaxDWordsModR;
     }
 
-    Output->SizeWords = NumeratorLength - TruncatedStartIndex;
-    memcpy(Output->Num, DoubleBignumScratch + TruncatedStartIndex, sizeof(u64)*Output->SizeWords);
+    LocalOutput.SizeWords = NumeratorLength - TruncatedStartIndex;
+    memcpy(LocalOutput.Num, DoubleBignumScratch + TruncatedStartIndex, sizeof(u64)*LocalOutput.SizeWords);
 
-    Stopif(Output->Num[Output->SizeWords - 1] == 0, "Invalid SizeWords in MontInner!\n");
+    Stopif(LocalOutput.Num[LocalOutput.SizeWords - 1] == 0, "Invalid SizeWords in MontInner!\n");
 
     if (RPowerOf2ModDWord)
     {
         for (u32 OutputIndex = 0;
-             OutputIndex < Output->SizeWords;
+             OutputIndex < LocalOutput.SizeWords;
              ++OutputIndex)
         {
-            Output->Num[OutputIndex] >>= RPowerOf2ModDWord;
+            LocalOutput.Num[OutputIndex] >>= RPowerOf2ModDWord;
         }
     }
 
-    AdjustSizeWordsDownUnchecked(Output);
+    AdjustSizeWordsDownUnchecked(&LocalOutput);
 
     // if c >= p then c := c - p
-    if (IsAGreaterThanOrEqualToB(Output, ModulusP))
+    if (IsAGreaterThanOrEqualToB(&LocalOutput, ModulusP))
     {
-        BigNumSubtract(Output, Output, ModulusP);
+        BigNumSubtract(&LocalOutput, &LocalOutput, ModulusP);
     }
+
+    memcpy(Output, &LocalOutput, sizeof(LocalOutput));
 }
 
 internal void
