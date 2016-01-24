@@ -1,14 +1,6 @@
 #include "crypt_helper.h"
 
-typedef struct sockaddr_in sockaddr_in;
-typedef struct sockaddr sockaddr;
-typedef struct timespec timespec;
-
 #define PRINT_ELAPSED_TIME 1
-
-#define PORT 8181
-// TODO(bwd): Connection issues?
-#define IP_ADDRESS "192.168.11.42"
 
 #if 1
 char GlobalCommand[] = "test?file=index.html&signature=553536586117154dacd49d664e5d63fdc88efb51";
@@ -50,20 +42,6 @@ internal MIN_UNIT_TEST_FUNC(TestHmacSha1)
 	MinUnitAssert(AreVectorsEqual(HmacScratch, (u8 *)HMAC_SHA_1_EXPECTED_HASH_0,
                                sizeof(HMAC_SHA_1_EXPECTED_HASH_0)),
 				  "Expected HMAC mismatch in TestBreakHmacSha1TimingLeak!");
-}
-
-internal void
-OpenSocketAndConnect(i32 *SocketFileDescriptor, sockaddr_in *ServerSocketAddr)
-{
-    i32 Status;
-
-    Stopif((SocketFileDescriptor == 0) || (ServerSocketAddr == 0), "Null input to OpenSocketConnectAndWrite!");
-
-    *SocketFileDescriptor = socket(AF_INET, SOCK_STREAM, 0);
-    Stopif(*SocketFileDescriptor < 0, "Error from socket() call in TestBreakHmacSha1TimingLeak");
-
-    Status = connect(*SocketFileDescriptor, (sockaddr *)ServerSocketAddr, sizeof(*ServerSocketAddr));
-    Stopif(Status < 0, "Error from connect() call in TestBreakHmacSha1TimingLeak");
 }
 
 internal u32

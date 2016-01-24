@@ -18,8 +18,6 @@
 #define FORBIDDEN 403
 #define NOTFOUND  404
 
-typedef struct timespec timespec;
-
 struct {
 	char *ext;
 	char *filetype;
@@ -248,9 +246,30 @@ void web(int fd, int hit)
 
 		write(fd, DebugBuffer, HMAC_RET_CODE_LENGTH_BYTES);
 	}
+	else if (strncmp(buffer, TEST_SRP_PREFIX, STR_LEN(TEST_SRP_PREFIX)) == 0)
+    {
+        if ((strncmp(buffer + STR_LEN(TEST_SRP_PREFIX), USER_PREFIX, STR_LEN(USER_PREFIX)) == 0) &&
+            (strncmp(buffer + STR_LEN(TEST_SRP_PREFIX) + STR_LEN(USER_PREFIX),
+                     SRP_TEST_VEC_EMAIL,
+                     STR_LEN(USER_PREFIX)) == 0))
+        {
+            u8 SendBuffer[4*sizeof(bignum)];
+
+            BigNumCopyUnchecked((bignum *)SendBuffer, bignum *Source);
+            BigNumCopyUnchecked();
+            BigNumCopyUnchecked();
+            BigNumCopyUnchecked();
+
+            write(fd, SendBuffer, sizeof(SendBuffer));
+        }
+        else
+        {
+            logger(ERROR, "Unsupported second argument in SRP command!", buffer, fd);
+        }
+    }
 	else
 	{
-		logger(FORBIDDEN,"Only simple GET operation, and test HMAC verification supported",buffer,fd);
+		logger(FORBIDDEN,"Only simple GET operation, test HMAC verification, and test SRP supported",buffer,fd);
 	}
 	sleep(1);	/* allow socket to drain before signalling the socket is closed */
 	close(fd);
