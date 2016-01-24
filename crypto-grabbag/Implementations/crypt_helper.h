@@ -773,12 +773,40 @@ Sha1KeyedMac(u8 *KeyedMac, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLengt
 #define HMAC_RET_CODE_INVALID 500
 #define HMAC_RET_CODE_LENGTH_BYTES 4
 
+#define PORT 8181
+#define IP_ADDRESS "192.168.11.42"
+
+#define TEST_USER_CMD_LENGTH (STR_LEN(TEST_SRP_PREFIX) + STR_LEN(USER_PREFIX) + STR_LEN(SRP_TEST_VEC_EMAIL) + 1)
+
+typedef struct sockaddr_in sockaddr_in;
+typedef struct sockaddr sockaddr;
+typedef struct timespec timespec;
+
+const char SRP_TEST_VEC_EMAIL[] = "alice";
+const char SRP_TEST_VEC_PASSWORD[] = "password123";
+
 const char HMAC_VALID_STRING[] = "200";
 const char HMAC_INVALID_STRING[] = "500";
 
 const char TEST_HMAC_PREFIX[] = "test?";
+const char TEST_SRP_PREFIX[] = "srp?";
 const char FILE_PREFIX[] = "file=";
 const char SIG_PREFIX[] = "signature=";
+const char USER_PREFIX[] = "user=";
+
+internal void
+OpenSocketAndConnect(i32 *SocketFileDescriptor, sockaddr_in *ServerSocketAddr)
+{
+    i32 Status;
+
+    Stopif((SocketFileDescriptor == 0) || (ServerSocketAddr == 0), "Null input to OpenSocketAndConnect!\n");
+
+    *SocketFileDescriptor = socket(AF_INET, SOCK_STREAM, 0);
+    Stopif(*SocketFileDescriptor < 0, "Error from socket() call in OpenSocketAndConnect!\n");
+
+    Status = connect(*SocketFileDescriptor, (sockaddr *)ServerSocketAddr, sizeof(*ServerSocketAddr));
+    Stopif(Status < 0, "Error from connect() call in OpenSocketAndConnect!\n");
+}
 
 internal void
 HmacSha1(u8 *Hmac, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength)
@@ -863,6 +891,43 @@ const bignum NIST_RFC_3526_GEN_BIGNUM =
     },
     .SizeWords = 1
 };
+
+const bignum NIST_RFC_5054_GEN_BIGNUM =
+{
+    .Num =
+    {
+        NIST_RFC_5054_GEN
+    },
+    .SizeWords = 1
+};
+
+const bignum RFC_5054_NIST_PRIME_1024 =
+{
+    .Num =
+    {
+        0x9FC61D2FC0EB06E3, 0xFD5138FE8376435B, 0x2FD4CBF4976EAA9A, 0x68EDBC3C05726CC0, 0xC529F566660E57EC,
+        0x82559B297BCF1885, 0xCE8EF4AD69B15D49, 0x5DC7D7B46154D6B6, 0x8E495C1D6089DAD1, 0xE0D5D8E250B98BE4,
+        0x383B4813D692C6E0, 0xD674DF7496EA81D3, 0x9EA2314C9C256576, 0x6072618775FF3C0B, 0x9C33F80AFA8FC5E8,
+        0xEEAF0AB9ADB38DD6, 
+    },
+    .SizeWords = 16
+};
+
+const bignum RFC_5054_TEST_SALT =
+{
+    .Num =
+    {
+        0xB5A727673A2441EE, 0xBEB25379D1A8581E, 
+    },
+    .SizeWords = 2
+};
+
+internal inline void
+BigNumCopyUnchecked(bignum *Dest, bignum *Source)
+{
+    Dest->SizeWords = Source->SizeWords;
+    memcpy(Dest->Num, Source->Num, Source->SizeWords*sizeof(Source->Num[0]));
+}
 
 internal inline u64
 CheckForCarry(u64 Sum, u64 AdditionOperand)
@@ -1007,12 +1072,16 @@ BigNumAdd(bignum *SumAB, bignum *A, bignum *B)
 {
     Stopif((SumAB == 0) || (A == 0) || (B == 0), "Null input to BigNumAdd!\n");
 
-    SumAB->SizeWords = MAX_BIGNUM_SIZE_WORDS;
-    u32 Carry = MultiPrecisionAdd(SumAB->Num, &SumAB->SizeWords,
+    bignum LocalSumAB;
+    LocalSumAB.SizeWords = MAX_BIGNUM_SIZE_WORDS;
+
+    u32 Carry = MultiPrecisionAdd(LocalSumAB.Num, &LocalSumAB.SizeWords,
                                   A->Num, A->SizeWords,
                                   B->Num, B->SizeWords);
 
-    AdjustSizeWordsDownUnchecked(SumAB);
+    AdjustSizeWordsDownUnchecked(&LocalSumAB);
+
+    BigNumCopyUnchecked(SumAB, &LocalSumAB);
 
     return Carry;
 }
@@ -1095,6 +1164,19 @@ BigNumSubtractModP(bignum *AMinusBModP, bignum *AModP, bignum *BModP, bignum *P)
 
     Stopif(IsAGreaterThanOrEqualToB(AModP, P) || IsAGreaterThanOrEqualToB(BModP, P),
            "Inputs to BigNumSubtractModP must be in [0, P)!");
+
+    if (IsAGreaterThanB(BModP, AModP))
+    {
+        bignum LocalAPlusP;
+        BigNumAdd(&LocalAPlusP, AModP, P);
+
+        BigNumSubtract(AMinusBModP, &LocalAPlusP, BModP);
+    }
+    else
+    {
+        BigNumSubtract(AMinusBModP, AModP, BModP);
+    }
+
 }
 
 internal void
@@ -1151,13 +1233,6 @@ ByteSwap(u8 *Buffer, u32 Length)
 		Buffer[Length - 1 - BufferIndex] = Buffer[BufferIndex];
 		Buffer[BufferIndex] = Temp;
 	}
-}
-
-internal inline void
-BigNumCopyUnchecked(bignum *Dest, bignum *Source)
-{
-    Dest->SizeWords = Source->SizeWords;
-    memcpy(Dest->Num, Source->Num, Source->SizeWords*sizeof(Source->Num[0]));
 }
 
 internal u32
@@ -1459,6 +1534,48 @@ GetZRInverseModP(bignum *Output, u64 *InputZ, u32 ZLengthDWords,
 }
 
 internal void
+FindMinusNInverseModR(bignum *MinusPInverseModR, bignum *ModulusP, u32 RPowerOf2)
+{
+    Stopif(RPowerOf2 % BITS_IN_DWORD, "Non-DWord aligned R not supported in FindMinusNInverseModR!\n");
+
+    FindNInverseModR(MinusPInverseModR, ModulusP, RPowerOf2);
+
+    u32 Borrow = 0;
+
+    // TODO(bwd): SizeWords -> R size in DWords
+    for (u32 MinusNInvIndex = 0;
+         MinusNInvIndex < MinusPInverseModR->SizeWords;
+         ++MinusNInvIndex)
+    {
+        MinusPInverseModR->Num[MinusNInvIndex] = -MinusPInverseModR->Num[MinusNInvIndex] - Borrow;
+
+        Borrow = CheckForBorrow(MinusPInverseModR->Num[MinusNInvIndex], 0);
+    }
+}
+
+internal void
+BigNumMultiplyModP(bignum *ProductABModP, bignum *A, bignum *B, bignum *P)
+{
+    Stopif((ProductABModP == 0) || (A == 0) || (B == 0)|| (P == 0), "Null InputX to BigNumMultiplyModP!\n");
+
+    bignum LocalProductABModP;
+    BigNumMultiplyOperandScanning(&LocalProductABModP, A, B);
+
+    // Reduce k*g^x mod P to satisfy BigNumSubtract function
+    bignum MinusPInverseModR;
+    FindMinusNInverseModR(&MinusPInverseModR, P, MAX_BIGNUM_SIZE_BITS);
+
+    GetZRInverseModP(&LocalProductABModP,
+                     LocalProductABModP.Num,
+                     LocalProductABModP.SizeWords,
+                     P,
+                     &MinusPInverseModR,
+                     MAX_BIGNUM_SIZE_BITS);
+
+    MultiplyByRModP(ProductABModP, &LocalProductABModP, P, MAX_BIGNUM_SIZE_BITS);
+}
+
+internal void
 MontInner(bignum *Output, bignum *XTimesRModP, bignum *YTimesRModP, bignum *ModulusP,
           bignum *MinusPInverseModR, u32 RPowerOf2)
 {
@@ -1479,26 +1596,6 @@ MontInner(bignum *Output, bignum *XTimesRModP, bignum *YTimesRModP, bignum *Modu
                                                          YTimesRModP->Num, YTimesRModP->SizeWords);
 
     GetZRInverseModP(Output, DoubleBignumScratch, ZLengthDWords, ModulusP, MinusPInverseModR, RPowerOf2);
-}
-
-internal void
-FindMinusNInverseModR(bignum *MinusPInverseModR, bignum *ModulusP, u32 RPowerOf2)
-{
-    Stopif(RPowerOf2 % BITS_IN_DWORD, "Non-DWord aligned R not supported in FindMinusNInverseModR!\n");
-
-    FindNInverseModR(MinusPInverseModR, ModulusP, RPowerOf2);
-
-    u32 Borrow = 0;
-
-    // TODO(bwd): SizeWords -> R size in DWords
-    for (u32 MinusNInvIndex = 0;
-         MinusNInvIndex < MinusPInverseModR->SizeWords;
-         ++MinusNInvIndex)
-    {
-        MinusPInverseModR->Num[MinusNInvIndex] = -MinusPInverseModR->Num[MinusNInvIndex] - Borrow;
-
-        Borrow = CheckForBorrow(MinusPInverseModR->Num[MinusNInvIndex], 0);
-    }
 }
 
 internal void
