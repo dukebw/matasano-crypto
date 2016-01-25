@@ -255,10 +255,10 @@ void web(int fd, int hit)
         {
             u8 SendBuffer[4*sizeof(bignum)];
 
-            BigNumCopyUnchecked((bignum *)SendBuffer, bignum *Source);
-            BigNumCopyUnchecked();
-            BigNumCopyUnchecked();
-            BigNumCopyUnchecked();
+            BigNumCopyUnchecked((bignum *)SendBuffer, (bignum *)&RFC_5054_NIST_PRIME_1024);
+            BigNumCopyUnchecked((bignum *)SendBuffer + 1, (bignum *)&NIST_RFC_5054_GEN_BIGNUM);
+            BigNumCopyUnchecked((bignum *)SendBuffer + 2, (bignum *)&RFC_5054_TEST_SALT);
+            BigNumCopyUnchecked((bignum *)SendBuffer + 3, (bignum *)&RFC_5054_TEST_BIG_B);
 
             write(fd, SendBuffer, sizeof(SendBuffer));
         }

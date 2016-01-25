@@ -2,20 +2,11 @@
 
 // Source for RFC 5054: https://tools.ietf.org/html/rfc5054
 
-#define NIST_RFC_5054_GEN 2
 #define GLOBAL_COMMAND_MAX_SIZE 128
 
 char GlobalCommand[GLOBAL_COMMAND_MAX_SIZE] = "srp?";
 
 CASSERT(sizeof(GlobalCommand) >= TEST_USER_CMD_LENGTH, implement_srp_c);
-
-internal inline u32
-BigNumSizeBytesUnchecked(bignum *BigNum)
-{
-    u32 Result = BigNum->SizeWords*sizeof(BigNum->Num[0]);
-
-    return Result;
-}
 
 const bignum RFC_5054_NIST_PRIME_1536 =
 {
@@ -28,99 +19,6 @@ const bignum RFC_5054_NIST_PRIME_1536 =
         0xBEEEA9614B19CC4D, 0xDBA51DF499AC4C80, 0xB1F12A8617A47BBB, 0x9DEF3CAFB939277A,
     },
     .SizeWords = 24
-};
-
-const bignum RFC_5054_TEST_K =
-{
-    .Num =
-    {
-        0x665C3E818913186F, 0x5AEF2CDD07ABAF0F, 0x7556AA04, 
-    },
-    .SizeWords = 3
-};
-
-const bignum RFC_5054_TEST_X =
-{
-    .Num =
-    {
-        0x93DB6CF84D16C124, 0xABE9127CC58CCF49, 0x94B7555A, 
-    },
-    .SizeWords = 3
-};
-
-const bignum RFC_5054_TEST_V =
-{
-    .Num =
-    {
-        0xDB2BE315E2099AFB, 0xE955A5E29E7AB245, 0x33B564E26480D78, 0xE058AD51CC72BFC9, 0x1AFF87B2B9DA6E04,
-        0x52E08AB5EA53D15C, 0xBBF4CEBFBB1681, 0x48CF1970B4FB6F84, 0xC671085A1447B52A, 0xF105B4787E5186F5,
-        0xE379BA4729FDC59, 0x822223CA1A605B53, 0x9886D8129BADA1F1, 0xB0DDE1569E8FA00A, 0x4E337D05B4B375BE,
-        0x7E273DE8696FFC4F, 
-    },
-    .SizeWords = 16
-};
-
-const bignum RFC_5054_TEST_LITTLE_A =
-{
-    .Num =
-    {
-        0xAFD529DDDA2D4393, 0xC81EDC04E2762A56, 0x1989806F0407210B, 0x60975527035CF2AD, 
-    },
-    .SizeWords = 4
-};
-
-const bignum RFC_5054_TEST_LITTLE_B =
-{
-    .Num =
-    {
-        0x9E61F5D105284D20, 0x1DDA08E974A004F4, 0x471E81F00F6928E0, 0xE487CB59D31AC550, 
-    },
-    .SizeWords = 4
-};
-
-const bignum RFC_5054_TEST_BIG_A =
-{
-    .Num =
-    {
-        0x72FAC47B0769447B, 0xB349EF5D76988A36, 0x58F0EDFDFE15EFEA, 0xEEF54073CA11CF58, 0x6530E69F66615261,
-        0xE1327F44BE087EF0, 0x71E1E8B9AF6D9C03, 0x42BA92AEACED8251, 0x8E39356179EAE45E, 0xBFCF99F921530EC,
-        0x2D1A5358A2CF1B6E, 0x3211C04692272D8B, 0x72557EC44352E890, 0xD0E560F0C64115BB, 0x47B0704C436F523D,
-        0x61D5E490F6F1B795, 
-    },
-    .SizeWords = 16
-};
-
-const bignum RFC_5054_TEST_BIG_B =
-{
-    .Num =
-    {
-        0xA8E3FB004B117B58, 0xEB4012B7D7665238, 0x910440B1B27AAEAE, 0x30B331EB76840, 0x9C6059F388838E7A,
-        0x7BD4FBAA37089E6F, 0xD7D82C7F8DEB75CE, 0xD0C6DDB58B318885, 0x6C6DA04453728610, 0xB681CBF87837EC99,
-        0x5A981652236F99D9, 0xDC46A0670DD125B9, 0x5393011BAF38964, 0x4916A1E77AF46AE1, 0xB6D041FA01BB152D,
-        0xBD0C61512C692C0C, 
-    },
-    .SizeWords = 16
-};
-
-const bignum RFC_5054_TEST_U =
-{
-    .Num =
-    {
-        0x70A7AE5F462EF019, 0x3487DA98554ED47D, 0xCE38B959, 
-    },
-    .SizeWords = 3
-};
-
-const bignum RFC_5054_TEST_PREMASTER_SECRET =
-{
-    .Num =
-    {
-        0x8A469FFECA686E5A, 0xC346D7E474B29EDE, 0xBE5BEC4EC0A3212D, 0x3CD67FC88A2F39A4, 0x210DCC1F10EB3394,
-        0x2AFAFA8F3499B200, 0xBDCAF8A709585EB, 0xA172B4A2A5903A, 0x41BB59B6D5979B5C, 0x876E2D013800D6C,
-        0x9AE12B0A6F67809F, 0x59B48220F7C4693C, 0xF271A10D233861E3, 0x90A3381F63B387AA, 0xAE450C0287745E79,
-        0xB0DC82BABCF30674,
-    },
-    .SizeWords = 16
 };
 
 // TODO(bwd): generate salt as random integer (second test)
@@ -258,7 +156,7 @@ internal MIN_UNIT_TEST_FUNC(TestImplementSrpTestVec)
 
 
     // MessageScratch := SHA1(I | ":" | P)
-    u32 SaltLengthBytes = sizeof(u64)*RFC_5054_TEST_SALT.SizeWords;
+    u32 SaltLengthBytes = BigNumSizeBytesUnchecked((bignum *)&RFC_5054_TEST_SALT);
     u32 EmailPasswordMsgLengthBytes = STR_LEN(SRP_TEST_VEC_EMAIL) + 1 + STR_LEN(SRP_TEST_VEC_PASSWORD);
     u32 SaltConcatHashEmailPwdLengthBytes = SaltLengthBytes + SHA_1_HASH_LENGTH_BYTES;
     Stopif((SaltConcatHashEmailPwdLengthBytes > sizeof(MessageScratch)) ||
@@ -443,7 +341,17 @@ internal MIN_UNIT_TEST_FUNC(TestClientServerAuth)
     u32 ReadBytes = read(SocketFileDescriptor, ReceiveBuffer, sizeof(ReceiveBuffer));
     Stopif(ReadBytes == sizeof(ReceiveBuffer), "Received message too long in TestBreakHmacSha1TimingLeak!");
 
-    bignum N;
+    bignum ModulusN;
+    BigNumCopyUnchecked(&ModulusN, (bignum *)ReceiveBuffer);
+
+    bignum LittleG;
+    BigNumCopyUnchecked(&LittleG, (bignum *)ReceiveBuffer + 1);
+
+    bignum Salt;
+    BigNumCopyUnchecked(&Salt, (bignum *)ReceiveBuffer + 2);
+
+    bignum BigB;
+    BigNumCopyUnchecked(&BigB, (bignum *)ReceiveBuffer + 3);
 }
 
 internal MIN_UNIT_TEST_FUNC(AllTests)
