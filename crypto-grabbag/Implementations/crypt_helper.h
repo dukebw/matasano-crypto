@@ -774,7 +774,7 @@ Sha1KeyedMac(u8 *KeyedMac, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLengt
 #define HMAC_RET_CODE_LENGTH_BYTES 4
 
 #define PORT 8181
-#define IP_ADDRESS "192.168.11.42"
+#define IP_ADDRESS "192.168.1.15"
 
 #define TEST_USER_CMD_LENGTH (STR_LEN(TEST_SRP_PREFIX) + STR_LEN(USER_PREFIX) + STR_LEN(SRP_TEST_VEC_EMAIL) + 1)
 
