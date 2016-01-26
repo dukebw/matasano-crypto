@@ -253,14 +253,20 @@ void web(int fd, int hit)
                      SRP_TEST_VEC_EMAIL,
                      STR_LEN(USER_PREFIX)) == 0))
         {
-            u8 SendBuffer[4*sizeof(bignum)];
+            u8 ServerSendRcvBuffer[4*sizeof(bignum)];
 
-            BigNumCopyUnchecked((bignum *)SendBuffer, (bignum *)&RFC_5054_NIST_PRIME_1024);
-            BigNumCopyUnchecked((bignum *)SendBuffer + 1, (bignum *)&NIST_RFC_5054_GEN_BIGNUM);
-            BigNumCopyUnchecked((bignum *)SendBuffer + 2, (bignum *)&RFC_5054_TEST_SALT);
-            BigNumCopyUnchecked((bignum *)SendBuffer + 3, (bignum *)&RFC_5054_TEST_BIG_B);
+            BigNumCopyUnchecked((bignum *)ServerSendRcvBuffer, (bignum *)&RFC_5054_NIST_PRIME_1024);
+            BigNumCopyUnchecked((bignum *)ServerSendRcvBuffer + 1, (bignum *)&NIST_RFC_5054_GEN_BIGNUM);
+            BigNumCopyUnchecked((bignum *)ServerSendRcvBuffer + 2, (bignum *)&RFC_5054_TEST_SALT);
+            BigNumCopyUnchecked((bignum *)ServerSendRcvBuffer + 3, (bignum *)&RFC_5054_TEST_BIG_B);
 
-            write(fd, SendBuffer, sizeof(SendBuffer));
+            write(fd, ServerSendRcvBuffer, sizeof(ServerSendRcvBuffer));
+
+            u32 ReadBytes = read(fd, ServerSendRcvBuffer, sizeof(ServerSendRcvBuffer));
+            if (ReadBytes == sizeof(ServerSendRcvBuffer))
+            {
+                logger(ERROR, "Received message too long in nweb server!", buffer, fd);
+            }
         }
         else
         {

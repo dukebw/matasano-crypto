@@ -337,21 +337,37 @@ internal MIN_UNIT_TEST_FUNC(TestClientServerAuth)
 
     write(SocketFileDescriptor, GlobalCommand, TEST_USER_CMD_LENGTH);
 
-    u8 ReceiveBuffer[4*sizeof(bignum)];
-    u32 ReadBytes = read(SocketFileDescriptor, ReceiveBuffer, sizeof(ReceiveBuffer));
-    Stopif(ReadBytes == sizeof(ReceiveBuffer), "Received message too long in TestBreakHmacSha1TimingLeak!");
+    u8 ClientSendRecvBuffer[4*sizeof(bignum)];
+    u32 ReadBytes = read(SocketFileDescriptor, ClientSendRecvBuffer, sizeof(ClientSendRecvBuffer));
+    Stopif(ReadBytes != sizeof(ClientSendRecvBuffer),
+           "Invalid bytes read from (N, g, s ,B) in TestClientServerAuth!");
 
     bignum ModulusN;
-    BigNumCopyUnchecked(&ModulusN, (bignum *)ReceiveBuffer);
+    BigNumCopyUnchecked(&ModulusN, (bignum *)ClientSendRecvBuffer);
 
     bignum LittleG;
-    BigNumCopyUnchecked(&LittleG, (bignum *)ReceiveBuffer + 1);
+    BigNumCopyUnchecked(&LittleG, (bignum *)ClientSendRecvBuffer + 1);
 
     bignum Salt;
-    BigNumCopyUnchecked(&Salt, (bignum *)ReceiveBuffer + 2);
+    BigNumCopyUnchecked(&Salt, (bignum *)ClientSendRecvBuffer + 2);
 
     bignum BigB;
-    BigNumCopyUnchecked(&BigB, (bignum *)ReceiveBuffer + 3);
+    BigNumCopyUnchecked(&BigB, (bignum *)ClientSendRecvBuffer + 3);
+
+    BigNumCopyUnchecked((bignum *)ClientSendRecvBuffer, (bignum *)&RFC_5054_TEST_BIG_A);
+
+    write(SocketFileDescriptor, ClientSendRecvBuffer, STR_LEN(GlobalCommand));
+
+    // u := SHA1(PAD(A) | PAD(B))
+    u8 LittleU[SHA_1_HASH_LENGTH_BYTES];
+    u8 MessageScratch[2*TestModulusSizeBytes];
+    Sha1PaddedAConcatPaddedB(LittleU,
+                             MessageScratch,
+                             &BigA,
+                             (bignum *)&RFC_5054_TEST_BIG_B,
+                             BigNumSizeBytesUnchecked((bignum *)&RFC_5054_NIST_PRIME_1024));
+
+    // TODO(bwd): Rest of SRP alg. from Challenge 36
 }
 
 internal MIN_UNIT_TEST_FUNC(AllTests)
