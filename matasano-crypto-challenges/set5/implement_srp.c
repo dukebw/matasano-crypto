@@ -90,6 +90,43 @@ Sha1PaddedAConcatPaddedB(u8 *OutputHash, u8 *ScratchBuffer, bignum *A, bignum *B
     Sha1(OutputHash, ScratchBuffer, 2*PSizeBytes);
 }
 
+internal void
+SrpClientGetX(u8 *OutLittleX,
+              u8 *Salt,
+              u32 SaltLengthBytes,
+              u8 *MessageScratch,
+              u32 MessageScratchMaxSizeBytes,
+              u8 *UserName,
+              u32 UserLengthBytes,
+              u8 *Password,
+              u32 PasswordLengthBytes)
+{
+    Stopif((OutLittleX == 0) || (Salt == 0) || (MessageScratch == 0), "Null input to SrpClientGetX!\n");
+
+    u32 EmailPasswordMsgLengthBytes = UserLengthBytes + 1 + PasswordLengthBytes;
+    u32 SaltConcatHashEmailPwdLengthBytes = SaltLengthBytes + SHA_1_HASH_LENGTH_BYTES;
+    Stopif((SaltConcatHashEmailPwdLengthBytes > MessageScratchMaxSizeBytes) ||
+           (EmailPasswordMsgLengthBytes > MessageScratchMaxSizeBytes),
+           "MessageScratch buffer overflow in TestImplementSrpTestVec!\n");
+
+    memcpy(MessageScratch, UserName, UserLengthBytes);
+
+    MessageScratch[UserLengthBytes] = ':';
+
+    memcpy(MessageScratch + UserLengthBytes + 1,
+           Password,
+           PasswordLengthBytes);
+
+    Sha1(MessageScratch, MessageScratch, EmailPasswordMsgLengthBytes);
+
+    memmove(MessageScratch + SaltLengthBytes, MessageScratch, SHA_1_HASH_LENGTH_BYTES);
+
+    CopyByteSwappedUnchecked(MessageScratch, Salt, SaltLengthBytes);
+
+    // x := SHA1(s | SHA1(I | ":" | P))
+    Sha1(OutLittleX, MessageScratch, SaltConcatHashEmailPwdLengthBytes);
+}
+
 internal MIN_UNIT_TEST_FUNC(TestImplementSrpTestVec)
 {
     /*
@@ -154,32 +191,18 @@ internal MIN_UNIT_TEST_FUNC(TestImplementSrpTestVec)
     MinUnitAssert(AreVectorsEqualByteSwapped(LittleK, (u8 *)RFC_5054_TEST_K.Num, sizeof(LittleK)),
                   "Little k mismatch (Client) in TestImplementSrpTestVec!\n");
 
-
     // MessageScratch := SHA1(I | ":" | P)
-    u32 SaltLengthBytes = BigNumSizeBytesUnchecked((bignum *)&RFC_5054_TEST_SALT);
-    u32 EmailPasswordMsgLengthBytes = STR_LEN(SRP_TEST_VEC_EMAIL) + 1 + STR_LEN(SRP_TEST_VEC_PASSWORD);
-    u32 SaltConcatHashEmailPwdLengthBytes = SaltLengthBytes + SHA_1_HASH_LENGTH_BYTES;
-    Stopif((SaltConcatHashEmailPwdLengthBytes > sizeof(MessageScratch)) ||
-           (EmailPasswordMsgLengthBytes > sizeof(MessageScratch)),
-           "MessageScratch buffer overflow in TestImplementSrpTestVec!\n");
-
-    memcpy(MessageScratch, SRP_TEST_VEC_EMAIL, STR_LEN(SRP_TEST_VEC_EMAIL));
-
-    MessageScratch[STR_LEN(SRP_TEST_VEC_EMAIL)] = ':';
-
-    memcpy(MessageScratch + STR_LEN(SRP_TEST_VEC_EMAIL) + 1,
-           SRP_TEST_VEC_PASSWORD,
-           STR_LEN(SRP_TEST_VEC_PASSWORD));
-
-    Sha1(MessageScratch, MessageScratch, EmailPasswordMsgLengthBytes);
-
-    memmove(MessageScratch + SaltLengthBytes, MessageScratch, SHA_1_HASH_LENGTH_BYTES);
-
-    CopyByteSwappedUnchecked(MessageScratch, (u8 *)RFC_5054_TEST_SALT.Num, SaltLengthBytes);
-
-    // x := SHA1(s | SHA1(I | ":" | P))
     u8 LittleX[SHA_1_HASH_LENGTH_BYTES];
-    Sha1(LittleX, MessageScratch, SaltConcatHashEmailPwdLengthBytes);
+    u32 SaltLengthBytes = BigNumSizeBytesUnchecked((bignum *)&RFC_5054_TEST_SALT);
+    SrpClientGetX(LittleX,
+                  (u8 *)RFC_5054_TEST_SALT.Num,
+                  SaltLengthBytes,
+                  MessageScratch,
+                  sizeof(MessageScratch),
+                  (u8 *)SRP_TEST_VEC_EMAIL,
+                  STR_LEN(SRP_TEST_VEC_EMAIL),
+                  (u8 *)SRP_TEST_VEC_PASSWORD,
+                  STR_LEN(SRP_TEST_VEC_PASSWORD));
 
     MinUnitAssert(AreVectorsEqualByteSwapped(LittleX, (u8 *)RFC_5054_TEST_X.Num, sizeof(LittleX)),
                   "Little x mismatch (Client) in TestImplementSrpTestVec!\n");
@@ -360,6 +383,7 @@ internal MIN_UNIT_TEST_FUNC(TestClientServerAuth)
 
     // u := SHA1(PAD(A) | PAD(B))
     u8 LittleU[SHA_1_HASH_LENGTH_BYTES];
+    // TODO(bwd): fix ModulusSizeBytes + add SrpClientGetX() call + continue S->C/C->S HMAC-validation
     u8 MessageScratch[2*TestModulusSizeBytes];
     Sha1PaddedAConcatPaddedB(LittleU,
                              MessageScratch,
@@ -367,7 +391,9 @@ internal MIN_UNIT_TEST_FUNC(TestClientServerAuth)
                              (bignum *)&RFC_5054_TEST_BIG_B,
                              BigNumSizeBytesUnchecked((bignum *)&RFC_5054_NIST_PRIME_1024));
 
-    // TODO(bwd): Rest of SRP alg. from Challenge 36
+    // x := SHA1(s | SHA1(I | ":" | P))
+    u8 LittleX[SHA_1_HASH_LENGTH_BYTES];
+    Sha1(LittleX, MessageScratch, SaltConcatHashEmailPwdLengthBytes);
 }
 
 internal MIN_UNIT_TEST_FUNC(AllTests)
