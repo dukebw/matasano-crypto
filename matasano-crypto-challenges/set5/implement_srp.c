@@ -74,7 +74,7 @@ CopyPaddedToBigEndianUnchecked(u8 *OutPaddedBigEndian, bignum *Input, u32 PSizeB
     u32 PaddingBytes = (PSizeBytes - InputSizeBytes);
     memset(OutPaddedBigEndian, 0, PaddingBytes);
 
-    CopyByteSwappedUnchecked(OutPaddedBigEndian, (u8 *)Input->Num, PSizeBytes);
+    CopyByteSwappedUnchecked(OutPaddedBigEndian + PaddingBytes, (u8 *)Input->Num, InputSizeBytes);
 }
 
 internal void
@@ -125,6 +125,58 @@ SrpClientGetX(u8 *OutLittleX,
 
     // x := SHA1(s | SHA1(I | ":" | P))
     Sha1(OutLittleX, MessageScratch, SaltConcatHashEmailPwdLengthBytes);
+}
+
+internal void
+ClientGeneratePremasterSecret(bignum *OutputSecret,
+                              bignum *BigB,
+                              u8 *LittleK,
+                              bignum *Gen,
+                              u8 *LittleX,
+                              bignum *LittleA,
+                              u8 *LittleU,
+                              bignum *PrimeModulusN)
+{
+    Stopif((OutputSecret == 0) ||
+           (BigB == 0) ||
+           (LittleK == 0) ||
+           (Gen == 0) ||
+           (LittleX == 0) ||
+           (LittleA == 0) ||
+           (LittleU == 0) ||
+           (PrimeModulusN == 0),
+           "Null input to ClientGeneratePremasterSecret!\n");
+
+    bignum LittleXBigNum;
+    HashOutputToBigNumUnchecked(&LittleXBigNum, LittleX);
+
+    // OutputSecret := g^x
+    MontModExpRBigNumMax(OutputSecret, Gen, &LittleXBigNum, PrimeModulusN);
+
+    bignum LittleKBigNum;
+    HashOutputToBigNumUnchecked(&LittleKBigNum, LittleK);
+
+    Stopif((LittleKBigNum.SizeWords + OutputSecret->SizeWords + 1) > MAX_BIGNUM_SIZE_WORDS,
+           "Potential overflow on multiplying k*g^x in TestImplementSrpTestVec!\n");
+
+    // OutputSecret := k * g^x (mod N)
+    BigNumMultiplyModP(OutputSecret, &LittleKBigNum, OutputSecret, PrimeModulusN);
+
+    // OutputSecret := (B - (k * g^x))
+    BigNumSubtractModP(OutputSecret, BigB, OutputSecret, PrimeModulusN);
+
+    // BigNumScratchExponent := u * x
+    bignum LittleUBigNum;
+    HashOutputToBigNumUnchecked(&LittleUBigNum, LittleU);
+
+    bignum BigNumScratchExponent;
+    BigNumMultiplyOperandScanning(&BigNumScratchExponent, &LittleUBigNum, &LittleXBigNum);
+
+    // BigNumScratchExponent := a + (u * x)
+    BigNumAdd(&BigNumScratchExponent, LittleA, &BigNumScratchExponent);
+
+    // OutputSecret := <premaster secret>
+    MontModExpRBigNumMax(OutputSecret, OutputSecret, &BigNumScratchExponent, PrimeModulusN);
 }
 
 internal MIN_UNIT_TEST_FUNC(TestImplementSrpTestVec)
@@ -208,46 +260,15 @@ internal MIN_UNIT_TEST_FUNC(TestImplementSrpTestVec)
                   "Little x mismatch (Client) in TestImplementSrpTestVec!\n");
 
     // <premaster secret> = (B - (k * g^x)) ^ (a + (u * x)) % N
-    bignum LittleXBigNum;
-    HashOutputToBigNumUnchecked(&LittleXBigNum, LittleX);
-
-    // BigNumScratch := g^x
     bignum BigNumScratch;
-    MontModExpRBigNumMax(&BigNumScratch,
-                         (bignum *)&NIST_RFC_5054_GEN_BIGNUM,
-                         &LittleXBigNum,
-                         (bignum *)&RFC_5054_NIST_PRIME_1024);
-
-    bignum LittleKBigNum;
-    HashOutputToBigNumUnchecked(&LittleKBigNum, LittleK);
-
-    Stopif((LittleKBigNum.SizeWords + BigNumScratch.SizeWords + 1) > MAX_BIGNUM_SIZE_WORDS,
-           "Potential overflow on multiplying k*g^x in TestImplementSrpTestVec!\n");
-
-    // BigNumScratch := k * g^x (mod N)
-    BigNumMultiplyModP(&BigNumScratch, &LittleKBigNum, &BigNumScratch, (bignum *)&RFC_5054_NIST_PRIME_1024);
-
-    // BigNumScratch := (B - (k * g^x))
-    BigNumSubtractModP(&BigNumScratch,
-                       (bignum *)&RFC_5054_TEST_BIG_B,
-                       (bignum *)&BigNumScratch,
-                       (bignum *)&RFC_5054_NIST_PRIME_1024);
-
-    // BigNumScratchExponent := u * x
-    bignum LittleUBigNum;
-    HashOutputToBigNumUnchecked(&LittleUBigNum, LittleU);
-
-    bignum BigNumScratchExponent;
-    BigNumMultiplyOperandScanning(&BigNumScratchExponent, &LittleUBigNum, &LittleXBigNum);
-
-    // BigNumScratchExponent := a + (u * x)
-    BigNumAdd(&BigNumScratchExponent, (bignum *)&RFC_5054_TEST_LITTLE_A, &BigNumScratchExponent);
-
-    // BigNumScratch := <premaster secret>
-    MontModExpRBigNumMax(&BigNumScratch,
-                         &BigNumScratch,
-                         &BigNumScratchExponent,
-                         (bignum *)&RFC_5054_NIST_PRIME_1024);
+    ClientGeneratePremasterSecret(&BigNumScratch,
+                                  (bignum *)&RFC_5054_TEST_BIG_B,
+                                  LittleK,
+                                  (bignum *)&NIST_RFC_5054_GEN_BIGNUM,
+                                  LittleX,
+                                  (bignum *)&RFC_5054_TEST_LITTLE_A,
+                                  LittleU,
+                                  (bignum *)&RFC_5054_NIST_PRIME_1024);
 
     MinUnitAssert(AreVectorsEqual(BigNumScratch.Num,
                                   (void *)RFC_5054_TEST_PREMASTER_SECRET.Num,
@@ -265,6 +286,7 @@ internal MIN_UNIT_TEST_FUNC(TestImplementSrpTestVec)
     MinUnitAssert(AreVectorsEqualByteSwapped(LittleK, (u8 *)RFC_5054_TEST_K.Num, sizeof(LittleK)),
                   "Little k mismatch (Server) in TestImplementSrpTestVec!\n");
 
+    bignum LittleKBigNum;
     HashOutputToBigNumUnchecked(&LittleKBigNum, LittleK);
 
     // BigNumScratch := k*v (mod N)
@@ -274,6 +296,7 @@ internal MIN_UNIT_TEST_FUNC(TestImplementSrpTestVec)
                        (bignum *)&RFC_5054_NIST_PRIME_1024);
 
     // BigNumScratchExponent := g^b
+    bignum BigNumScratchExponent;
     MontModExpRBigNumMax(&BigNumScratchExponent,
                          (bignum *)&NIST_RFC_5054_GEN_BIGNUM,
                          (bignum *)&RFC_5054_TEST_LITTLE_B,
@@ -296,6 +319,7 @@ internal MIN_UNIT_TEST_FUNC(TestImplementSrpTestVec)
     MinUnitAssert(AreVectorsEqualByteSwapped(LittleU, (u8 *)RFC_5054_TEST_U.Num, sizeof(LittleU)),
                   "Little u mismatch (Server) in TestImplementSrpTestVec!\n");
 
+    bignum LittleUBigNum;
     HashOutputToBigNumUnchecked(&LittleUBigNum, LittleU);
 
     // BigNumScratch := v^u (mod N)
@@ -383,17 +407,31 @@ internal MIN_UNIT_TEST_FUNC(TestClientServerAuth)
 
     // u := SHA1(PAD(A) | PAD(B))
     u8 LittleU[SHA_1_HASH_LENGTH_BYTES];
-    // TODO(bwd): fix ModulusSizeBytes + add SrpClientGetX() call + continue S->C/C->S HMAC-validation
-    u8 MessageScratch[2*TestModulusSizeBytes];
+    u32 ModulusSizeBytes = BigNumSizeBytesUnchecked((bignum *)&RFC_5054_NIST_PRIME_1024);
+    u8 MessageScratch[2*ModulusSizeBytes];
     Sha1PaddedAConcatPaddedB(LittleU,
                              MessageScratch,
-                             &BigA,
-                             (bignum *)&RFC_5054_TEST_BIG_B,
-                             BigNumSizeBytesUnchecked((bignum *)&RFC_5054_NIST_PRIME_1024));
+                             (bignum *)&RFC_5054_TEST_BIG_A,
+                             &BigB,
+                             ModulusSizeBytes);
 
     // x := SHA1(s | SHA1(I | ":" | P))
     u8 LittleX[SHA_1_HASH_LENGTH_BYTES];
-    Sha1(LittleX, MessageScratch, SaltConcatHashEmailPwdLengthBytes);
+    SrpClientGetX(LittleX,
+                  (u8 *)Salt.Num,
+                  BigNumSizeBytesUnchecked(&Salt),
+                  MessageScratch,
+                  sizeof(MessageScratch),
+                  (u8 *)SRP_TEST_VEC_EMAIL,
+                  STR_LEN(SRP_TEST_VEC_EMAIL),
+                  (u8 *)SRP_TEST_VEC_PASSWORD,
+                  STR_LEN(SRP_TEST_VEC_PASSWORD));
+
+    MinUnitAssert(AreVectorsEqualByteSwapped(LittleX, (u8 *)RFC_5054_TEST_X.Num, sizeof(LittleX)),
+                  "Little x mismatch (Client) in TestClientServerAuth!\n");
+
+    // TODO(bwd): generate C premaster secret, follow S sequence and validate HMACs
+    /* ClientGeneratePremasterSecret(); */
 }
 
 internal MIN_UNIT_TEST_FUNC(AllTests)
