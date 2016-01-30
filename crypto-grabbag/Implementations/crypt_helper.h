@@ -37,6 +37,8 @@ typedef struct timespec timespec;
 #define IS_ODD(Value) ((Value) & 0x1)
 #define IS_EVEN(Value) (!IS_ODD(Value))
 
+#define MEMBER_SIZE(type, Member) sizeof(((type *)0)->Member)
+
 const r32 EXPECTED_LETTER_FREQUENCY[] =
 {
     0.08167, 0.01492, 0.02782, 0.04253, 0.12702, 0.02228, 0.02015, 0.06094,
@@ -87,6 +89,27 @@ AreVectorsEqual(void *A, void *B, u32 Length)
 		}
 	}
 	return Result;
+}
+
+internal b32
+AreVectorsEqualByteSwapped(u8 *A, u8 *B, u32 LengthBytes)
+{
+    Stopif((A == 0) || (B == 0), "Null input to AreVectorsEqualByteSwapped!\n");
+
+    b32 Result = true;
+
+    for (u32 BIndex = 0;
+         BIndex < LengthBytes;
+         ++BIndex)
+    {
+        if (A[LengthBytes - BIndex - 1] != B[BIndex])
+        {
+            Result = false;
+            break;
+        }
+    }
+
+    return Result;
 }
 
 // NOTE(brendan): INPUT: character to shift mod 26, shift amount (assumed to be
@@ -1791,6 +1814,158 @@ HashSessionKeyGenIvAndEncrypt(u8 *OutputBuffer, u8 *OutputIv, u8 *SessionKey, u3
     GenRandUnchecked((u32 *)OutputIv, AES_128_BLOCK_LENGTH_WORDS);
 
     AesCbcEncrypt(OutputBuffer, Message, MessageLengthBytes, SessionSymmetricKey, OutputIv);
+}
+
+internal inline void
+CopyByteSwappedUnchecked(u8 *Dest, u8 *Source, u32 LengthBytes)
+{
+    for (u32 SourceIndex = 0;
+         SourceIndex < LengthBytes;
+         ++SourceIndex)
+    {
+        Dest[LengthBytes - SourceIndex - 1] = Source[SourceIndex];
+    }
+}
+
+internal void
+CopyPaddedToBigEndianUnchecked(u8 *OutPaddedBigEndian, bignum *Input, u32 PSizeBytes)
+{
+    u32 InputSizeBytes = BigNumSizeBytesUnchecked(Input);
+    Stopif(InputSizeBytes > PSizeBytes, "Invalid Input/PSizeBytes input to CopyPaddedToBigEndianUnchecked!\n");
+
+    u32 PaddingBytes = (PSizeBytes - InputSizeBytes);
+    memset(OutPaddedBigEndian, 0, PaddingBytes);
+
+    CopyByteSwappedUnchecked(OutPaddedBigEndian + PaddingBytes, (u8 *)Input->Num, InputSizeBytes);
+}
+
+internal void
+Sha1PaddedAConcatPaddedB(u8 *OutputHash, u8 *ScratchBuffer, bignum *A, bignum *B, u32 PSizeBytes)
+{
+    Stopif((OutputHash == 0) || (ScratchBuffer == 0) || (A == 0) || (B == 0),
+           "Null input to Sha1PaddedAConcatPaddedB!\n");
+
+    CopyPaddedToBigEndianUnchecked(ScratchBuffer, A, PSizeBytes);
+
+    CopyPaddedToBigEndianUnchecked(ScratchBuffer + PSizeBytes, B, PSizeBytes);
+
+    Sha1(OutputHash, ScratchBuffer, 2*PSizeBytes);
+}
+
+internal inline void
+HashOutputToBigNumUnchecked(bignum *OutBigNum, u8 *Hash)
+{
+    OutBigNum->SizeWords = SHA_1_HASH_LENGTH_BYTES/sizeof(u64) + 1;
+
+    memset(OutBigNum->Num, 0, sizeof(u64)*OutBigNum->SizeWords);
+
+    CopyByteSwappedUnchecked((u8 *)OutBigNum->Num, Hash, SHA_1_HASH_LENGTH_BYTES);
+}
+
+internal void
+SrpGetX(u8 *OutLittleX,
+        u8 *Salt,
+        u32 SaltLengthBytes,
+        u8 *MessageScratch,
+        u32 MessageScratchMaxSizeBytes,
+        u8 *UserName,
+        u32 UserLengthBytes,
+        u8 *Password,
+        u32 PasswordLengthBytes)
+{
+    Stopif((OutLittleX == 0) || (Salt == 0) || (MessageScratch == 0), "Null input to SrpGetX!\n");
+
+    u32 EmailPasswordMsgLengthBytes = UserLengthBytes + 1 + PasswordLengthBytes;
+    u32 SaltConcatHashEmailPwdLengthBytes = SaltLengthBytes + SHA_1_HASH_LENGTH_BYTES;
+    Stopif((SaltConcatHashEmailPwdLengthBytes > MessageScratchMaxSizeBytes) ||
+           (EmailPasswordMsgLengthBytes > MessageScratchMaxSizeBytes),
+           "MessageScratch buffer overflow in TestImplementSrpTestVec!\n");
+
+    // MessageScratch := SHA1(I | ":" | P)
+    memcpy(MessageScratch, UserName, UserLengthBytes);
+
+    MessageScratch[UserLengthBytes] = ':';
+
+    memcpy(MessageScratch + UserLengthBytes + 1,
+           Password,
+           PasswordLengthBytes);
+
+    Sha1(MessageScratch, MessageScratch, EmailPasswordMsgLengthBytes);
+
+    memmove(MessageScratch + SaltLengthBytes, MessageScratch, SHA_1_HASH_LENGTH_BYTES);
+
+    CopyByteSwappedUnchecked(MessageScratch, Salt, SaltLengthBytes);
+
+    // x := SHA1(s | SHA1(I | ":" | P))
+    Sha1(OutLittleX, MessageScratch, SaltConcatHashEmailPwdLengthBytes);
+}
+
+internal void
+ServerGetPremasterSecret(bignum *OutSecret, bignum *LittleV, bignum *LittleB, bignum *BigA)
+{
+    // TODO(bwd): Generate v := g^x mod N
+    u8 MessageScratch[2*MEMBER_SIZE(bignum, Num)];
+    u8 LittleK[SHA_1_HASH_LENGTH_BYTES];
+    u32 PSizeBytes = BigNumSizeBytesUnchecked((bignum *)&RFC_5054_NIST_PRIME_1024);
+    Sha1PaddedAConcatPaddedB(LittleK,
+                             MessageScratch,
+                             (bignum *)&RFC_5054_NIST_PRIME_1024,
+                             (bignum *)&NIST_RFC_5054_GEN_BIGNUM,
+                             PSizeBytes);
+
+    MinUnitAssert(AreVectorsEqualByteSwapped(LittleK, (u8 *)RFC_5054_TEST_K.Num, sizeof(LittleK)),
+                  "Little k mismatch (Server) in TestImplementSrpTestVec!\n");
+
+    bignum LittleKBigNum;
+    HashOutputToBigNumUnchecked(&LittleKBigNum, LittleK);
+
+    // BigNumScratch := k*v (mod N)
+    BigNumMultiplyModP(OutSecret,
+                       &LittleKBigNum,
+                       LittleV,
+                       (bignum *)&RFC_5054_NIST_PRIME_1024);
+
+    // BigNumScratchExponent := g^b
+    bignum BigNumScratchExponent;
+    MontModExpRBigNumMax(&BigNumScratchExponent,
+                         (bignum *)&NIST_RFC_5054_GEN_BIGNUM,
+                         LittleB,
+                         (bignum *)&RFC_5054_NIST_PRIME_1024);
+
+    // BigNumScratch := (k*v + g^b) % N
+    BigNumAddModN(OutSecret, OutSecret, &BigNumScratchExponent, (bignum *)&RFC_5054_NIST_PRIME_1024);
+
+    // TODO(bwd): remove
+    MinUnitAssert(AreVectorsEqual((void *)RFC_5054_TEST_BIG_B.Num, OutSecret,
+                                  BigNumSizeBytesUnchecked((bignum *)&RFC_5054_TEST_BIG_B)) &&
+                  (OutSecret->SizeWords == RFC_5054_TEST_BIG_B.SizeWords),
+                  "Big B Mismatch (Server) in TestImplementSrpTestVec!\n");
+
+    u8 LittleU[SHA_1_HASH_LENGTH_BYTES];
+    Sha1PaddedAConcatPaddedB(LittleU,
+                             MessageScratch,
+                             BigA,
+                             OutSecret,
+                             PSizeBytes);
+
+    // TODO(bwd): remove
+    MinUnitAssert(AreVectorsEqualByteSwapped(LittleU, (u8 *)RFC_5054_TEST_U.Num, sizeof(LittleU)),
+                  "Little u mismatch (Server) in TestImplementSrpTestVec!\n");
+
+    bignum LittleUBigNum;
+    HashOutputToBigNumUnchecked(&LittleUBigNum, LittleU);
+
+    // BigNumScratch := v^u (mod N)
+    MontModExpRBigNumMax(OutSecret,
+                         LittleV,
+                         &LittleUBigNum,
+                         (bignum *)&RFC_5054_NIST_PRIME_1024);
+
+    // BigNumScratch := A * v^u (mod N)
+    BigNumMultiplyModP(OutSecret, BigA, OutSecret, (bignum *)&RFC_5054_NIST_PRIME_1024);
+
+    // BigNumScratch := <premaster secret>
+    MontModExpRBigNumMax(OutSecret, OutSecret, LittleB, (bignum *)&RFC_5054_NIST_PRIME_1024);
 }
 
 #endif /* CRYPT_HELPER_H */
