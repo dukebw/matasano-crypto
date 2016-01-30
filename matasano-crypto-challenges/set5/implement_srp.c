@@ -23,119 +23,15 @@ const bignum RFC_5054_NIST_PRIME_1536 =
 
 // TODO(bwd): generate salt as random integer (second test)
 
-internal inline void
-CopyByteSwappedUnchecked(u8 *Dest, u8 *Source, u32 LengthBytes)
-{
-    for (u32 SourceIndex = 0;
-         SourceIndex < LengthBytes;
-         ++SourceIndex)
-    {
-        Dest[LengthBytes - SourceIndex - 1] = Source[SourceIndex];
-    }
-}
-
-internal b32
-AreVectorsEqualByteSwapped(u8 *A, u8 *B, u32 LengthBytes)
-{
-    Stopif((A == 0) || (B == 0), "Null input to AreVectorsEqualByteSwapped!\n");
-
-    b32 Result = true;
-
-    for (u32 BIndex = 0;
-         BIndex < LengthBytes;
-         ++BIndex)
-    {
-        if (A[LengthBytes - BIndex - 1] != B[BIndex])
-        {
-            Result = false;
-            break;
-        }
-    }
-
-    return Result;
-}
-
-internal inline void
-HashOutputToBigNumUnchecked(bignum *OutBigNum, u8 *Hash)
-{
-    OutBigNum->SizeWords = SHA_1_HASH_LENGTH_BYTES/sizeof(u64) + 1;
-
-    memset(OutBigNum->Num, 0, sizeof(u64)*OutBigNum->SizeWords);
-
-    CopyByteSwappedUnchecked((u8 *)OutBigNum->Num, Hash, SHA_1_HASH_LENGTH_BYTES);
-}
-
 internal void
-CopyPaddedToBigEndianUnchecked(u8 *OutPaddedBigEndian, bignum *Input, u32 PSizeBytes)
-{
-    u32 InputSizeBytes = BigNumSizeBytesUnchecked(Input);
-    Stopif(InputSizeBytes > PSizeBytes, "Invalid Input/PSizeBytes input to CopyPaddedToBigEndianUnchecked!\n");
-
-    u32 PaddingBytes = (PSizeBytes - InputSizeBytes);
-    memset(OutPaddedBigEndian, 0, PaddingBytes);
-
-    CopyByteSwappedUnchecked(OutPaddedBigEndian + PaddingBytes, (u8 *)Input->Num, InputSizeBytes);
-}
-
-internal void
-Sha1PaddedAConcatPaddedB(u8 *OutputHash, u8 *ScratchBuffer, bignum *A, bignum *B, u32 PSizeBytes)
-{
-    Stopif((OutputHash == 0) || (ScratchBuffer == 0) || (A == 0) || (B == 0),
-           "Null input to Sha1PaddedAConcatPaddedB!\n");
-
-    CopyPaddedToBigEndianUnchecked(ScratchBuffer, A, PSizeBytes);
-
-    CopyPaddedToBigEndianUnchecked(ScratchBuffer + PSizeBytes, B, PSizeBytes);
-
-    Sha1(OutputHash, ScratchBuffer, 2*PSizeBytes);
-}
-
-internal void
-SrpClientGetX(u8 *OutLittleX,
-              u8 *Salt,
-              u32 SaltLengthBytes,
-              u8 *MessageScratch,
-              u32 MessageScratchMaxSizeBytes,
-              u8 *UserName,
-              u32 UserLengthBytes,
-              u8 *Password,
-              u32 PasswordLengthBytes)
-{
-    Stopif((OutLittleX == 0) || (Salt == 0) || (MessageScratch == 0), "Null input to SrpClientGetX!\n");
-
-    u32 EmailPasswordMsgLengthBytes = UserLengthBytes + 1 + PasswordLengthBytes;
-    u32 SaltConcatHashEmailPwdLengthBytes = SaltLengthBytes + SHA_1_HASH_LENGTH_BYTES;
-    Stopif((SaltConcatHashEmailPwdLengthBytes > MessageScratchMaxSizeBytes) ||
-           (EmailPasswordMsgLengthBytes > MessageScratchMaxSizeBytes),
-           "MessageScratch buffer overflow in TestImplementSrpTestVec!\n");
-
-    memcpy(MessageScratch, UserName, UserLengthBytes);
-
-    MessageScratch[UserLengthBytes] = ':';
-
-    memcpy(MessageScratch + UserLengthBytes + 1,
-           Password,
-           PasswordLengthBytes);
-
-    Sha1(MessageScratch, MessageScratch, EmailPasswordMsgLengthBytes);
-
-    memmove(MessageScratch + SaltLengthBytes, MessageScratch, SHA_1_HASH_LENGTH_BYTES);
-
-    CopyByteSwappedUnchecked(MessageScratch, Salt, SaltLengthBytes);
-
-    // x := SHA1(s | SHA1(I | ":" | P))
-    Sha1(OutLittleX, MessageScratch, SaltConcatHashEmailPwdLengthBytes);
-}
-
-internal void
-ClientGeneratePremasterSecret(bignum *OutputSecret,
-                              bignum *BigB,
-                              u8 *LittleK,
-                              bignum *Gen,
-                              u8 *LittleX,
-                              bignum *LittleA,
-                              u8 *LittleU,
-                              bignum *PrimeModulusN)
+ClientGetPremasterSecret(bignum *OutputSecret,
+                         bignum *BigB,
+                         u8 *LittleK,
+                         bignum *Gen,
+                         u8 *LittleX,
+                         bignum *LittleA,
+                         u8 *LittleU,
+                         bignum *PrimeModulusN)
 {
     Stopif((OutputSecret == 0) ||
            (BigB == 0) ||
@@ -145,7 +41,7 @@ ClientGeneratePremasterSecret(bignum *OutputSecret,
            (LittleA == 0) ||
            (LittleU == 0) ||
            (PrimeModulusN == 0),
-           "Null input to ClientGeneratePremasterSecret!\n");
+           "Null input to ClientGetPremasterSecret!\n");
 
     bignum LittleXBigNum;
     HashOutputToBigNumUnchecked(&LittleXBigNum, LittleX);
@@ -216,8 +112,8 @@ internal MIN_UNIT_TEST_FUNC(TestImplementSrpTestVec)
                   (BigA.SizeWords == RFC_5054_TEST_BIG_A.SizeWords),
                   "Big A mismatch (Client) in TestImplementSrpTestVec!\n");
 
-    u32 TestModulusSizeBytes = BigNumSizeBytesUnchecked((bignum *)&RFC_5054_TEST_BIG_B);
-    u8 MessageScratch[2*TestModulusSizeBytes];
+    u32 PSizeBytes = BigNumSizeBytesUnchecked((bignum *)&RFC_5054_NIST_PRIME_1024);
+    u8 MessageScratch[2*PSizeBytes];
 
     // u := SHA1(PAD(A) | PAD(B))
     u8 LittleU[SHA_1_HASH_LENGTH_BYTES];
@@ -225,12 +121,10 @@ internal MIN_UNIT_TEST_FUNC(TestImplementSrpTestVec)
                              MessageScratch,
                              &BigA,
                              (bignum *)&RFC_5054_TEST_BIG_B,
-                             TestModulusSizeBytes);
+                             PSizeBytes);
 
     MinUnitAssert(AreVectorsEqualByteSwapped(LittleU, (u8 *)RFC_5054_TEST_U.Num, sizeof(LittleU)),
                   "Little u mismatch (Client) in TestImplementSrpTestVec!\n");
-
-    u32 PSizeBytes = BigNumSizeBytesUnchecked((bignum *)&RFC_5054_NIST_PRIME_1024);
 
     // k := SHA1(N | PAD(g))
     u8 LittleK[SHA_1_HASH_LENGTH_BYTES];
@@ -243,32 +137,31 @@ internal MIN_UNIT_TEST_FUNC(TestImplementSrpTestVec)
     MinUnitAssert(AreVectorsEqualByteSwapped(LittleK, (u8 *)RFC_5054_TEST_K.Num, sizeof(LittleK)),
                   "Little k mismatch (Client) in TestImplementSrpTestVec!\n");
 
-    // MessageScratch := SHA1(I | ":" | P)
     u8 LittleX[SHA_1_HASH_LENGTH_BYTES];
     u32 SaltLengthBytes = BigNumSizeBytesUnchecked((bignum *)&RFC_5054_TEST_SALT);
-    SrpClientGetX(LittleX,
-                  (u8 *)RFC_5054_TEST_SALT.Num,
-                  SaltLengthBytes,
-                  MessageScratch,
-                  sizeof(MessageScratch),
-                  (u8 *)SRP_TEST_VEC_EMAIL,
-                  STR_LEN(SRP_TEST_VEC_EMAIL),
-                  (u8 *)SRP_TEST_VEC_PASSWORD,
-                  STR_LEN(SRP_TEST_VEC_PASSWORD));
+    SrpGetX(LittleX,
+            (u8 *)RFC_5054_TEST_SALT.Num,
+            SaltLengthBytes,
+            MessageScratch,
+            sizeof(MessageScratch),
+            (u8 *)SRP_TEST_VEC_EMAIL,
+            STR_LEN(SRP_TEST_VEC_EMAIL),
+            (u8 *)SRP_TEST_VEC_PASSWORD,
+            STR_LEN(SRP_TEST_VEC_PASSWORD));
 
     MinUnitAssert(AreVectorsEqualByteSwapped(LittleX, (u8 *)RFC_5054_TEST_X.Num, sizeof(LittleX)),
                   "Little x mismatch (Client) in TestImplementSrpTestVec!\n");
 
     // <premaster secret> = (B - (k * g^x)) ^ (a + (u * x)) % N
     bignum BigNumScratch;
-    ClientGeneratePremasterSecret(&BigNumScratch,
-                                  (bignum *)&RFC_5054_TEST_BIG_B,
-                                  LittleK,
-                                  (bignum *)&NIST_RFC_5054_GEN_BIGNUM,
-                                  LittleX,
-                                  (bignum *)&RFC_5054_TEST_LITTLE_A,
-                                  LittleU,
-                                  (bignum *)&RFC_5054_NIST_PRIME_1024);
+    ClientGetPremasterSecret(&BigNumScratch,
+                             (bignum *)&RFC_5054_TEST_BIG_B,
+                             LittleK,
+                             (bignum *)&NIST_RFC_5054_GEN_BIGNUM,
+                             LittleX,
+                             (bignum *)&RFC_5054_TEST_LITTLE_A,
+                             LittleU,
+                             (bignum *)&RFC_5054_NIST_PRIME_1024);
 
     MinUnitAssert(AreVectorsEqual(BigNumScratch.Num,
                                   (void *)RFC_5054_TEST_PREMASTER_SECRET.Num,
@@ -277,68 +170,10 @@ internal MIN_UNIT_TEST_FUNC(TestImplementSrpTestVec)
                   "Premaster secret mismatch (Client) in TestImplementSrpTestVec!\n");
 
     // Server
-    Sha1PaddedAConcatPaddedB(LittleK,
-                             MessageScratch,
-                             (bignum *)&RFC_5054_NIST_PRIME_1024,
-                             (bignum *)&NIST_RFC_5054_GEN_BIGNUM,
-                             PSizeBytes);
-
-    MinUnitAssert(AreVectorsEqualByteSwapped(LittleK, (u8 *)RFC_5054_TEST_K.Num, sizeof(LittleK)),
-                  "Little k mismatch (Server) in TestImplementSrpTestVec!\n");
-
-    bignum LittleKBigNum;
-    HashOutputToBigNumUnchecked(&LittleKBigNum, LittleK);
-
-    // BigNumScratch := k*v (mod N)
-    BigNumMultiplyModP(&BigNumScratch,
-                       &LittleKBigNum,
-                       (bignum *)&RFC_5054_TEST_V,
-                       (bignum *)&RFC_5054_NIST_PRIME_1024);
-
-    // BigNumScratchExponent := g^b
-    bignum BigNumScratchExponent;
-    MontModExpRBigNumMax(&BigNumScratchExponent,
-                         (bignum *)&NIST_RFC_5054_GEN_BIGNUM,
-                         (bignum *)&RFC_5054_TEST_LITTLE_B,
-                         (bignum *)&RFC_5054_NIST_PRIME_1024);
-
-    // BigNumScratch := (k*v + g^b) % N
-    BigNumAddModN(&BigNumScratch, &BigNumScratch, &BigNumScratchExponent, (bignum *)&RFC_5054_NIST_PRIME_1024);
-
-    MinUnitAssert(AreVectorsEqual((void *)RFC_5054_TEST_BIG_B.Num, &BigNumScratch,
-                                  BigNumSizeBytesUnchecked((bignum *)&RFC_5054_TEST_BIG_B)) &&
-                  (BigNumScratch.SizeWords == RFC_5054_TEST_BIG_B.SizeWords),
-                  "Big B Mismatch (Server) in TestImplementSrpTestVec!\n");
-
-    Sha1PaddedAConcatPaddedB(LittleU,
-                             MessageScratch,
-                             (bignum *)&RFC_5054_TEST_BIG_A,
-                             &BigNumScratch,
-                             PSizeBytes);
-
-    MinUnitAssert(AreVectorsEqualByteSwapped(LittleU, (u8 *)RFC_5054_TEST_U.Num, sizeof(LittleU)),
-                  "Little u mismatch (Server) in TestImplementSrpTestVec!\n");
-
-    bignum LittleUBigNum;
-    HashOutputToBigNumUnchecked(&LittleUBigNum, LittleU);
-
-    // BigNumScratch := v^u (mod N)
-    MontModExpRBigNumMax(&BigNumScratch,
-                         (bignum *)&RFC_5054_TEST_V,
-                         &LittleUBigNum,
-                         (bignum *)&RFC_5054_NIST_PRIME_1024);
-
-    // BigNumScratch := A * v^u (mod N)
-    BigNumMultiplyModP(&BigNumScratch,
-                       (bignum *)&RFC_5054_TEST_BIG_A,
-                       &BigNumScratch,
-                       (bignum *)&RFC_5054_NIST_PRIME_1024);
-
-    // BigNumScratch := <premaster secret>
-    MontModExpRBigNumMax(&BigNumScratch,
-                         &BigNumScratch,
-                         (bignum *)&RFC_5054_TEST_LITTLE_B,
-                         (bignum *)&RFC_5054_NIST_PRIME_1024);
+    ServerGetPremasterSecret(&BigNumScratch,
+                             (bignum *)&RFC_5054_TEST_V,
+                             (bignum *)&RFC_5054_TEST_LITTLE_B,
+                             (bignum *)&RFC_5054_TEST_BIG_A);
 
     MinUnitAssert(AreVectorsEqual(BigNumScratch.Num,
                                   (void *)RFC_5054_TEST_PREMASTER_SECRET.Num,
@@ -403,7 +238,7 @@ internal MIN_UNIT_TEST_FUNC(TestClientServerAuth)
 
     BigNumCopyUnchecked((bignum *)ClientSendRecvBuffer, (bignum *)&RFC_5054_TEST_BIG_A);
 
-    write(SocketFileDescriptor, ClientSendRecvBuffer, STR_LEN(GlobalCommand));
+    write(SocketFileDescriptor, ClientSendRecvBuffer, sizeof(ClientSendRecvBuffer));
 
     // u := SHA1(PAD(A) | PAD(B))
     u8 LittleU[SHA_1_HASH_LENGTH_BYTES];
@@ -415,23 +250,59 @@ internal MIN_UNIT_TEST_FUNC(TestClientServerAuth)
                              &BigB,
                              ModulusSizeBytes);
 
+    // k := SHA1(N | PAD(g))
+    u8 LittleK[SHA_1_HASH_LENGTH_BYTES];
+    Sha1PaddedAConcatPaddedB(LittleK,
+                             MessageScratch,
+                             (bignum *)&RFC_5054_NIST_PRIME_1024,
+                             (bignum *)&NIST_RFC_5054_GEN_BIGNUM,
+                             ModulusSizeBytes);
+
+    MinUnitAssert(AreVectorsEqualByteSwapped(LittleK, (u8 *)RFC_5054_TEST_K.Num, sizeof(LittleK)),
+                  "Little k mismatch (Client) in TestImplementSrpTestVec!\n");
+
     // x := SHA1(s | SHA1(I | ":" | P))
     u8 LittleX[SHA_1_HASH_LENGTH_BYTES];
-    SrpClientGetX(LittleX,
-                  (u8 *)Salt.Num,
-                  BigNumSizeBytesUnchecked(&Salt),
-                  MessageScratch,
-                  sizeof(MessageScratch),
-                  (u8 *)SRP_TEST_VEC_EMAIL,
-                  STR_LEN(SRP_TEST_VEC_EMAIL),
-                  (u8 *)SRP_TEST_VEC_PASSWORD,
-                  STR_LEN(SRP_TEST_VEC_PASSWORD));
+    u32 SaltSizeBytes = BigNumSizeBytesUnchecked(&Salt);
+    SrpGetX(LittleX,
+            (u8 *)Salt.Num,
+            SaltSizeBytes,
+            MessageScratch,
+            sizeof(MessageScratch),
+            (u8 *)SRP_TEST_VEC_EMAIL,
+            STR_LEN(SRP_TEST_VEC_EMAIL),
+            (u8 *)SRP_TEST_VEC_PASSWORD,
+            STR_LEN(SRP_TEST_VEC_PASSWORD));
 
     MinUnitAssert(AreVectorsEqualByteSwapped(LittleX, (u8 *)RFC_5054_TEST_X.Num, sizeof(LittleX)),
                   "Little x mismatch (Client) in TestClientServerAuth!\n");
 
-    // TODO(bwd): generate C premaster secret, follow S sequence and validate HMACs
-    /* ClientGeneratePremasterSecret(); */
+    bignum BigNumScratch;
+    ClientGetPremasterSecret(&BigNumScratch,
+                             &BigB,
+                             LittleK,
+                             &LittleG,
+                             LittleX,
+                             (bignum *)&RFC_5054_TEST_LITTLE_A,
+                             LittleU,
+                             &ModulusN);
+
+    u8 ClientHashScratch[SHA_1_HASH_LENGTH_BYTES];
+    u32 ClientSecretSizeBytes = BigNumSizeBytesUnchecked(&BigNumScratch);
+    Sha1(ClientHashScratch, (u8 *)BigNumScratch.Num, ClientSecretSizeBytes);
+
+    // Send HMAC(K, salt)
+    HmacSha1(ClientHashScratch, (u8 *)BigNumScratch.Num, ClientSecretSizeBytes, (u8 *)Salt.Num, SaltSizeBytes);
+
+    memcpy(ClientSendRecvBuffer, ClientHashScratch, sizeof(ClientHashScratch));
+
+    write(SocketFileDescriptor, ClientSendRecvBuffer, STR_LEN(GlobalCommand));
+
+    ReadBytes = read(SocketFileDescriptor, ClientSendRecvBuffer, sizeof(ClientSendRecvBuffer));
+    Stopif(ReadBytes >= sizeof(HMAC_VALID_STRING), "Overflow read from (N, g, s ,B) in TestClientServerAuth!");
+
+    MinUnitAssert(AreVectorsEqual(ClientSendRecvBuffer, (void *)HMAC_VALID_STRING, STR_LEN(HMAC_VALID_STRING)),
+                  "HMAC mismatch in TestClientServerAuth!");
 }
 
 internal MIN_UNIT_TEST_FUNC(AllTests)
