@@ -238,7 +238,7 @@ internal MIN_UNIT_TEST_FUNC(TestClientServerAuth)
 
     BigNumCopyUnchecked((bignum *)ClientSendRecvBuffer, (bignum *)&RFC_5054_TEST_BIG_A);
 
-    write(SocketFileDescriptor, ClientSendRecvBuffer, sizeof(ClientSendRecvBuffer));
+    write(SocketFileDescriptor, ClientSendRecvBuffer, sizeof(RFC_5054_TEST_BIG_A));
 
     // u := SHA1(PAD(A) | PAD(B))
     u8 LittleU[SHA_1_HASH_LENGTH_BYTES];
@@ -294,9 +294,7 @@ internal MIN_UNIT_TEST_FUNC(TestClientServerAuth)
     // Send HMAC(K, salt)
     HmacSha1(ClientHashScratch, (u8 *)BigNumScratch.Num, ClientSecretSizeBytes, (u8 *)Salt.Num, SaltSizeBytes);
 
-    memcpy(ClientSendRecvBuffer, ClientHashScratch, sizeof(ClientHashScratch));
-
-    write(SocketFileDescriptor, ClientSendRecvBuffer, STR_LEN(GlobalCommand));
+    write(SocketFileDescriptor, ClientHashScratch, sizeof(ClientHashScratch));
 
     ReadBytes = read(SocketFileDescriptor, ClientSendRecvBuffer, sizeof(ClientSendRecvBuffer));
     Stopif(ReadBytes >= sizeof(HMAC_VALID_STRING), "Overflow read from (N, g, s ,B) in TestClientServerAuth!");

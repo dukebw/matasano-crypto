@@ -265,28 +265,43 @@ void web(int fd, int hit)
             u32 ReadBytes = read(fd, ServerSendRcvBuffer, sizeof(ServerSendRcvBuffer));
             if (ReadBytes == sizeof(ServerSendRcvBuffer))
             {
-                logger(ERROR, "Received message too long in nweb server!", buffer, fd);
+                logger(ERROR, "Received message _BigA_ too long in nweb server!", buffer, fd);
             }
 
-            u8 LittleX[SHA_1_HASH_LENGTH_BYTES];
-            u32 ModulusSizeBytes = BigNumSizeBytesUnchecked((bignum *)&RFC_5054_NIST_PRIME_1024);
-            u8 MessageScratch[2*ModulusSizeBytes];
-            SrpGetX(LittleX,
-                    (u8 *)RFC_5054_TEST_SALT.Num,
-                    BigNumSizeBytesUnchecked((bignum *)&RFC_5054_TEST_SALT),
-                    MessageScratch,
-                    sizeof(MessageScratch),
-                    (u8 *)SRP_TEST_VEC_EMAIL,
-                    STR_LEN(SRP_TEST_VEC_EMAIL),
-                    (u8 *)SRP_TEST_VEC_PASSWORD,
-                    STR_LEN(SRP_TEST_VEC_PASSWORD));
+            bignum BigA;
+            BigNumCopyUnchecked(&BigA, (bignum *)ServerSendRcvBuffer);
 
-            u8 LittleK[SHA_1_HASH_LENGTH_BYTES];
-            Sha1PaddedAConcatPaddedB(LittleK,
-                                     MessageScratch,
-                                     (bignum *)&RFC_5054_NIST_PRIME_1024,
-                                     (bignum *)&NIST_RFC_5054_GEN_BIGNUM,
-                                     ModulusSizeBytes);
+            bignum PremasterSecret;
+            ServerGetPremasterSecret(&PremasterSecret,
+                                     (bignum *)&RFC_5054_TEST_V,
+                                     (bignum *)&RFC_5054_TEST_LITTLE_B,
+                                     &BigA);
+
+            u8 ServerHashScratch[SHA_1_HASH_LENGTH_BYTES];
+            u32 ServerSecretSizeBytes = BigNumSizeBytesUnchecked(&PremasterSecret);
+            Sha1(ServerHashScratch, (u8 *)PremasterSecret.Num, ServerSecretSizeBytes);
+
+            // Send HMAC(K, salt)
+            HmacSha1(ServerHashScratch,
+                     (u8 *)PremasterSecret.Num,
+                     ServerSecretSizeBytes,
+                     (u8 *)RFC_5054_TEST_SALT.Num,
+                     BigNumSizeBytesUnchecked((bignum *)&RFC_5054_TEST_SALT));
+
+            ReadBytes = read(fd, ServerSendRcvBuffer, sizeof(ServerSendRcvBuffer));
+            if (ReadBytes == sizeof(ServerSendRcvBuffer))
+            {
+                logger(ERROR, "Received message _HMAC_ too long in nweb server!", buffer, fd);
+            }
+
+            if (memcmp(ServerSendRcvBuffer, ServerHashScratch, sizeof(ServerHashScratch)) == 0)
+            {
+                write(fd, HMAC_VALID_STRING, STR_LEN(HMAC_VALID_STRING));
+            }
+            else
+            {
+                write(fd, HMAC_INVALID_STRING, STR_LEN(HMAC_INVALID_STRING));
+            }
         }
         else
         {
