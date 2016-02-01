@@ -1,5 +1,5 @@
 # NOTE(brendan): set P using "export P=program_name" from shell
-P=matasano-crypto-challenges/set5/implement_srp
+P=matasano-crypto-challenges/set5/break_srp_zero_key
 P2=matasano-crypto-challenges/set4/nweb/nweb23
 
 OBJECTS=

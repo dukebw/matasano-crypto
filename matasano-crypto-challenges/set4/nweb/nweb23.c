@@ -262,11 +262,15 @@ void web(int fd, int hit)
 
             write(fd, ServerSendRcvBuffer, sizeof(ServerSendRcvBuffer));
 
+            logger(LOG, "Sent (N, g, s, B) from server!", buffer, fd);
+
             u32 ReadBytes = read(fd, ServerSendRcvBuffer, sizeof(ServerSendRcvBuffer));
             if (ReadBytes == sizeof(ServerSendRcvBuffer))
             {
                 logger(ERROR, "Received message _BigA_ too long in nweb server!", buffer, fd);
             }
+
+            logger(LOG, "Server read A!", buffer, fd);
 
             bignum BigA;
             BigNumCopyUnchecked(&BigA, (bignum *)ServerSendRcvBuffer);
@@ -294,13 +298,17 @@ void web(int fd, int hit)
                 logger(ERROR, "Received message _HMAC_ too long in nweb server!", buffer, fd);
             }
 
+            logger(LOG, "Server read HMAC!", buffer, fd);
+
             if (memcmp(ServerSendRcvBuffer, ServerHashScratch, sizeof(ServerHashScratch)) == 0)
             {
                 write(fd, HMAC_VALID_STRING, STR_LEN(HMAC_VALID_STRING));
+                logger(LOG, "HMAC Valid!", buffer, fd);
             }
             else
             {
                 write(fd, HMAC_INVALID_STRING, STR_LEN(HMAC_INVALID_STRING));
+                logger(LOG, "HMAC Invalid!", buffer, fd);
             }
         }
         else

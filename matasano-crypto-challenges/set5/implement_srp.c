@@ -91,11 +91,6 @@ internal MIN_UNIT_TEST_FUNC(TestClientServerAuth)
        Application Data        <------->       Application Data
    */
 
-    sockaddr_in ServerSocketAddr;
-    ServerSocketAddr.sin_family = AF_INET;
-    ServerSocketAddr.sin_addr.s_addr = inet_addr(IP_ADDRESS);
-    ServerSocketAddr.sin_port = htons(PORT);
-
     u8 ClientSendRecvBuffer[4*sizeof(bignum)];
     bignum ModulusN;
     bignum LittleG;
@@ -105,7 +100,6 @@ internal MIN_UNIT_TEST_FUNC(TestClientServerAuth)
     ClientConnectAndGetServerHello(ClientSendRecvBuffer,
                                    sizeof(ClientSendRecvBuffer),
                                    &SocketFileDescriptor,
-                                   &ServerSocketAddr,
                                    &ModulusN,
                                    &LittleG,
                                    &Salt,
@@ -125,7 +119,6 @@ internal MIN_UNIT_TEST_FUNC(TestClientServerAuth)
 
     u8 ClientHashScratch[SHA_1_HASH_LENGTH_BYTES];
     u32 ClientSecretSizeBytes = BigNumSizeBytesUnchecked(&ClientPremasterSecret);
-    Sha1(ClientHashScratch, (u8 *)ClientPremasterSecret.Num, ClientSecretSizeBytes);
 
     // Send HMAC(K, salt)
     HmacSha1(ClientHashScratch,
@@ -137,7 +130,7 @@ internal MIN_UNIT_TEST_FUNC(TestClientServerAuth)
     write(SocketFileDescriptor, ClientHashScratch, sizeof(ClientHashScratch));
 
     u32 ReadBytes = read(SocketFileDescriptor, ClientSendRecvBuffer, sizeof(ClientSendRecvBuffer));
-    Stopif(ReadBytes >= sizeof(HMAC_VALID_STRING), "Overflow read from (N, g, s ,B) in TestClientServerAuth!");
+    Stopif(ReadBytes > STR_LEN(HMAC_VALID_STRING), "Overflow read from (N, g, s ,B) in TestClientServerAuth!");
 
     MinUnitAssert(AreVectorsEqual(ClientSendRecvBuffer, (void *)HMAC_VALID_STRING, STR_LEN(HMAC_VALID_STRING)),
                   "HMAC mismatch in TestClientServerAuth!");

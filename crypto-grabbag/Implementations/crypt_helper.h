@@ -797,7 +797,7 @@ Sha1KeyedMac(u8 *KeyedMac, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLengt
 #define HMAC_RET_CODE_LENGTH_BYTES 4
 
 #define PORT 8181
-#define IP_ADDRESS "192.168.11.42"
+#define IP_ADDRESS "192.168.1.15"
 
 #define TEST_USER_CMD_LENGTH (STR_LEN(TEST_SRP_PREFIX) +    \
                               STR_LEN(USER_PREFIX) + STR_LEN(SRP_TEST_VEC_EMAIL) + 1)
@@ -1925,11 +1925,6 @@ ClientGetPremasterSecret(bignum *OutputSecret,
                          LittleA,
                          (bignum *)&RFC_5054_NIST_PRIME_1024);
 
-    // TODO(bwd):
-    MinUnitAssert(AreVectorsEqual(BigA.Num, (void *)RFC_5054_TEST_BIG_A.Num, RFC_5054_TEST_BIG_A.SizeWords) &&
-                  (BigA.SizeWords == RFC_5054_TEST_BIG_A.SizeWords),
-                  "Big A mismatch (Client) in TestImplementSrpTestVec!\n");
-
     u32 PSizeBytes = BigNumSizeBytesUnchecked((bignum *)&RFC_5054_NIST_PRIME_1024);
     u8 MessageScratch[2*PSizeBytes];
 
@@ -1941,10 +1936,6 @@ ClientGetPremasterSecret(bignum *OutputSecret,
                              (bignum *)&RFC_5054_TEST_BIG_B,
                              PSizeBytes);
 
-    // TODO(bwd):
-    MinUnitAssert(AreVectorsEqualByteSwapped(LittleU, (u8 *)RFC_5054_TEST_U.Num, sizeof(LittleU)),
-                  "Little u mismatch (Client) in TestImplementSrpTestVec!\n");
-
     // k := SHA1(N | PAD(g))
     u8 LittleK[SHA_1_HASH_LENGTH_BYTES];
     Sha1PaddedAConcatPaddedB(LittleK,
@@ -1952,10 +1943,6 @@ ClientGetPremasterSecret(bignum *OutputSecret,
                              (bignum *)&RFC_5054_NIST_PRIME_1024,
                              (bignum *)&NIST_RFC_5054_GEN_BIGNUM,
                              PSizeBytes);
-
-    // TODO(bwd):
-    MinUnitAssert(AreVectorsEqualByteSwapped(LittleK, (u8 *)RFC_5054_TEST_K.Num, sizeof(LittleK)),
-                  "Little k mismatch (Client) in TestImplementSrpTestVec!\n");
 
     u8 LittleX[SHA_1_HASH_LENGTH_BYTES];
     u32 SaltLengthBytes = BigNumSizeBytesUnchecked(Salt);
@@ -1968,10 +1955,6 @@ ClientGetPremasterSecret(bignum *OutputSecret,
             STR_LEN(SRP_TEST_VEC_EMAIL),
             (u8 *)SRP_TEST_VEC_PASSWORD,
             STR_LEN(SRP_TEST_VEC_PASSWORD));
-
-    // TODO(bwd):
-    MinUnitAssert(AreVectorsEqualByteSwapped(LittleX, (u8 *)RFC_5054_TEST_X.Num, sizeof(LittleX)),
-                  "Little x mismatch (Client) in TestImplementSrpTestVec!\n");
 
     bignum LittleXBigNum;
     HashOutputToBigNumUnchecked(&LittleXBigNum, LittleX);
@@ -2064,16 +2047,20 @@ internal void
 ClientConnectAndGetServerHello(u8 *ClientSendRecvBuffer,
                                u32 ClientBuffMaxSizeBytes,
                                i32 *SocketFileDescriptor,
-                               sockaddr_in *ServerSocketAddr,
                                bignum *ModulusN,
                                bignum *LittleG,
                                bignum *Salt,
                                bignum *BigB)
 {
-    Stopif((ClientSendRecvBuffer == 0) || (SocketFileDescriptor == 0) || (ServerSocketAddr == 0),
+    Stopif((ClientSendRecvBuffer == 0) || (SocketFileDescriptor == 0),
            "Null input to ClientConnectAndGetServerHello!");
 
-    OpenSocketAndConnect(SocketFileDescriptor, ServerSocketAddr);
+    sockaddr_in ServerSocketAddr;
+    ServerSocketAddr.sin_family = AF_INET;
+    ServerSocketAddr.sin_addr.s_addr = inet_addr(IP_ADDRESS);
+    ServerSocketAddr.sin_port = htons(PORT);
+
+    OpenSocketAndConnect(SocketFileDescriptor, &ServerSocketAddr);
 
     write(*SocketFileDescriptor, TEST_USER_COMMAND, TEST_USER_CMD_LENGTH);
 
