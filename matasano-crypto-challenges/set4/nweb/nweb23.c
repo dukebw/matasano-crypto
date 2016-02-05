@@ -264,12 +264,13 @@ void web(int fd, int hit)
 
             logger(LOG, "Sent (N, g, s, B) from server!", buffer, fd);
 
-            u32 ReadBytes = read(fd, ServerSendRcvBuffer, sizeof(ServerSendRcvBuffer));
+            u32 ReadBytes = read(fd, ServerSendRcvBuffer, sizeof(bignum));
             if (ReadBytes == sizeof(ServerSendRcvBuffer))
             {
                 logger(ERROR, "Received message _BigA_ too long in nweb server!", buffer, fd);
             }
 
+            sprintf(buffer, "A: 0x%x, ... ReadBytes: %d\n", *(u32 *)ServerSendRcvBuffer, ReadBytes);
             logger(LOG, "Server read A!", buffer, fd);
 
             bignum BigA;
@@ -292,11 +293,27 @@ void web(int fd, int hit)
                      (u8 *)RFC_5054_TEST_SALT.Num,
                      BigNumSizeBytesUnchecked((bignum *)&RFC_5054_TEST_SALT));
 
-            ReadBytes = read(fd, ServerSendRcvBuffer, sizeof(ServerSendRcvBuffer));
+            buffer[0] = 0;
+            logger(LOG, "Server reading HMAC!", buffer, fd);
+
+            ReadBytes = read(fd, ServerSendRcvBuffer, SHA_1_HASH_LENGTH_BYTES);
             if (ReadBytes == sizeof(ServerSendRcvBuffer))
             {
                 logger(ERROR, "Received message _HMAC_ too long in nweb server!", buffer, fd);
             }
+
+            logger(LOG, "Server finished reading HMAC!", buffer, fd);
+
+            for (u32 HmacWordIndex = 0;
+                 HmacWordIndex < 5;
+                 ++HmacWordIndex)
+            {
+                u32 HmacByteIndex = HmacWordIndex*sizeof(u32);
+                sprintf(buffer + HmacByteIndex, "H[%d]: 0x%x, ",
+                        HmacWordIndex,
+                        *(u32 *)(ServerSendRcvBuffer + HmacByteIndex));
+            }
+            sprintf(buffer + SHA_1_HASH_LENGTH_BYTES, "\n");
 
             logger(LOG, "Server read HMAC!", buffer, fd);
 

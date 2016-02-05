@@ -2,14 +2,15 @@
 
 internal MIN_UNIT_TEST_FUNC(TestBreakSrpZeroKey)
 {
-    u8 ClientSendRecvBuffer[4*sizeof(bignum)];
+    u8 ClientSendRecvBuffer[4*sizeof(bignum) + 1];
     bignum ModulusN;
     bignum LittleG;
     bignum Salt;
     bignum BigB;
     i32 SocketFileDescriptor;
+    u32 ClientBufferMaxSize = sizeof(ClientSendRecvBuffer) - 1;
     ClientConnectAndGetServerHello(ClientSendRecvBuffer,
-                                   sizeof(ClientSendRecvBuffer),
+                                   ClientBufferMaxSize,
                                    &SocketFileDescriptor,
                                    &ModulusN,
                                    &LittleG,
@@ -17,9 +18,9 @@ internal MIN_UNIT_TEST_FUNC(TestBreakSrpZeroKey)
                                    &BigB);
 
     // Send A == 0, so that Server calculates <premaster secret> = (A * v^u) ^ b % N == 0
-    memset(ClientSendRecvBuffer, 0, sizeof(bignum));
-
-    write(SocketFileDescriptor, ClientSendRecvBuffer, sizeof(bignum));
+    bignum Zero;
+    Zero.SizeWords = 0;
+    write(SocketFileDescriptor, &Zero, sizeof(Zero));
 
     // Hash 0, since pre-master secret is 0
     u8 ClientHashScratch[SHA_1_HASH_LENGTH_BYTES];
@@ -31,8 +32,9 @@ internal MIN_UNIT_TEST_FUNC(TestBreakSrpZeroKey)
 
     write(SocketFileDescriptor, ClientHashScratch, sizeof(ClientHashScratch));
 
-    u32 ReadBytes = read(SocketFileDescriptor, ClientSendRecvBuffer, sizeof(ClientSendRecvBuffer));
-    Stopif(ReadBytes > STR_LEN(HMAC_VALID_STRING), "Overflow read from (N, g, s ,B) in TestBreakSrpZeroKey!\n");
+    u32 ReadBytes = read(SocketFileDescriptor, ClientSendRecvBuffer, ClientBufferMaxSize);
+    Stopif(ReadBytes > STR_LEN(HMAC_VALID_STRING),
+           "Overflow read from HMAC Valid response in TestBreakSrpZeroKey!\n");
 
     MinUnitAssert(AreVectorsEqual(ClientSendRecvBuffer, (void *)HMAC_VALID_STRING, STR_LEN(HMAC_VALID_STRING)),
                   "Zero-key attack mismatch in TestBreakSrpZeroKey!\n");
