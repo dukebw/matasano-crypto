@@ -116,21 +116,6 @@ GenRandKeyAndGPowerRandKeyUnchecked(bignum *RandKey, bignum *GPowerRandKey, bign
     MontModExpRBigNumMax(GPowerRandKey, G, RandKey, P);
 }
 
-internal void
-PrintArray(u8 *Array, u32 ArrayLengthBytes)
-{
-    Stopif(Array == 0, "Null input to PrintArray!");
-
-    for (u32 ArrayIndex = 0;
-         ArrayIndex < ArrayLengthBytes;
-         ++ArrayIndex)
-    {
-        printf("%x, ", Array[ArrayIndex]);
-    }
-
-    printf("\n");
-}
-
 internal inline void
 EveInterceptMessage()
 {

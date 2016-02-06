@@ -797,7 +797,7 @@ Sha1KeyedMac(u8 *KeyedMac, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLengt
 #define HMAC_RET_CODE_LENGTH_BYTES 4
 
 #define PORT 8181
-#define IP_ADDRESS "192.168.1.7"
+const char IP_ADDRESS[] = "192.168.11.42";
 
 #define TEST_USER_CMD_LENGTH (STR_LEN(TEST_SRP_PREFIX) +    \
                               STR_LEN(USER_PREFIX) + STR_LEN(SRP_TEST_VEC_EMAIL) + 1)
@@ -1364,12 +1364,14 @@ ByteSwap(u8 *Buffer, u32 Length)
 	}
 }
 
+#define INVALID_LENGTH_WORDS(A, ALengthWords) (((ALengthWords) > 0) && ((A)[(ALengthWords) - 1] == 0))
+
 internal u32
 MultiplyOperandScanningUnchecked(u64 *ProductAB, u32 ProductABMaxLengthWords,
                                  u64 *A, u32 ALengthWords,
                                  u64 *B, u32 BLengthWords)
 {
-    Stopif((A[ALengthWords - 1] == 0) || (B[BLengthWords - 1] == 0),
+    Stopif(INVALID_LENGTH_WORDS(A, ALengthWords) || INVALID_LENGTH_WORDS(B, BLengthWords),
            "Invalid LengthWords parameter in MultiplyOperandScanningUnchecked!\n");
 
     memset(ProductAB, 0, sizeof(u64)*ProductABMaxLengthWords);
@@ -1401,13 +1403,8 @@ MultiplyOperandScanningUnchecked(u64 *ProductAB, u32 ProductABMaxLengthWords,
     {
         ResultLength = ProductABMaxLengthWords;
     }
-    else if (ProductAB[ResultLength - 1] == 0)
-    {
-        --ResultLength;
-    }
 
-	while ((ResultLength > 0) &&
-		   (ProductAB[ResultLength - 1] == 0))
+	while (INVALID_LENGTH_WORDS(ProductAB, ResultLength))
 	{
 		--ResultLength;
 	}
@@ -1576,8 +1573,12 @@ MultiplyByRModP(bignum *Output, bignum *InputX, bignum *ModulusP, u32 RPowerOf2)
 }
 
 internal void
-GetZRInverseModP(bignum *Output, u64 *InputZ, u32 ZLengthDWords,
-                 bignum *ModulusP, bignum *MinusPInverseModR, u32 RPowerOf2)
+GetZRInverseModP(bignum *Output,
+                 u64 *InputZ,
+                 u32 ZLengthDWords,
+                 bignum *ModulusP,
+                 bignum *MinusPInverseModR,
+                 u32 RPowerOf2)
 {
     Stopif((Output == 0) ||
            (InputZ == 0) ||
@@ -1601,29 +1602,37 @@ GetZRInverseModP(bignum *Output, u64 *InputZ, u32 ZLengthDWords,
         MaxDWordsModR = RPowerOf2/BITS_IN_DWORD;
     }
 
-    LocalOutput.SizeWords =
-        MultiplyOperandScanningUnchecked(LocalOutput.Num, MaxDWordsModR,
-                                         InputZ, ZLengthDWords,
-                                         MinusPInverseModR->Num, MinusPInverseModR->SizeWords);
+    LocalOutput.SizeWords = MultiplyOperandScanningUnchecked(LocalOutput.Num,
+                                                             MaxDWordsModR,
+                                                             InputZ,
+                                                             ZLengthDWords,
+                                                             MinusPInverseModR->Num,
+                                                             MinusPInverseModR->SizeWords);
 
     u64 RBitmaskMod2Pow64 = BITMASK_MOD_DWORD(RPowerOf2);
-    if (RBitmaskMod2Pow64)
+    if (RBitmaskMod2Pow64 && (LocalOutput.SizeWords > 0))
     {
         LocalOutput.Num[LocalOutput.SizeWords - 1] &= RBitmaskMod2Pow64;
     }
 
     // PTimesZPModR := (z*p' mod R)*p 
     u64 PTimesZPModR[2*MAX_BIGNUM_SIZE_WORDS];
-    u32 PZModRLengthDWords = MultiplyOperandScanningUnchecked(PTimesZPModR, ARRAY_LENGTH(PTimesZPModR),
-                                                              LocalOutput.Num, LocalOutput.SizeWords,
-                                                              ModulusP->Num, ModulusP->SizeWords);
+    u32 PZModRLengthDWords = MultiplyOperandScanningUnchecked(PTimesZPModR,
+                                                              ARRAY_LENGTH(PTimesZPModR),
+                                                              LocalOutput.Num,
+                                                              LocalOutput.SizeWords,
+                                                              ModulusP->Num,
+                                                              ModulusP->SizeWords);
 
     // DoubleBignumScratch := (z + (z*p' mod R)*p)
     u64 DoubleBignumScratch[2*MAX_BIGNUM_SIZE_WORDS];
     u32 NumeratorLength = ARRAY_LENGTH(DoubleBignumScratch);
-    MultiPrecisionAdd(DoubleBignumScratch, &NumeratorLength,
-                      InputZ, ZLengthDWords,
-                      PTimesZPModR, PZModRLengthDWords);
+    MultiPrecisionAdd(DoubleBignumScratch,
+                      &NumeratorLength,
+                      InputZ,
+                      ZLengthDWords,
+                      PTimesZPModR,
+                      PZModRLengthDWords);
 
     // Output := (z + (z*p' mod R)*p)/R
     u32 TruncatedStartIndex;
@@ -1687,21 +1696,29 @@ BigNumMultiplyModP(bignum *ProductABModP, bignum *A, bignum *B, bignum *P)
 {
     Stopif((ProductABModP == 0) || (A == 0) || (B == 0)|| (P == 0), "Null InputX to BigNumMultiplyModP!\n");
 
-    bignum LocalProductABModP;
-    BigNumMultiplyOperandScanning(&LocalProductABModP, A, B);
+    if ((A->SizeWords == 0) || (B->SizeWords == 0))
+    {
+        // If A or B are zero, the result will be zero mod P, so we check for this case
+        ProductABModP->SizeWords = 0;
+    }
+    else
+    {
+        bignum LocalProductABModP;
+        BigNumMultiplyOperandScanning(&LocalProductABModP, A, B);
 
-    // Reduce k*g^x mod P to satisfy BigNumSubtract function
-    bignum MinusPInverseModR;
-    FindMinusNInverseModR(&MinusPInverseModR, P, MAX_BIGNUM_SIZE_BITS);
+        // Reduce k*g^x mod P to satisfy BigNumSubtract function
+        bignum MinusPInverseModR;
+        FindMinusNInverseModR(&MinusPInverseModR, P, MAX_BIGNUM_SIZE_BITS);
 
-    GetZRInverseModP(&LocalProductABModP,
-                     LocalProductABModP.Num,
-                     LocalProductABModP.SizeWords,
-                     P,
-                     &MinusPInverseModR,
-                     MAX_BIGNUM_SIZE_BITS);
+        GetZRInverseModP(&LocalProductABModP,
+                         LocalProductABModP.Num,
+                         LocalProductABModP.SizeWords,
+                         P,
+                         &MinusPInverseModR,
+                         MAX_BIGNUM_SIZE_BITS);
 
-    MultiplyByRModP(ProductABModP, &LocalProductABModP, P, MAX_BIGNUM_SIZE_BITS);
+        MultiplyByRModP(ProductABModP, &LocalProductABModP, P, MAX_BIGNUM_SIZE_BITS);
+    }
 }
 
 internal void
@@ -2072,6 +2089,21 @@ ClientConnectAndGetServerHello(u8 *ClientSendRecvBuffer,
     BigNumCopyUnchecked(LittleG, (bignum *)ClientSendRecvBuffer + 1);
     BigNumCopyUnchecked(Salt, (bignum *)ClientSendRecvBuffer + 2);
     BigNumCopyUnchecked(BigB, (bignum *)ClientSendRecvBuffer + 3);
+}
+
+internal void
+PrintArray(u8 *Array, u32 ArrayLengthBytes)
+{
+    Stopif(Array == 0, "Null input to PrintArray!");
+
+    for (u32 ArrayIndex = 0;
+         ArrayIndex < ArrayLengthBytes;
+         ++ArrayIndex)
+    {
+        printf("%x, ", Array[ArrayIndex]);
+    }
+
+    printf("\n");
 }
 
 #endif /* CRYPT_HELPER_H */

@@ -70,6 +70,25 @@ const u8 TEST_HMAC_KEY[] =
 const u8 TEST_FILE_HMAC_HEX[] = "254b6040afd5a30d669c06c8a7e4e3e2e771fa51";
 #define HMAC_TEST_KEY_HEX_DIGIT_COUNT (2*sizeof(TEST_HMAC_KEY))
 
+internal inline void
+LogArrayUnchecked(u8 *Array, u32 ArraySizeBytes, char *PrintBuffer, i32 FileDescriptor)
+{
+    for (u32 ArrayIndex = 0;
+         ArrayIndex < ArraySizeBytes;
+         ArrayIndex += sizeof(u32))
+    {
+        sprintf(PrintBuffer, "A[%d]: 0x%x", ArrayIndex, *(u32 *)(Array + ArrayIndex));
+        logger(LOG, "", PrintBuffer, FileDescriptor);
+    }
+}
+
+internal inline void
+LogStringUnchecked(char *String, char *PrintBuffer, i32 FileDescriptor)
+{
+    PrintBuffer[0] = 0;
+    logger(LOG, String, PrintBuffer, FileDescriptor);
+}
+
 /* this is a child web server process, so we can exit on errors */
 void web(int fd, int hit)
 {
@@ -253,16 +272,18 @@ void web(int fd, int hit)
                      SRP_TEST_VEC_EMAIL,
                      STR_LEN(USER_PREFIX)) == 0))
         {
-            u8 ServerSendRcvBuffer[4*sizeof(bignum)];
+            u8 ServerSendRcvBuffer[4*sizeof(bignum) + sizeof(u32) + 1];
 
             BigNumCopyUnchecked((bignum *)ServerSendRcvBuffer, (bignum *)&RFC_5054_NIST_PRIME_1024);
             BigNumCopyUnchecked((bignum *)ServerSendRcvBuffer + 1, (bignum *)&NIST_RFC_5054_GEN_BIGNUM);
             BigNumCopyUnchecked((bignum *)ServerSendRcvBuffer + 2, (bignum *)&RFC_5054_TEST_SALT);
             BigNumCopyUnchecked((bignum *)ServerSendRcvBuffer + 3, (bignum *)&RFC_5054_TEST_BIG_B);
 
-            write(fd, ServerSendRcvBuffer, sizeof(ServerSendRcvBuffer));
+            write(fd, ServerSendRcvBuffer, 4*sizeof(bignum));
 
-            logger(LOG, "Sent (N, g, s, B) from server!", buffer, fd);
+            LogStringUnchecked("Sent (N, g, s, B) from server!", buffer, fd);
+
+            *(u32 *)ServerSendRcvBuffer = 0;
 
             u32 ReadBytes = read(fd, ServerSendRcvBuffer, sizeof(bignum));
             if (ReadBytes == sizeof(ServerSendRcvBuffer))
@@ -270,17 +291,35 @@ void web(int fd, int hit)
                 logger(ERROR, "Received message _BigA_ too long in nweb server!", buffer, fd);
             }
 
-            sprintf(buffer, "A: 0x%x, ... ReadBytes: %d\n", *(u32 *)ServerSendRcvBuffer, ReadBytes);
+            sprintf(buffer, "ReadBytes: %d\n", ReadBytes);
             logger(LOG, "Server read A!", buffer, fd);
+
+            LogArrayUnchecked(ServerSendRcvBuffer, ReadBytes, buffer, fd);
+
+            LogStringUnchecked("Server reading HMAC!", buffer, fd);
+
+            ReadBytes = read(fd, ServerSendRcvBuffer, SHA_1_HASH_LENGTH_BYTES);
+            if (ReadBytes != SHA_1_HASH_LENGTH_BYTES)
+            {
+                logger(ERROR, "Received message _HMAC_ invalid size in nweb server!", buffer, fd);
+            }
+
+            LogArrayUnchecked(ServerSendRcvBuffer, ReadBytes, buffer, fd);
+
+            LogStringUnchecked("Server finished reading HMAC!", buffer, fd);
 
             bignum BigA;
             BigNumCopyUnchecked(&BigA, (bignum *)ServerSendRcvBuffer);
+
+            LogStringUnchecked("Server getting Premaster Secret!", buffer, fd);
 
             bignum PremasterSecret;
             ServerGetPremasterSecret(&PremasterSecret,
                                      (bignum *)&RFC_5054_TEST_V,
                                      (bignum *)&RFC_5054_TEST_LITTLE_B,
                                      &BigA);
+
+            LogStringUnchecked("Server finished generating Premaster Secret!", buffer, fd);
 
             u8 ServerHashScratch[SHA_1_HASH_LENGTH_BYTES];
             u32 ServerSecretSizeBytes = BigNumSizeBytesUnchecked(&PremasterSecret);
@@ -292,30 +331,6 @@ void web(int fd, int hit)
                      ServerSecretSizeBytes,
                      (u8 *)RFC_5054_TEST_SALT.Num,
                      BigNumSizeBytesUnchecked((bignum *)&RFC_5054_TEST_SALT));
-
-            buffer[0] = 0;
-            logger(LOG, "Server reading HMAC!", buffer, fd);
-
-            ReadBytes = read(fd, ServerSendRcvBuffer, SHA_1_HASH_LENGTH_BYTES);
-            if (ReadBytes == sizeof(ServerSendRcvBuffer))
-            {
-                logger(ERROR, "Received message _HMAC_ too long in nweb server!", buffer, fd);
-            }
-
-            logger(LOG, "Server finished reading HMAC!", buffer, fd);
-
-            for (u32 HmacWordIndex = 0;
-                 HmacWordIndex < 5;
-                 ++HmacWordIndex)
-            {
-                u32 HmacByteIndex = HmacWordIndex*sizeof(u32);
-                sprintf(buffer + HmacByteIndex, "H[%d]: 0x%x, ",
-                        HmacWordIndex,
-                        *(u32 *)(ServerSendRcvBuffer + HmacByteIndex));
-            }
-            sprintf(buffer + SHA_1_HASH_LENGTH_BYTES, "\n");
-
-            logger(LOG, "Server read HMAC!", buffer, fd);
 
             if (memcmp(ServerSendRcvBuffer, ServerHashScratch, sizeof(ServerHashScratch)) == 0)
             {
