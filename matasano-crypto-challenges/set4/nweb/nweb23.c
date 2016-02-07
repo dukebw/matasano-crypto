@@ -272,7 +272,7 @@ void web(int fd, int hit)
                      SRP_TEST_VEC_EMAIL,
                      STR_LEN(USER_PREFIX)) == 0))
         {
-            u8 ServerSendRcvBuffer[4*sizeof(bignum) + sizeof(u32) + 1];
+            u8 ServerSendRcvBuffer[4*sizeof(bignum)];
 
             BigNumCopyUnchecked((bignum *)ServerSendRcvBuffer, (bignum *)&RFC_5054_NIST_PRIME_1024);
             BigNumCopyUnchecked((bignum *)ServerSendRcvBuffer + 1, (bignum *)&NIST_RFC_5054_GEN_BIGNUM);
@@ -294,7 +294,10 @@ void web(int fd, int hit)
             sprintf(buffer, "ReadBytes: %d\n", ReadBytes);
             logger(LOG, "Server read A!", buffer, fd);
 
-            LogArrayUnchecked(ServerSendRcvBuffer, ReadBytes, buffer, fd);
+            bignum BigA;
+            BigNumCopyUnchecked(&BigA, (bignum *)ServerSendRcvBuffer);
+
+            LogArrayUnchecked((u8 *)BigA.Num, BigNumSizeBytesUnchecked(&BigA), buffer, fd);
 
             LogStringUnchecked("Server reading HMAC!", buffer, fd);
 
@@ -308,9 +311,6 @@ void web(int fd, int hit)
 
             LogStringUnchecked("Server finished reading HMAC!", buffer, fd);
 
-            bignum BigA;
-            BigNumCopyUnchecked(&BigA, (bignum *)ServerSendRcvBuffer);
-
             LogStringUnchecked("Server getting Premaster Secret!", buffer, fd);
 
             bignum PremasterSecret;
@@ -320,6 +320,11 @@ void web(int fd, int hit)
                                      &BigA);
 
             LogStringUnchecked("Server finished generating Premaster Secret!", buffer, fd);
+
+            LogArrayUnchecked((u8 *)PremasterSecret.Num,
+                              BigNumSizeBytesUnchecked(&PremasterSecret),
+                              buffer,
+                              fd);
 
             u8 ServerHashScratch[SHA_1_HASH_LENGTH_BYTES];
             u32 ServerSecretSizeBytes = BigNumSizeBytesUnchecked(&PremasterSecret);
@@ -332,15 +337,19 @@ void web(int fd, int hit)
                      (u8 *)RFC_5054_TEST_SALT.Num,
                      BigNumSizeBytesUnchecked((bignum *)&RFC_5054_TEST_SALT));
 
+            LogStringUnchecked("Server generated HMAC(K, salt)!", buffer, fd);
+
+            LogArrayUnchecked(ServerHashScratch, sizeof(ServerHashScratch), buffer, fd);
+
             if (memcmp(ServerSendRcvBuffer, ServerHashScratch, sizeof(ServerHashScratch)) == 0)
             {
                 write(fd, HMAC_VALID_STRING, STR_LEN(HMAC_VALID_STRING));
-                logger(LOG, "HMAC Valid!", buffer, fd);
+                LogStringUnchecked("HMAC Valid!", buffer, fd);
             }
             else
             {
                 write(fd, HMAC_INVALID_STRING, STR_LEN(HMAC_INVALID_STRING));
-                logger(LOG, "HMAC Invalid!", buffer, fd);
+                LogStringUnchecked("HMAC Invalid!", buffer, fd);
             }
         }
         else

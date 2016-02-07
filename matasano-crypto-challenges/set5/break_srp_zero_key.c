@@ -17,7 +17,11 @@ internal MIN_UNIT_TEST_FUNC(TestBreakSrpZeroKey)
                                    &BigB);
 
     // Send A == 0, so that Server calculates <premaster secret> = (A * v^u) ^ b % N == 0
+#if 0
     memset(ClientSendRecvBuffer, 0, sizeof(bignum));
+#else
+    memcpy(ClientSendRecvBuffer, (bignum *)&RFC_5054_NIST_PRIME_1024, sizeof(bignum));
+#endif
     write(SocketFileDescriptor, ClientSendRecvBuffer, sizeof(bignum));
 
     // Hash 0, since pre-master secret is 0

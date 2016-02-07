@@ -2,6 +2,7 @@
 
 #define DH_PRIME 37
 #define DH_GENERATOR 5
+#define TEST_R_SIZE_BITS 2048
 
 // TODO(bwd): implementation with allocator
 global_variable bignum GlobalScratchBigNumA;
@@ -298,35 +299,48 @@ internal MIN_UNIT_TEST_FUNC(TestMontInner)
 
     MinUnitAssert((Output.SizeWords == 1) && (Output.Num[0] == 9), "Simple case failed in TestMontInner!\n");
 
-    MultiplyByRModP(&XTimesRModP, (bignum *)&TEST_BIGNUM_2_LEFT, (bignum *)&NIST_RFC_3526_PRIME_1536,
-                    MAX_BIGNUM_SIZE_BITS);
+    MultiplyByRModP(&XTimesRModP,
+                    (bignum *)&TEST_BIGNUM_2_LEFT,
+                    (bignum *)&NIST_RFC_3526_PRIME_1536,
+                    TEST_R_SIZE_BITS);
 
-    MinUnitAssert(AreVectorsEqual(&XTimesRModP, (bignum *)&TEST_BIGNUM_2_XR_MOD_P,
+    MinUnitAssert(AreVectorsEqual(&XTimesRModP,
+                                  (bignum *)&TEST_BIGNUM_2_XR_MOD_P,
                                   TEST_BIGNUM_2_XR_MOD_P.SizeWords),
                   "X*R mod P mismatch in TestMontInner!\n");
 
     MultiplyByRModP(&YTimesRModP, (bignum *)&TEST_BIGNUM_2_RIGHT, (bignum *)&NIST_RFC_3526_PRIME_1536,
-                    MAX_BIGNUM_SIZE_BITS);
+                    TEST_R_SIZE_BITS);
 
-    MinUnitAssert(AreVectorsEqual(&YTimesRModP, (bignum *)&TEST_BIGNUM_2_YR_MOD_P,
+    MinUnitAssert(AreVectorsEqual(&YTimesRModP,
+                                  (bignum *)&TEST_BIGNUM_2_YR_MOD_P,
                                   TEST_BIGNUM_2_YR_MOD_P.SizeWords),
                   "Y*R mod P mismatch in TestMontInner!\n");
 
-    FindMinusNInverseModR(&MinusPInverseModR, (bignum *)&NIST_RFC_3526_PRIME_1536, MAX_BIGNUM_SIZE_BITS);
+    FindMinusNInverseModR(&MinusPInverseModR, (bignum *)&NIST_RFC_3526_PRIME_1536, TEST_R_SIZE_BITS);
 
-    MontInner(&Output, &XTimesRModP, &YTimesRModP, (bignum *)&NIST_RFC_3526_PRIME_1536, &MinusPInverseModR, MAX_BIGNUM_SIZE_BITS);
+    MontInner(&Output,
+              &XTimesRModP,
+              &YTimesRModP,
+              (bignum *)&NIST_RFC_3526_PRIME_1536,
+              &MinusPInverseModR,
+              TEST_R_SIZE_BITS);
 
-    MinUnitAssert(AreVectorsEqual(Output.Num, (void *)TEST_BIGNUM_2_XYR_MOD_P.Num,
+    MinUnitAssert(AreVectorsEqual(Output.Num,
+                                  (void *)TEST_BIGNUM_2_XYR_MOD_P.Num,
                                   TEST_BIGNUM_2_XYR_MOD_P.SizeWords),
                   "Expected/actual mismatch after MontInner in TestMontInner!\n");
 }
 
 internal MIN_UNIT_TEST_FUNC(TestMontModExp)
 {
-    MontModExpRBigNumMax(&GlobalScratchBigNumA, (bignum *)&TEST_BIGNUM_2_LEFT, (bignum *)&TEST_BIGNUM_2_RIGHT,
+    MontModExpRBigNumMax(&GlobalScratchBigNumA,
+                         (bignum *)&TEST_BIGNUM_2_LEFT,
+                         (bignum *)&TEST_BIGNUM_2_RIGHT,
                          (bignum *)&NIST_RFC_3526_PRIME_1536);
 
-    MinUnitAssert(AreVectorsEqual(GlobalScratchBigNumA.Num, (void *)TEST_BIGNUM_2_POWER_MOD_P.Num,
+    MinUnitAssert(AreVectorsEqual(GlobalScratchBigNumA.Num,
+                                  (void *)TEST_BIGNUM_2_POWER_MOD_P.Num,
                                   sizeof(u64)*TEST_BIGNUM_2_POWER_MOD_P.SizeWords),
                   "Expected/actual mismatch in TestMontModExp!\n");
 }
@@ -352,7 +366,9 @@ internal MIN_UNIT_TEST_FUNC(TestDiffieHellmanBigNum)
     bignum SessionKeyB;
     MontModExpRBigNumMax(&SessionKeyB, &GPowerAModP, &GlobalScratchBigNumB, (bignum *)&NIST_RFC_3526_PRIME_1536);
 
-    MinUnitAssert(AreVectorsEqual(SessionKeyA.Num, SessionKeyB.Num, sizeof(u64)*NIST_RFC_3526_PRIME_1536.SizeWords),
+    MinUnitAssert(AreVectorsEqual(SessionKeyA.Num,
+                                  SessionKeyB.Num,
+                                  sizeof(u64)*NIST_RFC_3526_PRIME_1536.SizeWords),
                   "Mismatch in TestDiffieHellmanBigNum!\n");
 }
 

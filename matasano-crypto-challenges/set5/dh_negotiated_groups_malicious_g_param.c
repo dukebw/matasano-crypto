@@ -183,7 +183,9 @@ EveEntryPoint(void *Arg)
     EveInterceptMessage();
 
     u8 SessionSymmetricKey[SHA_1_HASH_LENGTH_BYTES];
-    Sha1(SessionSymmetricKey, (u8 *)GlobalEveScratch.Num, sizeof(GlobalEveScratch.Num[0])*GlobalEveScratch.SizeWords);
+    Sha1(SessionSymmetricKey,
+         (u8 *)GlobalEveScratch.Num,
+         sizeof(GlobalEveScratch.Num[0])*GlobalEveScratch.SizeWords);
 
     printf("Eve SessionSymmetricKey:\n");
     PrintArray(SessionSymmetricKey, sizeof(SessionSymmetricKey));

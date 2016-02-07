@@ -880,7 +880,7 @@ HmacSha1(u8 *Hmac, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength)
 }
 
 #define BITS_IN_BIGNUM_WORD     64
-#define MAX_BIGNUM_SIZE_BITS    2048
+#define MAX_BIGNUM_SIZE_BITS    4096
 #define MAX_BIGNUM_SIZE_BYTES   (MAX_BIGNUM_SIZE_BITS/BITS_IN_BYTE)
 #define MAX_BIGNUM_SIZE_WORDS   (MAX_BIGNUM_SIZE_BYTES/sizeof(u64))
 #define MAX_BIT_IN_BIGNUM_WORD  (BITS_IN_BIGNUM_WORD - 1)
@@ -1397,19 +1397,20 @@ MultiplyOperandScanningUnchecked(u64 *ProductAB, u32 ProductABMaxLengthWords,
         }
     }
 
-    u32 ResultLength;
-    ResultLength = (ALengthWords + BLengthWords);
-    if (ResultLength > ProductABMaxLengthWords)
+    // Extra word is because
+    // (a_31*2^31 + ... + a_0*2^0)*(b_31*2^31 + ... + b_0*2^0) == c_62*2^62 + ... + c_0*2^0
+    u32 ResultSizeWords = (ALengthWords + BLengthWords + 1);
+    if (ResultSizeWords > ProductABMaxLengthWords)
     {
-        ResultLength = ProductABMaxLengthWords;
+        ResultSizeWords = ProductABMaxLengthWords;
     }
 
-	while (INVALID_LENGTH_WORDS(ProductAB, ResultLength))
+	while (INVALID_LENGTH_WORDS(ProductAB, ResultSizeWords))
 	{
-		--ResultLength;
+		--ResultSizeWords;
 	}
 
-    return ResultLength;
+    return ResultSizeWords;
 }
 
 internal void
@@ -1419,14 +1420,11 @@ BigNumMultiplyOperandScanning(bignum *ProductAB, bignum *A, bignum *B)
 
     bignum TempProductAB;
 
-    MultiplyOperandScanningUnchecked(TempProductAB.Num, MAX_BIGNUM_SIZE_WORDS,
-                                     A->Num, A->SizeWords,
-                                     B->Num, B->SizeWords);
+    TempProductAB.SizeWords = MultiplyOperandScanningUnchecked(TempProductAB.Num, MAX_BIGNUM_SIZE_WORDS,
+                                                               A->Num, A->SizeWords,
+                                                               B->Num, B->SizeWords);
 
     memcpy(ProductAB, &TempProductAB, sizeof(TempProductAB));
-
-    ProductAB->SizeWords = MAX_BIGNUM_SIZE_WORDS;
-    AdjustSizeWordsDownUnchecked(ProductAB);
 }
 
 internal inline b32
@@ -1533,42 +1531,46 @@ MultiplyByRModP(bignum *Output, bignum *InputX, bignum *ModulusP, u32 RPowerOf2)
 
     BigNumCopyUnchecked(Output, InputX);
 
-    for (u32 RPowerIndex = 0;
-         RPowerIndex < RPowerOf2;
-         ++RPowerIndex)
+    if (Output->SizeWords > 0)
     {
-        u32 PrevMontInputWordHighBit = GET_HIGHEST_BIGNUM_BIT(Output->Num[0]);
-
-        Output->Num[0] <<= 1;
-
-        for (u32 InputIndex = 1;
-             InputIndex < Output->SizeWords;
-             ++InputIndex)
+        for (u32 RPowerIndex = 0;
+             RPowerIndex < RPowerOf2;
+             ++RPowerIndex)
         {
-            u64 TempMontInputWord = Output->Num[InputIndex];
+            u32 PrevMontInputWordHighBit = GET_HIGHEST_BIGNUM_BIT(Output->Num[0]);
 
-            Output->Num[InputIndex] = (Output->Num[InputIndex] << 1) | PrevMontInputWordHighBit;
+            Output->Num[0] <<= 1;
 
-            PrevMontInputWordHighBit = GET_HIGHEST_BIGNUM_BIT(TempMontInputWord);
-        }
-
-        if (Output->SizeWords < MAX_BIGNUM_SIZE_WORDS)
-        {
-            Output->Num[Output->SizeWords] = PrevMontInputWordHighBit;
-
-            if (PrevMontInputWordHighBit)
+            for (u32 InputIndex = 1;
+                 InputIndex < Output->SizeWords;
+                 ++InputIndex)
             {
-                ++Output->SizeWords;
+                u64 TempMontInputWord = Output->Num[InputIndex];
+
+                Output->Num[InputIndex] = (Output->Num[InputIndex] << 1) | PrevMontInputWordHighBit;
+
+                PrevMontInputWordHighBit = GET_HIGHEST_BIGNUM_BIT(TempMontInputWord);
             }
-        }
 
-        if (IsAGreaterThanB(Output, ModulusP))
-        {
-            BigNumSubtract(Output, Output, ModulusP);
-        }
+            if (Output->SizeWords < MAX_BIGNUM_SIZE_WORDS)
+            {
+                Output->Num[Output->SizeWords] = PrevMontInputWordHighBit;
 
-        Stopif(IsAGreaterThanOrEqualToB(Output, ModulusP),
-               "Output < ModulusP pre-condition broken for RPowerIndex %d in MultiplyByRModP!\n", RPowerIndex);
+                if (PrevMontInputWordHighBit)
+                {
+                    ++Output->SizeWords;
+                }
+            }
+
+            if (IsAGreaterThanB(Output, ModulusP))
+            {
+                BigNumSubtract(Output, Output, ModulusP);
+            }
+
+            Stopif(IsAGreaterThanOrEqualToB(Output, ModulusP),
+                   "Output < ModulusP pre-condition broken for RPowerIndex %d in MultiplyByRModP!\n",
+                   RPowerIndex);
+        }
     }
 }
 
@@ -1586,8 +1588,6 @@ GetZRInverseModP(bignum *Output,
            (MinusPInverseModR == 0),
            "Null input to GetZRInverseModP!\n");
 
-    bignum LocalOutput;
-
     // c := (z + (z*p' mod R)*p)/R
 
     // Output := (z*p' mod R)
@@ -1602,6 +1602,7 @@ GetZRInverseModP(bignum *Output,
         MaxDWordsModR = RPowerOf2/BITS_IN_DWORD;
     }
 
+    bignum LocalOutput;
     LocalOutput.SizeWords = MultiplyOperandScanningUnchecked(LocalOutput.Num,
                                                              MaxDWordsModR,
                                                              InputZ,
@@ -2100,7 +2101,7 @@ PrintArray(u8 *Array, u32 ArrayLengthBytes)
          ArrayIndex < ArrayLengthBytes;
          ++ArrayIndex)
     {
-        printf("%x, ", Array[ArrayIndex]);
+        printf("%02x", Array[ArrayIndex]);
     }
 
     printf("\n");

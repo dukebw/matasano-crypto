@@ -127,13 +127,17 @@ internal MIN_UNIT_TEST_FUNC(TestClientServerAuth)
              (u8 *)Salt.Num,
              BigNumSizeBytesUnchecked(&Salt));
 
+    PrintArray(ClientHashScratch, sizeof(ClientHashScratch));
+
     write(SocketFileDescriptor, ClientHashScratch, sizeof(ClientHashScratch));
 
     u32 ReadBytes = read(SocketFileDescriptor, ClientSendRecvBuffer, sizeof(ClientSendRecvBuffer));
-    Stopif(ReadBytes > STR_LEN(HMAC_VALID_STRING), "Overflow read from (N, g, s ,B) in TestClientServerAuth!");
+    Stopif(ReadBytes != STR_LEN(HMAC_VALID_STRING),
+           "Invalid size %d of HMAC Valid response in TestClientServerAuth!\n",
+           ReadBytes);
 
     MinUnitAssert(AreVectorsEqual(ClientSendRecvBuffer, (void *)HMAC_VALID_STRING, STR_LEN(HMAC_VALID_STRING)),
-                  "HMAC mismatch in TestClientServerAuth!");
+                  "HMAC mismatch in TestClientServerAuth!\n");
 }
 
 internal MIN_UNIT_TEST_FUNC(AllTests)
