@@ -8,7 +8,7 @@ typedef struct slre_cap slre_cap;
 
 int main(int argc, char **argv)
 {
-    Stopif(argc < 2, "Supply bignum value in argv[1]");
+    Stopif(argc < 2, "Supply bignum value in argv[1]!\n");
 
     slre_cap SlreCaps[2];
     char *InputString = argv[1];
