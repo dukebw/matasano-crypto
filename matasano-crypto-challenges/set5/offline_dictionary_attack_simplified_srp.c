@@ -11,6 +11,47 @@ SimpleSrpGetHmacKSaltUnchecked(u8 *HmacKSalt, bignum *PremasterSecret, bignum *S
     HmacSha1(HmacKSalt, K, sizeof(K), (u8 *)Salt->Num, BigNumSizeBytesUnchecked(Salt));
 }
 
+const u64 TEST_LITTLE_U[] =
+{
+    0x308e51fd2291bb37, 0x6d8bb86f06266075
+};
+
+const u8 DICTIONARY[] =
+{
+    'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u',
+    'v', 'w', 'x', 'y', 'z',
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U',
+    'V', 'W', 'X', 'Y', 'Z',
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
+};
+
+internal void
+ClientSimpleGetHmacPremasterSecret(u8 *ClientHmacKSalt, bignum *LittleU, bignum *LittleX, bignum *BigB)
+{
+    Stopif((ClientHmacKSalt == 0) || (LittleU == 0) || (LittleX == 0) || (BigB == 0),
+           "Null input to ClientSimpleGetHmacPremasterSecret!");
+
+    // BigNumScratch := u*x
+    bignum BigNumScratch;
+    BigNumMultiplyOperandScanning(&BigNumScratch, LittleU, LittleX);
+
+    // BigNumScratch := a + (u * x)
+    BigNumAdd(&BigNumScratch, (bignum *)&RFC_5054_TEST_LITTLE_A, &BigNumScratch);
+
+    // BigNumScratch := <premaster secret>
+    MontModExpRBigNumMax(&BigNumScratch,
+                         BigB,
+                         &BigNumScratch,
+                         (bignum *)&RFC_5054_NIST_PRIME_1024);
+
+    SimpleSrpGetHmacKSaltUnchecked(ClientHmacKSalt, &BigNumScratch, (bignum *)&RFC_5054_TEST_SALT);
+}
+
+internal u64
+IntegerPowerClamp64(u32 Base, u32 Exponent)
+{
+}
+
 internal MIN_UNIT_TEST_FUNC(TestOfflineDictAttackSimplifiedSrp)
 {
     /*
@@ -56,24 +97,19 @@ internal MIN_UNIT_TEST_FUNC(TestOfflineDictAttackSimplifiedSrp)
     GenRandUnchecked((u32 *)LittleU.Num, LittleUSize32BitWords);
     LittleU.SizeWords = LittleUSize32BitWords/2;
 
-    // Client
-    // BigNumScratch := u*x
-    bignum BigNumScratch;
-    BigNumMultiplyOperandScanning(&BigNumScratch, &LittleU, &LittleX);
-
-    // BigNumScratch := a + (u * x)
-    BigNumAdd(&BigNumScratch, (bignum *)&RFC_5054_TEST_LITTLE_A, &BigNumScratch);
-
-    // BigNumScratch := <premaster secret>
-    MontModExpRBigNumMax(&BigNumScratch,
-                         (bignum *)&RFC_5054_TEST_BIG_B,
-                         &BigNumScratch,
+    // BigB := g**b (calculated by Server)
+    bignum BigB;
+    MontModExpRBigNumMax(&BigB,
+                         (bignum *)&NIST_RFC_5054_GEN_BIGNUM,
+                         (bignum *)&RFC_5054_TEST_LITTLE_B,
                          (bignum *)&RFC_5054_NIST_PRIME_1024);
 
+    // Client
     u8 ClientHmacKSalt[SHA_1_HASH_LENGTH_BYTES];
-    SimpleSrpGetHmacKSaltUnchecked(ClientHmacKSalt, &BigNumScratch, (bignum *)&RFC_5054_TEST_SALT);
+    ClientSimpleGetHmacPremasterSecret(ClientHmacKSalt, &LittleU, &LittleX, &BigB);
 
     // Server
+    bignum BigNumScratch;
     bignum LittleV;
     MontModExpRBigNumMax(&LittleV,
                          (bignum *)&NIST_RFC_5054_GEN_BIGNUM,
@@ -103,6 +139,34 @@ internal MIN_UNIT_TEST_FUNC(TestOfflineDictAttackSimplifiedSrp)
 
     MinUnitAssert(AreVectorsEqual(ServerHmacKSalt, ClientHmacKSalt, sizeof(ServerHmacKSalt)),
                   "Hmac mismatch in TestOfflineDictAttackSimplifiedSrp!\n");
+
+    // Server chooses fake b, B, u and salt and cracks password from Client's HMAC-SHA256(K, salt)
+    BigB.SizeWords = 1;
+    BigB.Num[0] = 2;
+
+    LittleU.SizeWords = 1;
+    LittleU.Num[0] = 1;
+
+    // Client
+    ClientSimpleGetHmacPremasterSecret(ClientHmacKSalt, &LittleU, &LittleX, &BigB);
+
+    // Server offline attack
+    char PasswordGuess[10];
+
+    Stopif(IntegerPowerClamp64(ARRAY_LENGTH(DICTIONARY), ARRAY_LENGTH(PasswordGuess)) == UINT64_MAX, file);
+
+    u32 TotalGuessIndex;
+    for (TotalGuessIndex = 0;
+         TotalGuessIndex < ARRAY_LENGTH(PasswordGuess);
+         ++TotalGuessIndex)
+    {
+        // TODO(bwd): Map TotalGuessIndex to guess (Index % 62, (Index/62) % 62, ...), get x
+        // and HMAC
+    }
+    
+    MinUnitAssert(((PwdGuessSizeBytes < ARRAY_LENGTH(PasswordGuess)) &&
+                   !memcmp(ClientHmacKSalt, ServerHmacKSalt, sizeof(ServerHmacKSalt))),
+                  "Password not guessed in TestOfflineDictAttackSimplifiedSrp!");
 }
 
 internal MIN_UNIT_TEST_FUNC(AllTests)

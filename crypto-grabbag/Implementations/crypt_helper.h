@@ -1797,7 +1797,11 @@ MontModExp(bignum *OutputA, bignum *InputX, bignum *ExponentE, bignum *ModulusP,
 
                 if ((ExponentE->Num[BitCountEIndex/BITS_IN_DWORD] >> (BitCountEIndex % BITS_IN_DWORD)) & 0x1)
                 {
-                    MontInner(&LocalResult, &LocalResult, &InputXTimesRModP, ModulusP, &MinusPInverseModR,
+                    MontInner(&LocalResult,
+                              &LocalResult,
+                              &InputXTimesRModP,
+                              ModulusP,
+                              &MinusPInverseModR,
                               RPowerOf2);
                 }
             }
