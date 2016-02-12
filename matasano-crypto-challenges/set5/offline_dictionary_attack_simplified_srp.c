@@ -22,7 +22,7 @@ const u8 DICTIONARY[] =
     'v', 'w', 'x', 'y', 'z',
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U',
     'V', 'W', 'X', 'Y', 'Z',
-    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0',
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
 };
 
 internal void
@@ -47,9 +47,34 @@ ClientSimpleGetHmacPremasterSecret(u8 *ClientHmacKSalt, bignum *LittleU, bignum 
     SimpleSrpGetHmacKSaltUnchecked(ClientHmacKSalt, &BigNumScratch, (bignum *)&RFC_5054_TEST_SALT);
 }
 
-internal u64
-IntegerPowerClamp64(u32 Base, u32 Exponent)
+internal u128
+IntegerPower(u32 Base, u32 Exponent)
 {
+    u128 Result = 1;
+
+    for(;
+        Exponent;
+        --Exponent)
+    {
+        Result *= Base;
+    }
+
+    return Result;
+}
+
+internal u128
+IntegerLog(u128 Value, u32 Base)
+{
+    u32 Result;
+
+    for (Result = 0;
+         Value >= Base;
+         ++Result)
+    {
+        Value /= Base;
+    }
+
+    return Result;
 }
 
 internal MIN_UNIT_TEST_FUNC(TestOfflineDictAttackSimplifiedSrp)
@@ -151,22 +176,46 @@ internal MIN_UNIT_TEST_FUNC(TestOfflineDictAttackSimplifiedSrp)
     ClientSimpleGetHmacPremasterSecret(ClientHmacKSalt, &LittleU, &LittleX, &BigB);
 
     // Server offline attack
-    char PasswordGuess[10];
+    char PasswordGuess[16];
 
-    Stopif(IntegerPowerClamp64(ARRAY_LENGTH(DICTIONARY), ARRAY_LENGTH(PasswordGuess)) == UINT64_MAX, file);
+    FILE *LogFile = fopen("guess_password.log", "w");
+    Stopif(LogFile == 0, "fopen failed in TestOfflineDictAttackSimplifiedSrp!");
 
     u32 TotalGuessIndex;
-    for (TotalGuessIndex = 0;
-         TotalGuessIndex < ARRAY_LENGTH(PasswordGuess);
+    u32 DictEntryCount = ARRAY_LENGTH(DICTIONARY);
+    b32 FoundPassword = false;
+    u32 PrevGuessSizeBytes;
+    for (TotalGuessIndex = 0, PrevGuessSizeBytes = 0;
+         TotalGuessIndex < IntegerPower(DictEntryCount, ARRAY_LENGTH(PasswordGuess) - 1);
          ++TotalGuessIndex)
     {
-        // TODO(bwd): Map TotalGuessIndex to guess (Index % 62, (Index/62) % 62, ...), get x
-        // and HMAC
+        u32 PwdGuessSizeBytes = IntegerLog(TotalGuessIndex, DictEntryCount) + 1;
+
+        if (PrevGuessSizeBytes < PwdGuessSizeBytes)
+        {
+            printf("Size bytes: %d\nTotalGuessIndex: %d\n", PwdGuessSizeBytes, TotalGuessIndex);
+        }
+
+        for (u32 PwdGuessIndex = 0;
+             PwdGuessIndex < PwdGuessSizeBytes;
+             ++PwdGuessIndex)
+        {
+            u32 DictIndex = (TotalGuessIndex / IntegerPower(DictEntryCount, PwdGuessIndex)) % DictEntryCount;
+            PasswordGuess[PwdGuessIndex] = DICTIONARY[DictIndex];
+        }
+
+        if (!memcmp("aaa", PasswordGuess, sizeof("aaa")))
+        {
+            FoundPassword = true;
+            break;
+        }
+
+        PasswordGuess[PwdGuessSizeBytes] = 0;
+
+        PrevGuessSizeBytes = PwdGuessSizeBytes;
     }
     
-    MinUnitAssert(((PwdGuessSizeBytes < ARRAY_LENGTH(PasswordGuess)) &&
-                   !memcmp(ClientHmacKSalt, ServerHmacKSalt, sizeof(ServerHmacKSalt))),
-                  "Password not guessed in TestOfflineDictAttackSimplifiedSrp!");
+    MinUnitAssert(FoundPassword, "Password not guessed in TestOfflineDictAttackSimplifiedSrp!");
 }
 
 internal MIN_UNIT_TEST_FUNC(AllTests)
