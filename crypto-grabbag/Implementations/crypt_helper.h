@@ -34,6 +34,10 @@ typedef struct timespec timespec;
 #define ONE_MILLION (ONE_THOUSAND*ONE_THOUSAND)
 #define ONE_BILLION (ONE_THOUSAND*ONE_MILLION)
 
+#define SIZE_1KB 0x1000
+#define SIZE_1MB (SIZE_1KB*SIZE_1KB)
+#define SIZE_1GB (SIZE_1MB*SIZE_1KB)
+
 #define IS_ODD(Value) ((Value) & 0x1)
 #define IS_EVEN(Value) (!IS_ODD(Value))
 

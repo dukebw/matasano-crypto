@@ -283,7 +283,7 @@ void web(int fd, int hit)
 
             LogStringUnchecked("Sent (N, g, s, B) from server!", buffer, fd);
 
-            *(u32 *)ServerSendRcvBuffer = 0;
+            memset(ServerSendRcvBuffer, 0, sizeof(u32));
 
             u32 ReadBytes = read(fd, ServerSendRcvBuffer, sizeof(bignum));
             if (ReadBytes == sizeof(ServerSendRcvBuffer))

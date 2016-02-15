@@ -24,6 +24,11 @@ const u8 DICTIONARY[] =
     'V', 'W', 'X', 'Y', 'Z',
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
 };
+const u32 DICT_ENTRY_COUNT = ARRAY_LENGTH(DICTIONARY);
+
+const char TEST_PASSWORD[] = "password123";
+
+global_variable char GlobalGuessPasswords[30*SIZE_1MB];
 
 internal void
 ClientSimpleGetHmacPremasterSecret(u8 *ClientHmacKSalt, bignum *LittleU, bignum *LittleX, bignum *BigB)
@@ -47,34 +52,60 @@ ClientSimpleGetHmacPremasterSecret(u8 *ClientHmacKSalt, bignum *LittleU, bignum 
     SimpleSrpGetHmacKSaltUnchecked(ClientHmacKSalt, &BigNumScratch, (bignum *)&RFC_5054_TEST_SALT);
 }
 
-internal u128
-IntegerPower(u32 Base, u32 Exponent)
+internal void
+ServerSimpleGetHmacPremasterSecret(u8 *ServerHmacKSalt, bignum *LittleU, bignum *LittleX, bignum *LittleB)
 {
-    u128 Result = 1;
+    Stopif((ServerHmacKSalt == 0) || (LittleU == 0) || (LittleX == 0) || (LittleB == 0),
+           "Null input to ServerSimpleGetHmacPremasterSecret!");
 
-    for(;
-        Exponent;
-        --Exponent)
-    {
-        Result *= Base;
-    }
+    bignum BigNumScratch;
+    bignum LittleV;
+    MontModExpRBigNumMax(&LittleV,
+                         (bignum *)&NIST_RFC_5054_GEN_BIGNUM,
+                         LittleX,
+                         (bignum *)&RFC_5054_NIST_PRIME_1024);
 
-    return Result;
+    // BigNumScratch := v ** u
+    MontModExpRBigNumMax(&BigNumScratch,
+                         &LittleV,
+                         LittleU,
+                         (bignum *)&RFC_5054_NIST_PRIME_1024);
+
+    // BigNumScratch := A * v ** u % n
+    BigNumMultiplyModP(&BigNumScratch,
+                       (bignum *)&RFC_5054_TEST_BIG_A,
+                       &BigNumScratch,
+                       (bignum *)&RFC_5054_NIST_PRIME_1024);
+
+    // BigNumScratch := <premaster secret>
+    MontModExpRBigNumMax(&BigNumScratch,
+                         &BigNumScratch,
+                         LittleB,
+                         (bignum *)&RFC_5054_NIST_PRIME_1024);
+
+    SimpleSrpGetHmacKSaltUnchecked(ServerHmacKSalt, &BigNumScratch, (bignum *)&RFC_5054_TEST_SALT);
 }
 
-internal u128
-IntegerLog(u128 Value, u32 Base)
+internal void
+GetLittleX(bignum *LittleX, char *Password, u32 PasswordSizeBytes)
 {
-    u32 Result;
+    Stopif((LittleX == 0) || (Password == 0), "Null input to GetLittleX!");
 
-    for (Result = 0;
-         Value >= Base;
-         ++Result)
-    {
-        Value /= Base;
-    }
+    u32 SaltSizeBytes = BigNumSizeBytesUnchecked((bignum *)&RFC_5054_TEST_SALT);
+    u32 XMessageSizeBytes = SaltSizeBytes + PasswordSizeBytes;
 
-    return Result;
+    u8 MessageScratch[MESSAGE_SCRATCH_SIZE_BYTES];
+    Stopif(XMessageSizeBytes > sizeof(MessageScratch),
+           "Buffer overflow in TestOfflineDictAttackSimplifiedSrp!\n");
+
+    memcpy(MessageScratch, (u8 *)RFC_5054_TEST_SALT.Num, SaltSizeBytes);
+    memcpy(MessageScratch + SaltSizeBytes, Password, PasswordSizeBytes);
+
+    u32 LittleXSizeDWords = SHA_1_HASH_LENGTH_BYTES/sizeof(u64) + 1;
+    memset(LittleX->Num, 0, LittleXSizeDWords*sizeof(u64));
+
+    Sha1((u8 *)LittleX->Num, MessageScratch, XMessageSizeBytes);
+    LittleX->SizeWords = LittleXSizeDWords;
 }
 
 internal MIN_UNIT_TEST_FUNC(TestOfflineDictAttackSimplifiedSrp)
@@ -100,22 +131,8 @@ internal MIN_UNIT_TEST_FUNC(TestOfflineDictAttackSimplifiedSrp)
     */
 
     // LittleX calculated identically, so do it once
-    u32 SaltSizeBytes = BigNumSizeBytesUnchecked((bignum *)&RFC_5054_TEST_SALT);
-    u32 XMessageSizeBytes = SaltSizeBytes + STR_LEN(SRP_TEST_VEC_PASSWORD);
-
-    u8 MessageScratch[MESSAGE_SCRATCH_SIZE_BYTES];
-    Stopif(XMessageSizeBytes > sizeof(MessageScratch),
-           "Buffer overflow in TestOfflineDictAttackSimplifiedSrp!\n");
-
-    memcpy(MessageScratch, (u8 *)RFC_5054_TEST_SALT.Num, SaltSizeBytes);
-    memcpy(MessageScratch + SaltSizeBytes, SRP_TEST_VEC_PASSWORD, STR_LEN(SRP_TEST_VEC_PASSWORD));
-
     bignum LittleX;
-    u32 LittleXSizeDWords = SHA_1_HASH_LENGTH_BYTES/sizeof(u64) + 1;
-    memset(LittleX.Num, 0, LittleXSizeDWords*sizeof(u64));
-
-    Sha1((u8 *)LittleX.Num, MessageScratch, XMessageSizeBytes);
-    LittleX.SizeWords = LittleXSizeDWords;
+    GetLittleX(&LittleX, (char *)TEST_PASSWORD, STR_LEN(TEST_PASSWORD));
 
     bignum LittleU;
     u32 LittleUSize32BitWords = 128/BITS_IN_WORD;
@@ -134,33 +151,8 @@ internal MIN_UNIT_TEST_FUNC(TestOfflineDictAttackSimplifiedSrp)
     ClientSimpleGetHmacPremasterSecret(ClientHmacKSalt, &LittleU, &LittleX, &BigB);
 
     // Server
-    bignum BigNumScratch;
-    bignum LittleV;
-    MontModExpRBigNumMax(&LittleV,
-                         (bignum *)&NIST_RFC_5054_GEN_BIGNUM,
-                         &LittleX,
-                         (bignum *)&RFC_5054_NIST_PRIME_1024);
-
-    // BigNumScratch := v ** u
-    MontModExpRBigNumMax(&BigNumScratch,
-                         &LittleV,
-                         &LittleU,
-                         (bignum *)&RFC_5054_NIST_PRIME_1024);
-
-    // BigNumScratch := A * v ** u % n
-    BigNumMultiplyModP(&BigNumScratch,
-                       (bignum *)&RFC_5054_TEST_BIG_A,
-                       &BigNumScratch,
-                       (bignum *)&RFC_5054_NIST_PRIME_1024);
-
-    // BigNumScratch := <premaster secret>
-    MontModExpRBigNumMax(&BigNumScratch,
-                         &BigNumScratch,
-                         (bignum *)&RFC_5054_TEST_LITTLE_B,
-                         (bignum *)&RFC_5054_NIST_PRIME_1024);
-
     u8 ServerHmacKSalt[SHA_1_HASH_LENGTH_BYTES];
-    SimpleSrpGetHmacKSaltUnchecked(ServerHmacKSalt, &BigNumScratch, (bignum *)&RFC_5054_TEST_SALT);
+    ServerSimpleGetHmacPremasterSecret(ServerHmacKSalt, &LittleU, &LittleX, (bignum *)&RFC_5054_TEST_LITTLE_B);
 
     MinUnitAssert(AreVectorsEqual(ServerHmacKSalt, ClientHmacKSalt, sizeof(ServerHmacKSalt)),
                   "Hmac mismatch in TestOfflineDictAttackSimplifiedSrp!\n");
@@ -176,46 +168,64 @@ internal MIN_UNIT_TEST_FUNC(TestOfflineDictAttackSimplifiedSrp)
     ClientSimpleGetHmacPremasterSecret(ClientHmacKSalt, &LittleU, &LittleX, &BigB);
 
     // Server offline attack
-    char PasswordGuess[16];
+    const char PWD_GUESS_FILENAME[] = "password_guesses_20";
+    FILE *GuessPasswords = fopen(PWD_GUESS_FILENAME, "r");
+    Stopif(GuessPasswords == 0,
+           "fopen failed on %s in TestOfflineDictAttackSimplifiedSrp!",
+           PWD_GUESS_FILENAME);
 
-    FILE *LogFile = fopen("guess_password.log", "w");
-    Stopif(LogFile == 0, "fopen failed in TestOfflineDictAttackSimplifiedSrp!");
+    u32 ReadBytes = fread(GlobalGuessPasswords, 1, sizeof(GlobalGuessPasswords), GuessPasswords);
+    Stopif(ReadBytes >= (sizeof(GlobalGuessPasswords) - 1),
+           "File not completely read in TestOfflineDictAttackSimplifiedSrp!");
 
-    u32 TotalGuessIndex;
-    u32 DictEntryCount = ARRAY_LENGTH(DICTIONARY);
+    GlobalGuessPasswords[ReadBytes] = 0;
+
     b32 FoundPassword = false;
-    u32 PrevGuessSizeBytes;
-    for (TotalGuessIndex = 0, PrevGuessSizeBytes = 0;
-         TotalGuessIndex < IntegerPower(DictEntryCount, ARRAY_LENGTH(PasswordGuess) - 1);
-         ++TotalGuessIndex)
+    char *NextPwdGuess;
+    char *EndOfNextPwdGuess;
+    u32 NextPwdGuessSizeBytes;
+    bignum ServerPremasterSecret;
+    bignum LittleV;
+    for (NextPwdGuess = GlobalGuessPasswords, EndOfNextPwdGuess = strchr(GlobalGuessPasswords, '\n');
+         EndOfNextPwdGuess;
+         EndOfNextPwdGuess = strchr(EndOfNextPwdGuess, '\n'))
     {
-        u32 PwdGuessSizeBytes = IntegerLog(TotalGuessIndex, DictEntryCount) + 1;
+        *EndOfNextPwdGuess++ = 0;
 
-        if (PrevGuessSizeBytes < PwdGuessSizeBytes)
-        {
-            printf("Size bytes: %d\nTotalGuessIndex: %d\n", PwdGuessSizeBytes, TotalGuessIndex);
-        }
+        NextPwdGuessSizeBytes = EndOfNextPwdGuess - NextPwdGuess - 1;
 
-        for (u32 PwdGuessIndex = 0;
-             PwdGuessIndex < PwdGuessSizeBytes;
-             ++PwdGuessIndex)
-        {
-            u32 DictIndex = (TotalGuessIndex / IntegerPower(DictEntryCount, PwdGuessIndex)) % DictEntryCount;
-            PasswordGuess[PwdGuessIndex] = DICTIONARY[DictIndex];
-        }
+        GetLittleX(&LittleX, NextPwdGuess, NextPwdGuessSizeBytes);
 
-        if (!memcmp("aaa", PasswordGuess, sizeof("aaa")))
+        // S = (A * v ** u)**b % n == A * v % n (since u == 1 and b == 1)
+        // v := g ** x
+        MontModExpRBigNumMax(&LittleV,
+                             (bignum *)&NIST_RFC_5054_GEN_BIGNUM,
+                             &LittleX,
+                             (bignum *)&RFC_5054_NIST_PRIME_1024);
+
+        // ServerPremasterSecret := A * v % n
+        BigNumMultiplyModP(&ServerPremasterSecret,
+                           (bignum *)&RFC_5054_TEST_BIG_A,
+                           &LittleV,
+                           (bignum *)&RFC_5054_NIST_PRIME_1024);
+
+        SimpleSrpGetHmacKSaltUnchecked(ServerHmacKSalt,
+                                       &ServerPremasterSecret,
+                                       (bignum *)&RFC_5054_TEST_SALT);
+
+        if (!memcmp(ServerHmacKSalt, ClientHmacKSalt, sizeof(ClientHmacKSalt)))
         {
             FoundPassword = true;
             break;
         }
 
-        PasswordGuess[PwdGuessSizeBytes] = 0;
-
-        PrevGuessSizeBytes = PwdGuessSizeBytes;
+        NextPwdGuess = EndOfNextPwdGuess;
     }
-    
-    MinUnitAssert(FoundPassword, "Password not guessed in TestOfflineDictAttackSimplifiedSrp!");
+
+    MinUnitAssert(FoundPassword &&
+                  !memcmp(NextPwdGuess, TEST_PASSWORD, STR_LEN(TEST_PASSWORD)) &&
+                  (NextPwdGuessSizeBytes == STR_LEN(TEST_PASSWORD)),
+                  "Password not guessed in TestOfflineDictAttackSimplifiedSrp!\n");
 }
 
 internal MIN_UNIT_TEST_FUNC(AllTests)
