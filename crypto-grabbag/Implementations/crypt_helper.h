@@ -896,6 +896,7 @@ typedef struct
 {
     u64 Num[MAX_BIGNUM_SIZE_WORDS];
     u32 SizeWords;
+    b32 Negative;
 } bignum;
 
 // Little-endian
@@ -1237,13 +1238,9 @@ CheckForBorrow(u64 Difference, u64 LeftOperand)
     return Borrow;
 }
 
-internal u32 
-BigNumSubtract(bignum *AMinusB, bignum *A, bignum *B)
+internal u32
+BigNumUnsignedSubtract(bignum *AMinusB, bignum *A, bignum *B)
 {
-    Stopif((AMinusB == 0) || (A == 0) || (B == 0), "Null input to BigNumSubtract!\n");
-
-    Stopif(IsAGreaterThanB(B, A), "No support for negative numbers yet! (BigNumSubtract)\n");
-
     u32 Borrow = 0;
 
     u64 LeftOperand = A->Num[0];
@@ -1286,6 +1283,51 @@ BigNumSubtract(bignum *AMinusB, bignum *A, bignum *B)
 
     AMinusB->SizeWords = A->SizeWords;
     AdjustSizeWordsDownUnchecked(AMinusB);
+
+    return Borrow;
+}
+
+// TODO(bwd): Test signed-ness + add signed addition, multiplication, etc? Or asserts
+internal u32 
+BigNumSubtract(bignum *AMinusB, bignum *A, bignum *B)
+{
+    Stopif((AMinusB == 0) || (A == 0) || (B == 0), "Null input to BigNumSubtract!\n");
+
+    /*-
+     *  a -  b      a-b
+     *  a - -b      a+b
+     * -a -  b      -(a+b)
+     * -a - -b      b-a
+     */
+    if (A->Negative)
+    {
+        if (B->Negative)
+        {
+            bignum *Temp = A;
+            A = B;
+            B = Temp;
+        }
+        else
+        {
+            // Add, neg
+        }
+    }
+    else if (B->Negative)
+    {
+        // Add, pos
+    }
+
+    u32 Borrow;
+    if (IsAGreaterThanB(A, B))
+    {
+        Borrow = BigNumUnsignedSubtract(AMinusB, A, B);
+        AMinusB->Negative = false;
+    }
+    else
+    {
+        Borrow = BigNumUnsignedSubtract(AMinusB, B, A);
+        AMinusB->Negative = true;
+    }
 
     return Borrow;
 }

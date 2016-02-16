@@ -129,7 +129,6 @@ BinaryInverseInnerLoop(bignum *UOrV, bignum *X1OrX2, bignum *PrimeP)
 internal void
 GetInverseModN(bignum *EInverseModN, bignum *InputA, bignum *PrimeP)
 {
-    // TODO(bwd): can't deal with PrimeP being .. not prime..
     Stopif((EInverseModN == 0) || (InputA == 0) || (PrimeP == 0), "Null input to GetInverseModN!\n");
 
     Stopif((InputA->SizeWords == 0), "InputA must be in [1, p - 1] in GetInverseModN!\n");
@@ -155,12 +154,12 @@ GetInverseModN(bignum *EInverseModN, bignum *InputA, bignum *PrimeP)
         if (IsAGreaterThanOrEqualToB(&U, &V))
         {
             BigNumSubtract(&U, &U, &V);
-            BigNumSubtractModP(&X1, &X1, &X2, PrimeP);
+            BigNumSubtract(&X1, &X1, &X2);
         }
         else
         {
             BigNumSubtract(&V, &V, &U);
-            BigNumSubtractModP(&X2, &X2, &X1, PrimeP);
+            BigNumSubtract(&X2, &X2, &X1);
         }
     }
 
