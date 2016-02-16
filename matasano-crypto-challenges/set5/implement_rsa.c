@@ -129,6 +129,7 @@ BinaryInverseInnerLoop(bignum *UOrV, bignum *X1OrX2, bignum *PrimeP)
 internal void
 GetInverseModN(bignum *EInverseModN, bignum *InputA, bignum *PrimeP)
 {
+    // TODO(bwd): can't deal with PrimeP being .. not prime..
     Stopif((EInverseModN == 0) || (InputA == 0) || (PrimeP == 0), "Null input to GetInverseModN!\n");
 
     Stopif((InputA->SizeWords == 0), "InputA must be in [1, p - 1] in GetInverseModN!\n");
@@ -239,19 +240,43 @@ internal MIN_UNIT_TEST_FUNC(TestImplementRsa)
     GetRandPrime(&PrimeQ);
     GetRandPrime(&PrimeP);
 
+    // n := pq
     bignum ModulusN;
     BigNumMultiplyOperandScanning(&ModulusN, &PrimeP, &PrimeQ);
+
+    // totient := (p - 1)(q - 1)
+    PrimeQ.Num[0] -= 1;
+    PrimeP.Num[0] -= 1;
+
+    bignum Totient;
+    BigNumMultiplyOperandScanning(&Totient, &PrimeP, &PrimeQ);
 
     bignum PrivateKeyD;
     bignum PublicExponentE;
     PublicExponentE.SizeWords = 1;
     PublicExponentE.Num[0] = 3;
-    GetInverseModN(&PrivateKeyD, &PublicExponentE, &ModulusN);
+    GetInverseModN(&PrivateKeyD, &PublicExponentE, &Totient);
 
-    bignum DTimesEModP;
-    BigNumMultiplyModP(&DTimesEModP, &PrivateKeyD, &PublicExponentE, &ModulusN);
+    bignum BigNumScratch;
+    BigNumMultiplyModP(&BigNumScratch, &PrivateKeyD, &PublicExponentE, &Totient);
 
-    MinUnitAssert(IsEqualToOneUnchecked(&DTimesEModP), "de not equal to 1 mod p in TestImplementRsa!\n");
+    MinUnitAssert(IsEqualToOneUnchecked(&BigNumScratch), "de not equal to 1 mod phi in TestImplementRsa!\n");
+
+    char Message[] = "When we are born, we cry that we are come to this great stage of fools.";
+
+    u32 CeilingMessageSizeDWords = (STR_LEN(Message) + (BYTES_IN_BIGNUM_WORD - 1))/BYTES_IN_BIGNUM_WORD;
+    BigNumScratch.SizeWords = CeilingMessageSizeDWords;
+    BigNumScratch.Num[BigNumScratch.SizeWords - 1] = 0;
+    memcpy(BigNumScratch.Num, Message, STR_LEN(Message));
+
+    // To encrypt: c = m**e % n.
+    MontModExpRBigNumMax(&BigNumScratch, &BigNumScratch, &PublicExponentE, &ModulusN);
+
+    // To decrypt: m = c**d % n 
+    MontModExpRBigNumMax(&BigNumScratch, &BigNumScratch, &PrivateKeyD, &ModulusN);
+
+    MinUnitAssert(!memcmp(BigNumScratch.Num, Message, CeilingMessageSizeDWords),
+                  "Decrypt/Encrypt mismatch in TestImplementRsa!\n");
 }
 
 internal MIN_UNIT_TEST_FUNC(AllTests)

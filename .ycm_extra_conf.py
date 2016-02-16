@@ -64,7 +64,9 @@ flags = [
 '-isystem',
 './tests/gmock/include',
 '-I',
-'./crypto-grabbag/Implementations'
+'./crypto-grabbag/Implementations',
+'-I',
+'./slre'
 ]
 
 
