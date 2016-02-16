@@ -884,6 +884,7 @@ HmacSha1(u8 *Hmac, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength)
 }
 
 #define BITS_IN_BIGNUM_WORD     64
+#define BYTES_IN_BIGNUM_WORD    (BITS_IN_BIGNUM_WORD/BITS_IN_BYTE)
 #define MAX_BIGNUM_SIZE_BITS    4096
 #define MAX_BIGNUM_SIZE_BYTES   (MAX_BIGNUM_SIZE_BITS/BITS_IN_BYTE)
 #define MAX_BIGNUM_SIZE_WORDS   (MAX_BIGNUM_SIZE_BYTES/sizeof(u64))
