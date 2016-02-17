@@ -1200,13 +1200,9 @@ MultiPrecisionAdd(u64 *SumAB, u32 *SumLengthWords,
     return Carry;
 }
 
-// IN: integers A, B in [0, 2^(W*t))
-// OUT: (eps, C) where C = A + B mod 2^(W*t), and eps is the carry bit
-internal u32 
-BigNumAdd(bignum *SumAB, bignum *A, bignum *B)
+internal u32
+BigNumUnsignedAdd(bignum *SumAB, bignum *A, bignum *B)
 {
-    Stopif((SumAB == 0) || (A == 0) || (B == 0), "Null input to BigNumAdd!\n");
-
     bignum LocalSumAB;
     LocalSumAB.SizeWords = MAX_BIGNUM_SIZE_WORDS;
 
@@ -1287,7 +1283,77 @@ BigNumUnsignedSubtract(bignum *AMinusB, bignum *A, bignum *B)
     return Borrow;
 }
 
-// TODO(bwd): Test signed-ness + add signed addition, multiplication, etc? Or asserts
+internal inline void
+BigNumSwapUnchecked(bignum **A, bignum **B)
+{
+    bignum *Temp = *A;
+    *A = *B;
+    *B = Temp;
+}
+
+// IN: integers A, B in [0, 2^(W*t))
+// OUT: (eps, C) where C = A + B mod 2^(W*t), and eps is the carry bit
+internal u32 
+BigNumAdd(bignum *SumAB, bignum *A, bignum *B)
+{
+    Stopif((SumAB == 0) || (A == 0) || (B == 0), "Null input to BigNumAdd!\n");
+
+    /*-
+     *  a +  b      a+b
+     *  a + -b      a-b
+     * -a +  b      b-a
+     * -a + -b      -(a+b)
+     */
+    b32 Subtract = false;
+    if (A->Negative)
+    {
+        if (B->Negative)
+        {
+            SumAB->Negative = true;
+        }
+        else
+        {
+            BigNumSwapUnchecked(&A, &B);
+            Subtract = true;
+        }
+    }
+    else if (B->Negative)
+    {
+        Subtract = true;
+    }
+
+    u32 Carry;
+    if (Subtract)
+    {
+        Carry = BigNumUnsignedSubtract(SumAB, A, B);
+    }
+    else
+    {
+        Carry = BigNumUnsignedAdd(SumAB, A, B);
+    }
+
+    return Carry;
+}
+
+internal u32
+BigNumSubtractMaybeNegUnchecked(bignum *AMinusB, bignum *A, bignum *B)
+{
+    u32 Borrow;
+
+    if (IsAGreaterThanB(A, B))
+    {
+        Borrow = BigNumUnsignedSubtract(AMinusB, A, B);
+        AMinusB->Negative = false;
+    }
+    else
+    {
+        Borrow = BigNumUnsignedSubtract(AMinusB, B, A);
+        AMinusB->Negative = true;
+    }
+
+    return Borrow;
+}
+
 internal u32 
 BigNumSubtract(bignum *AMinusB, bignum *A, bignum *B)
 {
@@ -1299,34 +1365,33 @@ BigNumSubtract(bignum *AMinusB, bignum *A, bignum *B)
      * -a -  b      -(a+b)
      * -a - -b      b-a
      */
+    b32 Add = false;
     if (A->Negative)
     {
         if (B->Negative)
         {
-            bignum *Temp = A;
-            A = B;
-            B = Temp;
+            BigNumSwapUnchecked(&A, &B);
         }
         else
         {
-            // Add, neg
+            Add = true;
+            AMinusB->Negative = true;
         }
     }
     else if (B->Negative)
     {
-        // Add, pos
+        Add = true;
+        AMinusB->Negative = false;
     }
 
     u32 Borrow;
-    if (IsAGreaterThanB(A, B))
+    if (Add)
     {
-        Borrow = BigNumUnsignedSubtract(AMinusB, A, B);
-        AMinusB->Negative = false;
+        Borrow = BigNumUnsignedAdd(AMinusB, A, B);
     }
     else
     {
-        Borrow = BigNumUnsignedSubtract(AMinusB, B, A);
-        AMinusB->Negative = true;
+        Borrow = BigNumSubtractMaybeNegUnchecked(AMinusB, A, B);
     }
 
     return Borrow;

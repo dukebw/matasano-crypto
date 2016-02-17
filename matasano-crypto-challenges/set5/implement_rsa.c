@@ -184,6 +184,10 @@ InitOsslBnUnchecked(BIGNUM *OsslBignum, u64 *Array, u32 SizeDWords, u32 ArrayMax
     OsslBignum->neg = 0;
 }
 
+internal MIN_UNIT_TEST_FUNC(TestBigNumNegative)
+{
+}
+
 internal MIN_UNIT_TEST_FUNC(TestBinaryInverse)
 {
     BIGNUM BN_Prime2048;
@@ -280,6 +284,7 @@ internal MIN_UNIT_TEST_FUNC(TestImplementRsa)
 
 internal MIN_UNIT_TEST_FUNC(AllTests)
 {
+    MinUnitRunTest(TestBigNumNegative);
     MinUnitRunTest(TestBinaryInverse);
     MinUnitRunTest(TestImplementRsa);
 }
