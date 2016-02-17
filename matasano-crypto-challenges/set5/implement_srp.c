@@ -12,7 +12,8 @@ const bignum RFC_5054_NIST_PRIME_1536 =
         0xDF028A7CEC67F0D0, 0x80B655BB9A22E8DC, 0x1558903BA0D0F843, 0x51C6A94BE4607A29, 0x5F4F5F556E27CBDE,
         0xBEEEA9614B19CC4D, 0xDBA51DF499AC4C80, 0xB1F12A8617A47BBB, 0x9DEF3CAFB939277A,
     },
-    .SizeWords = 24
+    .SizeWords = 24,
+    .Negative = false,
 };
 
 // TODO(bwd): generate salt as random integer (second test)

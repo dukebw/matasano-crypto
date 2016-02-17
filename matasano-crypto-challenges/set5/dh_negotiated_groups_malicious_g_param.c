@@ -160,14 +160,12 @@ EveEntryPoint(void *Arg)
 #endif // some attack
 
 #if G_EQUALS_1_ATTACK // g := 1
-    GlobalEveScratch.Num[0] = 1;
-    GlobalEveScratch.SizeWords = 1;
+    BigNumSetToOneUnchecked(&GlobalEveScratch);
 #elif G_EQUALS_P_ATTACK // g := p
     BigNumCopyUnchecked(&GlobalEveScratch, (bignum *)&NIST_RFC_3526_PRIME_1536);
 #elif G_EQUALS_P_MINUS_1_ATTACK // g := p - 1
     // TODO(bwd): works half the time... ((-1)^(X*Y) == -1) iff (X*Y) odd
-    GlobalEveScratch.Num[0] = 1;
-    GlobalEveScratch.SizeWords = 1;
+    BigNumSetToOneUnchecked(&GlobalEveScratch);
 
     BigNumSubtract(&GlobalEveScratch, (bignum *)&NIST_RFC_3526_PRIME_1536, &GlobalEveScratch);
 #endif // some attack

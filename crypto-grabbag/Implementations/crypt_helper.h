@@ -801,7 +801,7 @@ Sha1KeyedMac(u8 *KeyedMac, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLengt
 #define HMAC_RET_CODE_LENGTH_BYTES 4
 
 #define PORT 8181
-const char IP_ADDRESS[] = "192.168.11.42";
+const char IP_ADDRESS[] = "192.168.1.19";
 
 #define TEST_USER_CMD_LENGTH (STR_LEN(TEST_SRP_PREFIX) +    \
                               STR_LEN(USER_PREFIX) + STR_LEN(SRP_TEST_VEC_EMAIL) + 1)
@@ -910,7 +910,8 @@ const bignum NIST_RFC_3526_PRIME_1536 =
         0x4FE1356D6D51C245, 0x302B0A6DF25F1437, 0xEF9519B3CD3A431B, 0x514A08798E3404DD, 0x20BBEA63B139B22,
         0x29024E088A67CC74, 0xC4C6628B80DC1CD1, 0xC90FDAA22168C234, 0xFFFFFFFFFFFFFFFF,
     },
-    .SizeWords = 24
+    .SizeWords = 24,
+    .Negative = false,
 };
 
 #define NIST_RFC_3526_GEN 2
@@ -921,7 +922,8 @@ const bignum NIST_RFC_3526_GEN_BIGNUM =
     {
         NIST_RFC_3526_GEN
     },
-    .SizeWords = 1
+    .SizeWords = 1,
+    .Negative = false,
 };
 
 #define NIST_RFC_5054_GEN 2
@@ -932,7 +934,8 @@ const bignum NIST_RFC_5054_GEN_BIGNUM =
     {
         NIST_RFC_5054_GEN
     },
-    .SizeWords = 1
+    .SizeWords = 1,
+    .Negative = false,
 };
 
 const bignum RFC_5054_NIST_PRIME_1024 =
@@ -944,7 +947,8 @@ const bignum RFC_5054_NIST_PRIME_1024 =
         0x383B4813D692C6E0, 0xD674DF7496EA81D3, 0x9EA2314C9C256576, 0x6072618775FF3C0B, 0x9C33F80AFA8FC5E8,
         0xEEAF0AB9ADB38DD6, 
     },
-    .SizeWords = 16
+    .SizeWords = 16,
+    .Negative = false,
 };
 
 const bignum RFC_5054_TEST_SALT =
@@ -953,7 +957,8 @@ const bignum RFC_5054_TEST_SALT =
     {
         0xB5A727673A2441EE, 0xBEB25379D1A8581E, 
     },
-    .SizeWords = 2
+    .SizeWords = 2,
+    .Negative = false,
 };
 
 const bignum RFC_5054_TEST_K =
@@ -962,7 +967,8 @@ const bignum RFC_5054_TEST_K =
     {
         0x665C3E818913186F, 0x5AEF2CDD07ABAF0F, 0x7556AA04, 
     },
-    .SizeWords = 3
+    .SizeWords = 3,
+    .Negative = false,
 };
 
 const bignum RFC_5054_TEST_X =
@@ -971,7 +977,8 @@ const bignum RFC_5054_TEST_X =
     {
         0x93DB6CF84D16C124, 0xABE9127CC58CCF49, 0x94B7555A, 
     },
-    .SizeWords = 3
+    .SizeWords = 3,
+    .Negative = false,
 };
 
 const bignum RFC_5054_TEST_V =
@@ -983,7 +990,8 @@ const bignum RFC_5054_TEST_V =
         0xE379BA4729FDC59, 0x822223CA1A605B53, 0x9886D8129BADA1F1, 0xB0DDE1569E8FA00A, 0x4E337D05B4B375BE,
         0x7E273DE8696FFC4F, 
     },
-    .SizeWords = 16
+    .SizeWords = 16,
+    .Negative = false,
 };
 
 const bignum RFC_5054_TEST_LITTLE_A =
@@ -992,7 +1000,8 @@ const bignum RFC_5054_TEST_LITTLE_A =
     {
         0xAFD529DDDA2D4393, 0xC81EDC04E2762A56, 0x1989806F0407210B, 0x60975527035CF2AD, 
     },
-    .SizeWords = 4
+    .SizeWords = 4,
+    .Negative = false,
 };
 
 const bignum RFC_5054_TEST_LITTLE_B =
@@ -1001,7 +1010,8 @@ const bignum RFC_5054_TEST_LITTLE_B =
     {
         0x9E61F5D105284D20, 0x1DDA08E974A004F4, 0x471E81F00F6928E0, 0xE487CB59D31AC550, 
     },
-    .SizeWords = 4
+    .SizeWords = 4,
+    .Negative = false,
 };
 
 const bignum RFC_5054_TEST_BIG_A =
@@ -1013,7 +1023,8 @@ const bignum RFC_5054_TEST_BIG_A =
         0x2D1A5358A2CF1B6E, 0x3211C04692272D8B, 0x72557EC44352E890, 0xD0E560F0C64115BB, 0x47B0704C436F523D,
         0x61D5E490F6F1B795, 
     },
-    .SizeWords = 16
+    .SizeWords = 16,
+    .Negative = false,
 };
 
 const bignum RFC_5054_TEST_BIG_B =
@@ -1025,7 +1036,8 @@ const bignum RFC_5054_TEST_BIG_B =
         0x5A981652236F99D9, 0xDC46A0670DD125B9, 0x5393011BAF38964, 0x4916A1E77AF46AE1, 0xB6D041FA01BB152D,
         0xBD0C61512C692C0C, 
     },
-    .SizeWords = 16
+    .SizeWords = 16,
+    .Negative = false,
 };
 
 const bignum RFC_5054_TEST_U =
@@ -1034,7 +1046,8 @@ const bignum RFC_5054_TEST_U =
     {
         0x70A7AE5F462EF019, 0x3487DA98554ED47D, 0xCE38B959, 
     },
-    .SizeWords = 3
+    .SizeWords = 3,
+    .Negative = false,
 };
 
 const bignum RFC_5054_TEST_PREMASTER_SECRET =
@@ -1046,8 +1059,17 @@ const bignum RFC_5054_TEST_PREMASTER_SECRET =
         0x9AE12B0A6F67809F, 0x59B48220F7C4693C, 0xF271A10D233861E3, 0x90A3381F63B387AA, 0xAE450C0287745E79,
         0xB0DC82BABCF30674,
     },
-    .SizeWords = 16
+    .SizeWords = 16,
+    .Negative = false,
 };
+
+internal inline void
+BigNumSetToOneUnchecked(bignum *BigNum)
+{
+    BigNum->Num[0] = 1;
+    BigNum->SizeWords = 1;
+    BigNum->Negative = false;
+}
 
 internal inline u32
 BigNumSizeBytesUnchecked(bignum *BigNum)
@@ -1062,6 +1084,7 @@ BigNumCopyUnchecked(bignum *Dest, bignum *Source)
 {
     Dest->SizeWords = Source->SizeWords;
     memcpy(Dest->Num, Source->Num, BigNumSizeBytesUnchecked(Source));
+    Dest->Negative = Source->Negative;
 }
 
 internal inline u64
@@ -1092,11 +1115,9 @@ AdjustSizeWordsDownUnchecked(bignum *BigNum)
 }
 
 internal b32
-IsAGreaterThanB(bignum *A, bignum *B)
+IsAGreaterThanBUnsignedUnchecked(bignum *A, bignum *B)
 {
 	b32 Result = false;
-
-	Stopif((A == 0) || (B == 0), "Null input to IsAGreaterThanB\n");
 
 	if (A->SizeWords > B->SizeWords)
 	{
@@ -1124,6 +1145,41 @@ IsAGreaterThanB(bignum *A, bignum *B)
 			}
 		}
 	}
+
+	return Result;
+}
+
+internal inline void
+BigNumSwapUnchecked(bignum **A, bignum **B)
+{
+    bignum *Temp = *A;
+    *A = *B;
+    *B = Temp;
+}
+
+internal b32
+IsAGreaterThanB(bignum *A, bignum *B)
+{
+	b32 Result = false;
+
+	Stopif((A == 0) || (B == 0), "Null input to IsAGreaterThanB\n");
+
+    if (A->Negative != B->Negative)
+    {
+        if ((A->SizeWords > 0) || (B->SizeWords > 0))
+        {
+            Result = B->Negative;
+        }
+    }
+    else
+    {
+        if (A->Negative && B->Negative)
+        {
+            BigNumSwapUnchecked(&A, &B);
+        }
+
+        Result = IsAGreaterThanBUnsignedUnchecked(A, B);
+    }
 
 	return Result;
 }
@@ -1201,7 +1257,7 @@ MultiPrecisionAdd(u64 *SumAB, u32 *SumLengthWords,
 }
 
 internal u32
-BigNumUnsignedAdd(bignum *SumAB, bignum *A, bignum *B)
+BigNumUnsignedAddUnchecked(bignum *SumAB, bignum *A, bignum *B)
 {
     bignum LocalSumAB;
     LocalSumAB.SizeWords = MAX_BIGNUM_SIZE_WORDS;
@@ -1235,7 +1291,7 @@ CheckForBorrow(u64 Difference, u64 LeftOperand)
 }
 
 internal u32
-BigNumUnsignedSubtract(bignum *AMinusB, bignum *A, bignum *B)
+BigNumUnsignedSubtractUnchecked(bignum *AMinusB, bignum *A, bignum *B)
 {
     u32 Borrow = 0;
 
@@ -1283,14 +1339,6 @@ BigNumUnsignedSubtract(bignum *AMinusB, bignum *A, bignum *B)
     return Borrow;
 }
 
-internal inline void
-BigNumSwapUnchecked(bignum **A, bignum **B)
-{
-    bignum *Temp = *A;
-    *A = *B;
-    *B = Temp;
-}
-
 // IN: integers A, B in [0, 2^(W*t))
 // OUT: (eps, C) where C = A + B mod 2^(W*t), and eps is the carry bit
 internal u32 
@@ -1325,11 +1373,11 @@ BigNumAdd(bignum *SumAB, bignum *A, bignum *B)
     u32 Carry;
     if (Subtract)
     {
-        Carry = BigNumUnsignedSubtract(SumAB, A, B);
+        Carry = BigNumUnsignedSubtractUnchecked(SumAB, A, B);
     }
     else
     {
-        Carry = BigNumUnsignedAdd(SumAB, A, B);
+        Carry = BigNumUnsignedAddUnchecked(SumAB, A, B);
     }
 
     return Carry;
@@ -1342,12 +1390,12 @@ BigNumSubtractMaybeNegUnchecked(bignum *AMinusB, bignum *A, bignum *B)
 
     if (IsAGreaterThanB(A, B))
     {
-        Borrow = BigNumUnsignedSubtract(AMinusB, A, B);
+        Borrow = BigNumUnsignedSubtractUnchecked(AMinusB, A, B);
         AMinusB->Negative = false;
     }
     else
     {
-        Borrow = BigNumUnsignedSubtract(AMinusB, B, A);
+        Borrow = BigNumUnsignedSubtractUnchecked(AMinusB, B, A);
         AMinusB->Negative = true;
     }
 
@@ -1387,7 +1435,7 @@ BigNumSubtract(bignum *AMinusB, bignum *A, bignum *B)
     u32 Borrow;
     if (Add)
     {
-        Borrow = BigNumUnsignedAdd(AMinusB, A, B);
+        Borrow = BigNumUnsignedAddUnchecked(AMinusB, A, B);
     }
     else
     {
