@@ -1063,12 +1063,36 @@ const bignum RFC_5054_TEST_PREMASTER_SECRET =
     .Negative = false,
 };
 
+internal inline b32
+IsEqualToOneUnchecked(bignum *BigNum)
+{
+    b32 Result = (BigNum->SizeWords == 1) && (BigNum->Num[0] == 1) && (BigNum->Negative = false);
+
+    return Result;
+}
+
+internal inline b32
+IsEvenUnchecked(bignum *BigNum)
+{
+    b32 Result = (BigNum->Num[0] % 2) == 0;
+
+    return Result;
+}
+
 internal inline void
 BigNumSetToOneUnchecked(bignum *BigNum)
 {
     BigNum->Num[0] = 1;
     BigNum->SizeWords = 1;
     BigNum->Negative = false;
+}
+
+internal inline void
+InitTinyBigNumUnchecked(bignum *BigNum, u64 Value, b32 Negative)
+{
+    BigNum->SizeWords = 1;
+    BigNum->Num[0] = Value;
+    BigNum->Negative = Negative;
 }
 
 internal inline u32
@@ -1268,7 +1292,8 @@ BigNumUnsignedAddUnchecked(bignum *SumAB, bignum *A, bignum *B)
 
     AdjustSizeWordsDownUnchecked(&LocalSumAB);
 
-    BigNumCopyUnchecked(SumAB, &LocalSumAB);
+    SumAB->SizeWords = LocalSumAB.SizeWords;
+    memcpy(SumAB->Num, LocalSumAB.Num, BigNumSizeBytesUnchecked(&LocalSumAB));
 
     return Carry;
 }
@@ -1339,6 +1364,25 @@ BigNumUnsignedSubtractUnchecked(bignum *AMinusB, bignum *A, bignum *B)
     return Borrow;
 }
 
+internal u32
+BigNumSubtractMaybeNegUnchecked(bignum *AMinusB, bignum *A, bignum *B)
+{
+    u32 Borrow;
+
+    if (IsAGreaterThanB(A, B))
+    {
+        Borrow = BigNumUnsignedSubtractUnchecked(AMinusB, A, B);
+        AMinusB->Negative = false;
+    }
+    else
+    {
+        Borrow = BigNumUnsignedSubtractUnchecked(AMinusB, B, A);
+        AMinusB->Negative = true;
+    }
+
+    return Borrow;
+}
+
 // IN: integers A, B in [0, 2^(W*t))
 // OUT: (eps, C) where C = A + B mod 2^(W*t), and eps is the carry bit
 internal u32 
@@ -1369,11 +1413,15 @@ BigNumAdd(bignum *SumAB, bignum *A, bignum *B)
     {
         Subtract = true;
     }
+    else
+    {
+        SumAB->Negative = false;
+    }
 
     u32 Carry;
     if (Subtract)
     {
-        Carry = BigNumUnsignedSubtractUnchecked(SumAB, A, B);
+        Carry = BigNumSubtractMaybeNegUnchecked(SumAB, A, B);
     }
     else
     {
@@ -1381,25 +1429,6 @@ BigNumAdd(bignum *SumAB, bignum *A, bignum *B)
     }
 
     return Carry;
-}
-
-internal u32
-BigNumSubtractMaybeNegUnchecked(bignum *AMinusB, bignum *A, bignum *B)
-{
-    u32 Borrow;
-
-    if (IsAGreaterThanB(A, B))
-    {
-        Borrow = BigNumUnsignedSubtractUnchecked(AMinusB, A, B);
-        AMinusB->Negative = false;
-    }
-    else
-    {
-        Borrow = BigNumUnsignedSubtractUnchecked(AMinusB, B, A);
-        AMinusB->Negative = true;
-    }
-
-    return Borrow;
 }
 
 internal u32 
@@ -1414,6 +1443,7 @@ BigNumSubtract(bignum *AMinusB, bignum *A, bignum *B)
      * -a - -b      b-a
      */
     b32 Add = false;
+    bignum LocalAMinusB;
     if (A->Negative)
     {
         if (B->Negative)
@@ -1423,24 +1453,26 @@ BigNumSubtract(bignum *AMinusB, bignum *A, bignum *B)
         else
         {
             Add = true;
-            AMinusB->Negative = true;
+            LocalAMinusB.Negative = true;
         }
     }
     else if (B->Negative)
     {
         Add = true;
-        AMinusB->Negative = false;
+        LocalAMinusB.Negative = false;
     }
 
     u32 Borrow;
     if (Add)
     {
-        Borrow = BigNumUnsignedAddUnchecked(AMinusB, A, B);
+        Borrow = BigNumUnsignedAddUnchecked(&LocalAMinusB, A, B);
     }
     else
     {
-        Borrow = BigNumSubtractMaybeNegUnchecked(AMinusB, A, B);
+        Borrow = BigNumSubtractMaybeNegUnchecked(&LocalAMinusB, A, B);
     }
+
+    BigNumCopyUnchecked(AMinusB, &LocalAMinusB);
 
     return Borrow;
 }
@@ -1501,11 +1533,7 @@ BigNumAddModN(bignum *SumABModN, bignum *A, bignum *B, bignum *N)
 
     u32 Carry = BigNumAdd(SumABModN, A, B);
 
-    if (Carry)
-    {
-        BigNumSubtract(SumABModN, SumABModN, N);
-    }
-    else if (!IsAGreaterThanB(N, SumABModN))
+    if (Carry || IsAGreaterThanOrEqualToB(SumABModN, N))
     {
         BigNumSubtract(SumABModN, SumABModN, N);
     }
@@ -1578,13 +1606,21 @@ BigNumMultiplyOperandScanning(bignum *ProductAB, bignum *A, bignum *B)
 {
     Stopif((ProductAB == 0) || (A == 0) || (B == 0), "Null input to BigNumMultiplyModNOperandScanning!\n");
 
-    bignum TempProductAB;
+    if (A->Negative != B->Negative)
+    {
+        ProductAB->Negative = true;
+    }
+    else
+    {
+        ProductAB->Negative = false;
+    }
 
-    TempProductAB.SizeWords = MultiplyOperandScanningUnchecked(TempProductAB.Num, MAX_BIGNUM_SIZE_WORDS,
-                                                               A->Num, A->SizeWords,
-                                                               B->Num, B->SizeWords);
+    u64 TempProductAB[MAX_BIGNUM_SIZE_WORDS];
+    ProductAB->SizeWords = MultiplyOperandScanningUnchecked(TempProductAB, ARRAY_LENGTH(TempProductAB),
+                                                            A->Num, A->SizeWords,
+                                                            B->Num, B->SizeWords);
 
-    memcpy(ProductAB, &TempProductAB, sizeof(TempProductAB));
+    memcpy(ProductAB->Num, TempProductAB, BigNumSizeBytesUnchecked(ProductAB));
 }
 
 internal inline b32
@@ -1592,8 +1628,8 @@ IsInverseOfNMod2PowerKUnchecked(bignum *BigNum, bignum *BigNumInverse, u32 Power
 {
     Stopif(PowerOf2 > MAX_BIGNUM_SIZE_BITS, "Invalid PowerOf2 in IsInverseOfNMod2PowerKUnchecked!\n");
 
-    // TODO(bwd): copy BigNum mod 2^k and multiply with BigNum' mod 2^k to get BigNum*BigNum' mod 2^k
     bignum ScratchProduct;
+    memset(ScratchProduct.Num, 0, sizeof(ScratchProduct.Num));
     BigNumMultiplyOperandScanning(&ScratchProduct, BigNumInverse, BigNum);
 
     u32 NextPowerOf2DWordIndex;
@@ -1639,8 +1675,7 @@ FindNInverseModR(bignum *NInverseModR, bignum *N, u32 RPowerOf2)
 
     // Hensel's Lemma to calculate 1/N mod R -- used to avoid explicit trial division
 
-    NInverseModR->SizeWords = 1;
-    NInverseModR->Num[0] = 1;
+    BigNumSetToOneUnchecked(NInverseModR);
 
     u32 NextPowerOf2 = 1;
     while (NextPowerOf2 < RPowerOf2)
@@ -1883,8 +1918,12 @@ BigNumMultiplyModP(bignum *ProductABModP, bignum *A, bignum *B, bignum *P)
 }
 
 internal void
-MontInner(bignum *Output, bignum *XTimesRModP, bignum *YTimesRModP, bignum *ModulusP,
-          bignum *MinusPInverseModR, u32 RPowerOf2)
+MontInner(bignum *Output,
+          bignum *XTimesRModP,
+          bignum *YTimesRModP,
+          bignum *ModulusP,
+          bignum *MinusPInverseModR,
+          u32 RPowerOf2)
 {
     Stopif((Output == 0) ||
            (XTimesRModP == 0) ||
@@ -1925,8 +1964,7 @@ MontModExp(bignum *OutputA, bignum *InputX, bignum *ExponentE, bignum *ModulusP,
 
     if ((InputX->Num[0] == 1) && (InputX->SizeWords == 1))
     {
-        OutputA->Num[0] = 1;
-        OutputA->SizeWords = 1;
+        BigNumSetToOneUnchecked(OutputA);
     }
     else
     {
@@ -1943,8 +1981,7 @@ MontModExp(bignum *OutputA, bignum *InputX, bignum *ExponentE, bignum *ModulusP,
             MultiplyByRModP(&InputXTimesRModP, InputX, ModulusP, RPowerOf2);
 
             // A := R mod p
-            LocalResult.Num[0] = 1;
-            LocalResult.SizeWords = 1;
+            BigNumSetToOneUnchecked(&LocalResult);
             MultiplyByRModP(&LocalResult, &LocalResult, ModulusP, RPowerOf2);
 
             u32 BitCountExponentE = ((BITS_IN_DWORD*(ExponentE->SizeWords - 1)) +
@@ -1967,8 +2004,7 @@ MontModExp(bignum *OutputA, bignum *InputX, bignum *ExponentE, bignum *ModulusP,
             }
 
             // return Mont(A, 1)
-            InputXTimesRModP.Num[0] = 1;
-            InputXTimesRModP.SizeWords = 1;
+            BigNumSetToOneUnchecked(&InputXTimesRModP);
             MontInner(&LocalResult, &LocalResult, &InputXTimesRModP, ModulusP, &MinusPInverseModR, RPowerOf2);
         }
         else

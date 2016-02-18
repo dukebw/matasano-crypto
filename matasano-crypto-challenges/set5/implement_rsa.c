@@ -3,22 +3,6 @@
 
 #define P_Q_SIZE_BITS (MAX_BIGNUM_SIZE_BITS/4)
 
-internal inline b32
-IsEqualToOneUnchecked(bignum *BigNum)
-{
-    b32 Result = (BigNum->SizeWords == 1) && (BigNum->Num[0] == 1);
-
-    return Result;
-}
-
-internal inline b32
-IsEvenUnchecked(bignum *BigNum)
-{
-    b32 Result = (BigNum->Num[0] % 2) == 0;
-
-    return Result;
-}
-
 const bignum TEST_INV_MOD_INPUT =
 {
     .Num =
@@ -121,10 +105,11 @@ GetRandPrime(bignum *RandPrimeModP)
 {
     Stopif(RandPrimeModP == 0, "Null input to GetRandPrime!\n");
 
+    RandPrimeModP->SizeWords = P_Q_SIZE_BITS/BITS_IN_DWORD;
+    RandPrimeModP->Negative = false;
+
     BIGNUM *BN_RandPrime = BN_new();
     i32 PrimeFound = BN_generate_prime_ex(BN_RandPrime, P_Q_SIZE_BITS, 0, 0, 0, 0);
-
-    RandPrimeModP->SizeWords = P_Q_SIZE_BITS/BITS_IN_DWORD;
 
     Stopif(!PrimeFound, "No prime found in TestImplementRsa!\n");
 

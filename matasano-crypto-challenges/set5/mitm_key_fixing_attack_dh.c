@@ -41,8 +41,13 @@ internal MIN_UNIT_TEST_FUNC(TestMitmKeyFixingAttack)
 
     u8 IvA[AES_128_BLOCK_LENGTH_BYTES];
     u8 SessionSymmetricKey[SHA_1_HASH_LENGTH_BYTES];
-    HashSessionKeyGenIvAndEncrypt(GlobalExchangeBuffer, IvA, (u8 *)SessionKeyA.Num, sizeof(u64)*SessionKeyA.SizeWords,
-                                  Message, STR_LEN(DH_MITM_TEST_MSG_A), SessionSymmetricKey);
+    HashSessionKeyGenIvAndEncrypt(GlobalExchangeBuffer,
+                                  IvA,
+                                  (u8 *)SessionKeyA.Num,
+                                  sizeof(u64)*SessionKeyA.SizeWords,
+                                  Message,
+                                  STR_LEN(DH_MITM_TEST_MSG_A),
+                                  SessionSymmetricKey);
 
     AesCbcDecrypt(Message, GlobalExchangeBuffer, STR_LEN(DH_MITM_TEST_MSG_A), SessionSymmetricKey, IvA);
 

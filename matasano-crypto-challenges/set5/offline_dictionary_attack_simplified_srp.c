@@ -106,6 +106,7 @@ GetLittleX(bignum *LittleX, char *Password, u32 PasswordSizeBytes)
 
     Sha1((u8 *)LittleX->Num, MessageScratch, XMessageSizeBytes);
     LittleX->SizeWords = LittleXSizeDWords;
+    LittleX->Negative = false;
 }
 
 internal MIN_UNIT_TEST_FUNC(TestOfflineDictAttackSimplifiedSrp)
@@ -138,6 +139,7 @@ internal MIN_UNIT_TEST_FUNC(TestOfflineDictAttackSimplifiedSrp)
     u32 LittleUSize32BitWords = 128/BITS_IN_WORD;
     GenRandUnchecked((u32 *)LittleU.Num, LittleUSize32BitWords);
     LittleU.SizeWords = LittleUSize32BitWords/2;
+    LittleU.Negative = false;
 
     // BigB := g**b (calculated by Server)
     bignum BigB;

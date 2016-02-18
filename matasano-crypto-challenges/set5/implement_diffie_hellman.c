@@ -260,7 +260,9 @@ internal MIN_UNIT_TEST_FUNC(TestBigNumSubtract)
 // TODO(bwd): Test case where A + B overflow 2^(W*t)
 internal MIN_UNIT_TEST_FUNC(TestBigNumAddModN)
 {
-    BigNumAddModN(&GlobalScratchBigNumA, (bignum *)&TEST_BIGNUM_2_LEFT, (bignum *)&TEST_BIGNUM_2_RIGHT,
+    BigNumAddModN(&GlobalScratchBigNumA,
+                  (bignum *)&TEST_BIGNUM_2_LEFT,
+                  (bignum *)&TEST_BIGNUM_2_RIGHT,
                   (bignum *)&NIST_RFC_3526_PRIME_1536);
 
     MinUnitAssert(GlobalScratchBigNumA.SizeWords == TEST_BIGNUM_2_SUM_MOD_P.SizeWords,
@@ -297,17 +299,10 @@ internal MIN_UNIT_TEST_FUNC(TestMontInner)
     bignum Output;
     bignum TestP;
 
-    XTimesRModP.SizeWords = 1;
-    XTimesRModP.Num[0] = 2;
-
-    YTimesRModP.SizeWords = 1;
-    YTimesRModP.Num[0] = 6;
-
-    MinusPInverseModR.SizeWords = 1;
-    MinusPInverseModR.Num[0] = 13;
-
-    TestP.SizeWords = 1;
-    TestP.Num[0] = 11;
+    InitTinyBigNumUnchecked(&XTimesRModP, 2, false);
+    InitTinyBigNumUnchecked(&YTimesRModP, 6, false);
+    InitTinyBigNumUnchecked(&MinusPInverseModR, 13, false);
+    InitTinyBigNumUnchecked(&TestP, 11, false);
 
     MontInner(&Output, &XTimesRModP, &YTimesRModP, &TestP, &MinusPInverseModR, 4);
 
@@ -362,8 +357,7 @@ internal MIN_UNIT_TEST_FUNC(TestMontModExp)
 internal MIN_UNIT_TEST_FUNC(TestDiffieHellmanBigNum)
 {
     bignum DhGenerator;
-    DhGenerator.SizeWords = 1;
-    DhGenerator.Num[0] = NIST_RFC_3526_GEN;
+    InitTinyBigNumUnchecked(&DhGenerator, NIST_RFC_3526_GEN, false);
 
     GenRandBigNumModNUnchecked(&GlobalScratchBigNumA, (bignum *)&NIST_RFC_3526_PRIME_1536);
 

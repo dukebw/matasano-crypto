@@ -321,7 +321,8 @@ internal MIN_UNIT_TEST_FUNC(TestDhNegotiatedGroups)
 
     MontModExpRBigNumMax(&SessionKeyA, &BigB, &LittleA, (bignum *)&NIST_RFC_3526_PRIME_1536);
 
-    u8 MasterPlaintext[DH_MALICIOUS_G_MAX_PLAINTEXT_SIZE_BYTES] = "Master: This is my message!\nYou decrypted it!\n";
+    u8 MasterPlaintext[DH_MALICIOUS_G_MAX_PLAINTEXT_SIZE_BYTES] =
+        "Master: This is my message!\nYou decrypted it!\n";
     u32 MasterCiphertextSizeBytes = strlen((char *)MasterPlaintext) + 1;
 
     Stopif(MasterCiphertextSizeBytes > sizeof(MasterPlaintext), "MasterPlaintext buffer overflow\n");
