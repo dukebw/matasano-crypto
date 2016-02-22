@@ -1,9 +1,31 @@
 #include "crypt_helper.h"
+#include <openssl/err.h>
+#include <openssl/rand.h>
 #include <openssl/bn.h>
 
 #define P_Q_SIZE_BITS (MAX_BIGNUM_SIZE_BITS/4)
 
-const bignum TEST_INV_MOD_INPUT =
+#define BIGNUM_BINARY_OP_FN(Name) u32 Name(bignum *SumAB, bignum *A, bignum *B)
+typedef BIGNUM_BINARY_OP_FN(bignum_binary_op_fn);
+
+#define OSSL_BN_BINARY_OP_FN(Name) void Name(BIGNUM *SumAB, BIGNUM *A, BIGNUM *B)
+typedef OSSL_BN_BINARY_OP_FN(ossl_bn_binary_op_fn);
+
+typedef struct
+{
+    BIGNUM LeftOp;
+    BIGNUM RightOp;
+    BIGNUM Result;
+} ossl_binary_operands;
+
+typedef struct
+{
+    bignum LeftOp;
+    bignum RightOp;
+    bignum Result;
+} bignum_binary_operands;
+
+internal const bignum TEST_INV_MOD_INPUT =
 {
     .Num =
     {
@@ -19,7 +41,7 @@ const bignum TEST_INV_MOD_INPUT =
     .Negative = false,
 };
 
-const bignum RFC_5054_NIST_PRIME_2048 =
+internal const bignum RFC_5054_NIST_PRIME_2048 =
 {
     .Num =
     {
@@ -35,7 +57,7 @@ const bignum RFC_5054_NIST_PRIME_2048 =
     .Negative = false,
 };
 
-const bignum TEST_NEG_A =
+internal const bignum TEST_NEG_A =
 {
     .Num =
     {
@@ -51,7 +73,7 @@ const bignum TEST_NEG_A =
     .Negative = false,
 };
 
-const bignum TEST_NEG_B =
+internal const bignum TEST_NEG_B =
 {
     .Num =
     {
@@ -67,7 +89,7 @@ const bignum TEST_NEG_B =
     .Negative = false,
 };
 
-const bignum TEST_NEG_B_MINUS_A =
+internal const bignum TEST_NEG_B_MINUS_A =
 {
     .Num =
     {
@@ -84,7 +106,7 @@ const bignum TEST_NEG_B_MINUS_A =
 };
 
 // C := A - B
-const bignum TEST_NEG_C_PLUS_C =
+internal const bignum TEST_NEG_C_PLUS_C =
 {
     .Num =
     {
@@ -124,19 +146,22 @@ GetRandPrime(bignum *RandPrimeModP)
 }
 
 internal void
-DivideNonZeroBignumBy2Unchecked(bignum *BigNum)
+DivideBignumBy2Unchecked(bignum *BigNum)
 {
-    u32 BigNumLastWordIndex = (BigNum->SizeWords - 1);
-    for (u32 BigNumIndex = 0;
-         BigNumIndex < BigNumLastWordIndex;
-         ++BigNumIndex)
+    if (BigNum->SizeWords > 0)
     {
-        BigNum->Num[BigNumIndex] = ((BigNum->Num[BigNumIndex + 1] << (BITS_IN_DWORD - 1)) |
-                                    (BigNum->Num[BigNumIndex] >> 1));
-    }
+        u32 BigNumLastWordIndex = (BigNum->SizeWords - 1);
+        for (u32 BigNumIndex = 0;
+             BigNumIndex < BigNumLastWordIndex;
+             ++BigNumIndex)
+        {
+            BigNum->Num[BigNumIndex] = ((BigNum->Num[BigNumIndex + 1] << (BITS_IN_DWORD - 1)) |
+                                        (BigNum->Num[BigNumIndex] >> 1));
+        }
 
-    BigNum->Num[BigNumLastWordIndex] >>= 1;
-    AdjustSizeWordsDownUnchecked(BigNum);
+        BigNum->Num[BigNumLastWordIndex] >>= 1;
+        AdjustSizeWordsDownUnchecked(BigNum);
+    }
 }
 
 internal void
@@ -144,17 +169,17 @@ BinaryInverseInnerLoop(bignum *UOrV, bignum *X1OrX2, bignum *PrimeP)
 {
     while (IsEvenUnchecked(UOrV))
     {
-        DivideNonZeroBignumBy2Unchecked(UOrV);
+        DivideBignumBy2Unchecked(UOrV);
 
         if (IsEvenUnchecked(X1OrX2))
         {
-            DivideNonZeroBignumBy2Unchecked(X1OrX2);
+            DivideBignumBy2Unchecked(X1OrX2);
         }
         else
         {
             BigNumAdd(X1OrX2, X1OrX2, PrimeP);
 
-            DivideNonZeroBignumBy2Unchecked(X1OrX2);
+            DivideBignumBy2Unchecked(X1OrX2);
         }
     }
 }
@@ -178,8 +203,9 @@ BinaryInverseInnerLoop(bignum *UOrV, bignum *X1OrX2, bignum *PrimeP)
            Else: v ← v − u, x2 ← x2 − x1 .
    4. If u = 1 then return(x1 mod p); else return(x2 mod p).
 */
+// NOTE(brendan): Unused for now. Unchecked input requirement: PrimeP is prime.
 internal void
-GetInverseModN(bignum *EInverseModN, bignum *InputA, bignum *PrimeP)
+GetInverseModPPrime(bignum *EInverseModN, bignum *InputA, bignum *PrimeP)
 {
     Stopif((EInverseModN == 0) || (InputA == 0) || (PrimeP == 0), "Null input to GetInverseModN!\n");
 
@@ -192,11 +218,10 @@ GetInverseModN(bignum *EInverseModN, bignum *InputA, bignum *PrimeP)
     BigNumCopyUnchecked(&V, PrimeP);
 
     bignum X1;
-    X1.SizeWords = 1;
-    X1.Num[0] = 1;
+    BigNumSetToOneUnchecked(&X1);
 
     bignum X2;
-    X2.SizeWords = 0;
+    BigNumSetToZeroUnchecked(&X2);
 
     while (!IsEqualToOneUnchecked(&U) && !IsEqualToOneUnchecked(&V))
     {
@@ -227,6 +252,151 @@ GetInverseModN(bignum *EInverseModN, bignum *InputA, bignum *PrimeP)
     Stopif(IsAGreaterThanOrEqualToB(EInverseModN, PrimeP), "InvModResult not mod P in GetInverseModN!\n");
 }
 
+/*
+   Knuth. TAOCP, Volume 2, Section 4.5.2 #39.
+
+   Y1. [Find power of 2.] Set k <- 0, and then repeatedly set k <- k + 1, u <- u/2, v <- v/2,
+       zero or more times until u and v are not both even.
+   Y2. [Initialize.] Set (u1, u2, u3) <- (1, 0, u) and (v1, v2, v3) <- (v, 1 - u, v).
+       If u is odd, set (t1, t2, t3) <- (0, -1, -v) and go to Y4.
+       Otherwise, set (t1, t2, t3) <- (1, 0, u).
+   Y3. [Halve t3.] If t1 and t2 are both even, set (t1, t2, t3) <- (t1, t2, t3)/2;
+       otherwise set (t1, t2, t3) <- (t1 + v, t2 - u, t3)/2. (In the latter case,
+       t1 + v and t2 - u will both be even).
+   Y4. [Is t3 even?] If t3 is even, go back to Y3.
+   Y5. [Reset max(u3, v3).] If t3 is positive, set (u1, u2, u3) <- (t1, t2, t3);
+       otherwise set (v1, v2, v3) <- (v - t1, -u - t2, -t3).
+   Y6. [Subtract.] Set (t1, t2, t3) <- (u1, u2, u3) - (v1, v2, v3). Then if t1 < 0,
+       set (t1, t2) <- (t1 + v, t2 - u). If t3 != 0, go back to Y3.
+       Otherwise the algorithm terminates with (u1, u2, u3*2^k) as the output.
+*/
+internal b32
+GetInverseModN(bignum *AInverseModN, bignum *InputA, bignum *ModulusN)
+{
+    bignum U;
+    BigNumCopyUnchecked(&U, InputA);
+
+    bignum V;
+    BigNumCopyUnchecked(&V, ModulusN);
+
+    Stopif((InputA->SizeWords == 0) || (ModulusN->SizeWords == 0), "Zero input to GetInverseModN!");
+    Stopif(InputA->Negative || ModulusN->Negative, "Negative input to GetInverseModN!");
+
+    // Y1
+    u32 GcdPowerOf2_K;
+    for (GcdPowerOf2_K = 0;
+         IsEvenUnchecked(&U) && IsEvenUnchecked(&V);
+         ++GcdPowerOf2_K)
+    {
+        DivideBignumBy2Unchecked(&U);
+        DivideBignumBy2Unchecked(&V);
+    }
+
+    b32 InputAInverted;
+    if (GcdPowerOf2_K > 0)
+    {
+        InputAInverted = false;
+    }
+    else
+    {
+        // Y2
+        // We only care about u1 of the output: (u1*a + u2*n == 1) => (u1 == a^-1 mod n)
+        bignum U1;
+        bignum U2;
+        bignum U3;
+        BigNumSetToOneUnchecked(&U1);
+        BigNumSetToZeroUnchecked(&U2);
+        BigNumCopyUnchecked(&U3, &U);
+
+        bignum V1;
+        bignum V2;
+        bignum V3;
+        BigNumCopyUnchecked(&V1, &V);
+        BigNumSubtract(&V2, &U1, &U);
+        BigNumCopyUnchecked(&V3, &V);
+
+        bignum T1;
+        bignum T2;
+        bignum T3;
+        if (IsOddUnchecked(&U))
+        {
+            BigNumSetToZeroUnchecked(&T1);
+
+            InitTinyBigNumUnchecked(&T2, 1, true);
+
+            BigNumCopyMinusUnchecked(&T3, &V);
+        }
+        else
+        {
+            BigNumSetToOneUnchecked(&T1);
+
+            BigNumSetToZeroUnchecked(&T2);
+
+            BigNumCopyUnchecked(&T3, &U);
+        }
+
+        do
+        {
+            // Y3, Y4
+            while (IsEvenUnchecked(&T3))
+            {
+                if (!(IsEvenUnchecked(&T1) && IsEvenUnchecked(&T2)))
+                {
+                    BigNumAdd(&T1, &T1, &V);
+                    BigNumSubtract(&T2, &T2, &U);
+                }
+
+                DivideBignumBy2Unchecked(&T1);
+                DivideBignumBy2Unchecked(&T2);
+                DivideBignumBy2Unchecked(&T3);
+            }
+
+            // Y5
+            if ((T3.SizeWords > 0) && !T3.Negative)
+            {
+                BigNumCopyUnchecked(&U1, &T1);
+                BigNumCopyUnchecked(&U2, &T2);
+                BigNumCopyUnchecked(&U3, &T3);
+            }
+            else
+            {
+                BigNumSubtract(&V1, &V, &T1);
+
+                BigNumAdd(&V2, &U, &T2);
+                V2.Negative = !V2.Negative;
+
+                BigNumCopyMinusUnchecked(&V3, &T3);
+            }
+
+            // Y6
+            BigNumSubtract(&T1, &U1, &V1);
+            BigNumSubtract(&T2, &U2, &V2);
+            BigNumSubtract(&T3, &U3, &V3);
+
+            Stopif(!IsEvenUnchecked(&T3), "Alg. broken!\n");
+
+            if ((T1.SizeWords > 0) && T1.Negative)
+            {
+                BigNumAdd(&T1, &T1, &V);
+                BigNumSubtract(&T2, &T2, &U);
+            }
+        } while (!IsEqualToZeroUnchecked(&T3));
+
+        if (IsEqualToOneUnchecked(&U3))
+        {
+            InputAInverted = true;
+        }
+        else
+        {
+            InputAInverted = false;
+        }
+
+        BigNumCopyUnchecked(AInverseModN, &U1);
+    }
+
+    return InputAInverted;
+}
+
 internal void
 InitOsslBnUnchecked(BIGNUM *OsslBignum, u64 *Array, u32 SizeDWords, u32 ArrayMaxSizeDWords)
 {
@@ -234,14 +404,159 @@ InitOsslBnUnchecked(BIGNUM *OsslBignum, u64 *Array, u32 SizeDWords, u32 ArrayMax
     OsslBignum->top = SizeDWords;
     OsslBignum->dmax = ArrayMaxSizeDWords;
     OsslBignum->neg = 0;
+    OsslBignum->flags = BN_FLG_STATIC_DATA;
+}
+
+internal inline void
+GenOsslPseudoRandBn(BIGNUM *OsslBignum, u32 Bits)
+{
+    i32 Status = BN_pseudo_rand(OsslBignum, Bits, -1, false);
+    Stopif(Status != 1,
+           "BN_pseudo_rand failed in GenOsslPseudoRandBn!\nERR_get_error(): 0x%lx\n",
+           ERR_get_error());
+}
+
+internal inline void
+OsslAddBn(BIGNUM *SumAB, BIGNUM *A, BIGNUM *B)
+{
+    i32 Status = BN_add(SumAB, A, B);
+    Stopif(Status != 1, "BN_add failed in OsslAddBn!\nERR_get_error(): 0x%lx\n", ERR_get_error());
+}
+
+internal inline void
+OsslSubtractBn(BIGNUM *AMinusB, BIGNUM *A, BIGNUM *B)
+{
+    i32 Status = BN_sub(AMinusB, A, B);
+    Stopif(Status != 1, "BN_add failed in OsslSubtractBn!\nERR_get_error(): 0x%lx\n", ERR_get_error());
+}
+
+internal inline void
+OsslMultiplyBn(BIGNUM *ATimesB, BIGNUM *A, BIGNUM *B)
+{
+    BN_CTX *Context = BN_CTX_new();
+
+    i32 Status = BN_mul(ATimesB, A, B, Context);
+    Stopif(Status != 1, "BN_mul failed in OsslMultiplyBn!\nERR_get_error(): 0x%lx\n", ERR_get_error());
+
+    BN_CTX_free(Context);
+}
+
+internal inline b32
+BigNumEqualsOsslBn(bignum *BigNum, BIGNUM *OsslBignum)
+{
+    b32 Result;
+
+    Result = (!memcmp(BigNum->Num, OsslBignum->d, BYTES_IN_BIGNUM_WORD*OsslBignum->top) &&
+              ((i32)BigNum->SizeWords == OsslBignum->top) &&
+              (BigNum->Negative == OsslBignum->neg));
+
+    return Result;
+}
+
+internal void
+BinaryOpAndAssertEqual(bignum_binary_operands *Ops,
+                       ossl_binary_operands *OsslOps,
+                       b32 LeftOpNegative,
+                       b32 RightOpNegative,
+                       bignum_binary_op_fn *BigNumBinaryOpFn,
+                       ossl_bn_binary_op_fn *OsslBnBinaryOpFn)
+{
+    Stopif((Ops == 0) || (OsslOps == 0), "Null input to BinaryOpAndAssertEqual!");
+
+    Ops->LeftOp.Negative = LeftOpNegative;
+    Ops->RightOp.Negative = RightOpNegative;
+    OsslOps->LeftOp.neg = LeftOpNegative;
+    OsslOps->RightOp.neg = RightOpNegative;
+
+    OsslBnBinaryOpFn(&OsslOps->Result, &OsslOps->LeftOp, &OsslOps->RightOp);
+    BigNumBinaryOpFn(&Ops->Result, &Ops->LeftOp, &Ops->RightOp);
+
+    MinUnitAssert(BigNumEqualsOsslBn(&Ops->Result, &OsslOps->Result), "BigNum/OsslBignum mismatch in TestBigNumNegative!\n");
+}
+
+internal void
+GenerateLeftRightOpSetSize(ossl_binary_operands *OsslOps, bignum_binary_operands *Ops, u32 Bits)
+{
+    GenOsslPseudoRandBn(&OsslOps->LeftOp, Bits);
+    GenOsslPseudoRandBn(&OsslOps->RightOp, Bits);
+
+    Ops->LeftOp.SizeWords = OsslOps->LeftOp.top;
+    Ops->RightOp.SizeWords = OsslOps->RightOp.top;
 }
 
 internal MIN_UNIT_TEST_FUNC(TestBigNumNegative)
 {
+    ossl_binary_operands OsslOps;
+    bignum_binary_operands Ops;
+    u64 BN_ResultBuffer[MAX_BIGNUM_SIZE_WORDS];
+
+    bignum Zero;
+    BigNumSetToZeroUnchecked(&Zero);
+
+    InitOsslBnUnchecked(&OsslOps.LeftOp, Ops.LeftOp.Num, 0, ARRAY_LENGTH(Ops.LeftOp.Num));
+    InitOsslBnUnchecked(&OsslOps.RightOp, Ops.RightOp.Num, 0, ARRAY_LENGTH(Ops.RightOp.Num));
+    InitOsslBnUnchecked(&OsslOps.Result, BN_ResultBuffer, 0, ARRAY_LENGTH(BN_ResultBuffer));
+
+    for (u32 TestCount = 0;
+         TestCount < 2048;
+         ++TestCount)
+    {
+        GenerateLeftRightOpSetSize(&OsslOps, &Ops, MAX_BIGNUM_SIZE_BITS - BITS_IN_BIGNUM_WORD);
+
+        BigNumAdd(&Ops.Result, &Ops.LeftOp, &Zero);
+        MinUnitAssert(AreBigNumsEqualUnchecked(&Ops.Result, &Ops.LeftOp),
+                      "Zero case failed in TestBigNumNegative!\n");
+
+        BigNumAdd(&Ops.Result, &Zero, &Ops.LeftOp);
+        MinUnitAssert(AreBigNumsEqualUnchecked(&Ops.Result, &Ops.LeftOp),
+                      "Zero case failed in TestBigNumNegative!\n");
+
+        BigNumSubtract(&Ops.Result, &Ops.LeftOp, &Zero);
+        MinUnitAssert(AreBigNumsEqualUnchecked(&Ops.Result, &Ops.LeftOp),
+                      "Zero case failed in TestBigNumNegative!\n");
+
+        BigNumSubtract(&Ops.Result, &Zero, &Ops.LeftOp);
+        MinUnitAssert(((Ops.Result.SizeWords == Ops.LeftOp.SizeWords) &&
+                       (Ops.Result.Negative != Ops.LeftOp.Negative) &&
+                       !memcmp(Ops.Result.Num, Ops.LeftOp.Num, BigNumSizeBytesUnchecked(&Ops.LeftOp))),
+                      "Zero case failed in TestBigNumNegative!\n");
+
+        BinaryOpAndAssertEqual(&Ops, &OsslOps, false, false, BigNumAdd, OsslAddBn);
+        BinaryOpAndAssertEqual(&Ops, &OsslOps, false, true, BigNumAdd, OsslAddBn);
+        BinaryOpAndAssertEqual(&Ops, &OsslOps, true, false, BigNumAdd, OsslAddBn);
+        BinaryOpAndAssertEqual(&Ops, &OsslOps, true, true, BigNumAdd, OsslAddBn);
+
+        BinaryOpAndAssertEqual(&Ops, &OsslOps, false, false, BigNumSubtract, OsslSubtractBn);
+        BinaryOpAndAssertEqual(&Ops, &OsslOps, false, true, BigNumSubtract, OsslSubtractBn);
+        BinaryOpAndAssertEqual(&Ops, &OsslOps, true, false, BigNumSubtract, OsslSubtractBn);
+        BinaryOpAndAssertEqual(&Ops, &OsslOps, true, true, BigNumSubtract, OsslSubtractBn);
+
+        GenerateLeftRightOpSetSize(&OsslOps, &Ops, MAX_BIGNUM_SIZE_BITS/4);
+
+        BinaryOpAndAssertEqual(&Ops, &OsslOps, false, false, BigNumMultiplyOperandScanning, OsslMultiplyBn);
+        BinaryOpAndAssertEqual(&Ops, &OsslOps, true, false, BigNumMultiplyOperandScanning, OsslMultiplyBn);
+        BinaryOpAndAssertEqual(&Ops, &OsslOps, false, true, BigNumMultiplyOperandScanning, OsslMultiplyBn);
+        BinaryOpAndAssertEqual(&Ops, &OsslOps, true, true, BigNumMultiplyOperandScanning, OsslMultiplyBn);
+    }
 }
 
 internal MIN_UNIT_TEST_FUNC(TestBinaryInverse)
 {
+    // TODO(bwd): gcd + gcd tests (Simple, average and corner/extreme degenerate)
+    bignum SimpleInput;
+    InitTinyBigNumUnchecked(&SimpleInput, 17, false);
+
+    bignum SimplePrime;
+    InitTinyBigNumUnchecked(&SimplePrime, 3120, false);
+
+    bignum InvModResult;
+    GetInverseModN(&InvModResult, &SimpleInput, &SimplePrime);
+
+    MinUnitAssert((InvModResult.Num[0] == 2753) &&
+                  (InvModResult.SizeWords == 1) &&
+                  (InvModResult.Negative == false),
+                  "Simple inv mod case failed in TestBinaryInverse!\n");
+
     BIGNUM BN_Prime2048;
     InitOsslBnUnchecked(&BN_Prime2048,
                         (u64 *)RFC_5054_NIST_PRIME_2048.Num,
@@ -249,9 +564,6 @@ internal MIN_UNIT_TEST_FUNC(TestBinaryInverse)
                         ARRAY_LENGTH(RFC_5054_NIST_PRIME_2048.Num));
 
     Stopif(!BN_is_prime_ex(&BN_Prime2048, 64, 0, 0), "Test prime not prime in TestBinaryInverse!\n");
-
-    bignum InvModResult;
-    GetInverseModN(&InvModResult, (bignum *)&TEST_INV_MOD_INPUT, (bignum *)&RFC_5054_NIST_PRIME_2048);
 
     BN_CTX *Context = BN_CTX_new();
 
@@ -269,8 +581,9 @@ internal MIN_UNIT_TEST_FUNC(TestBinaryInverse)
 
     BN_CTX_free(Context);
 
-    MinUnitAssert(!memcmp(InvModResult.Num, ExpectedModInv.d, BYTES_IN_BIGNUM_WORD*ExpectedModInv.top) &&
-                  ((i32)InvModResult.SizeWords == ExpectedModInv.top),
+    GetInverseModN(&InvModResult, (bignum *)&TEST_INV_MOD_INPUT, (bignum *)&RFC_5054_NIST_PRIME_2048);
+
+    MinUnitAssert(BigNumEqualsOsslBn(&InvModResult, &ExpectedModInv),
                   "InvModResult mismatch in TestBinaryInverse!\n");
 }
 
@@ -290,39 +603,40 @@ internal MIN_UNIT_TEST_FUNC(TestImplementRsa)
           integer d, 1 < d < φ, such that ed ≡ 1 (mod φ).
        5. A’s public key is (n, e); A’s private key is d.
     */
+    bignum PrivateKeyD;
+    bignum PublicExponentE;
+    InitTinyBigNumUnchecked(&PublicExponentE, 3, false);
+
     bignum PrimeQ;
     bignum PrimeP;
-    GetRandPrime(&PrimeQ);
-    GetRandPrime(&PrimeP);
+    bignum Totient;
+    do
+    {
+        GetRandPrime(&PrimeQ);
+        GetRandPrime(&PrimeP);
+
+        // totient := (p - 1)(q - 1) == pq - p - q + 1
+        BigNumMultiplyOperandScanning(&Totient, &PrimeP, &PrimeQ);
+        BigNumSubtract(&Totient, &Totient, &PrimeP);
+        BigNumSubtract(&Totient, &Totient, &PrimeQ);
+
+        bignum One;
+        BigNumSetToOneUnchecked(&One);
+        BigNumAdd(&Totient, &Totient, &One);
+    } while (!GetInverseModN(&PrivateKeyD, &PublicExponentE, &Totient));
+
+    char Message[] = "When we are born, we cry that we are come to this great stage of fools.";
+
+    bignum BigNumScratch;
+    u32 CeilingMessageSizeDWords = (STR_LEN(Message) + (BYTES_IN_BIGNUM_WORD - 1))/BYTES_IN_BIGNUM_WORD;
+    BigNumScratch.SizeWords = CeilingMessageSizeDWords;
+    BigNumScratch.Num[BigNumScratch.SizeWords - 1] = 0;
+    BigNumScratch.Negative = false;
+    memcpy(BigNumScratch.Num, Message, STR_LEN(Message));
 
     // n := pq
     bignum ModulusN;
     BigNumMultiplyOperandScanning(&ModulusN, &PrimeP, &PrimeQ);
-
-    // totient := (p - 1)(q - 1)
-    PrimeQ.Num[0] -= 1;
-    PrimeP.Num[0] -= 1;
-
-    bignum Totient;
-    BigNumMultiplyOperandScanning(&Totient, &PrimeP, &PrimeQ);
-
-    bignum PrivateKeyD;
-    bignum PublicExponentE;
-    PublicExponentE.SizeWords = 1;
-    PublicExponentE.Num[0] = 3;
-    GetInverseModN(&PrivateKeyD, &PublicExponentE, &Totient);
-
-    bignum BigNumScratch;
-    BigNumMultiplyModP(&BigNumScratch, &PrivateKeyD, &PublicExponentE, &Totient);
-
-    MinUnitAssert(IsEqualToOneUnchecked(&BigNumScratch), "de not equal to 1 mod phi in TestImplementRsa!\n");
-
-    char Message[] = "When we are born, we cry that we are come to this great stage of fools.";
-
-    u32 CeilingMessageSizeDWords = (STR_LEN(Message) + (BYTES_IN_BIGNUM_WORD - 1))/BYTES_IN_BIGNUM_WORD;
-    BigNumScratch.SizeWords = CeilingMessageSizeDWords;
-    BigNumScratch.Num[BigNumScratch.SizeWords - 1] = 0;
-    memcpy(BigNumScratch.Num, Message, STR_LEN(Message));
 
     // To encrypt: c = m**e % n.
     MontModExpRBigNumMax(&BigNumScratch, &BigNumScratch, &PublicExponentE, &ModulusN);

@@ -26,7 +26,7 @@ const u8 DICTIONARY[] =
 };
 const u32 DICT_ENTRY_COUNT = ARRAY_LENGTH(DICTIONARY);
 
-const char TEST_PASSWORD[] = "password123";
+const char TEST_PASSWORD[] = "alice1";
 
 global_variable char GlobalGuessPasswords[30*SIZE_1MB];
 

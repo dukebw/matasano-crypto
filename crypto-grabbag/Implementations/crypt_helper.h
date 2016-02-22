@@ -43,7 +43,7 @@ typedef struct timespec timespec;
 
 #define MEMBER_SIZE(type, Member) sizeof(((type *)0)->Member)
 
-const r32 EXPECTED_LETTER_FREQUENCY[] =
+internal const r32 EXPECTED_LETTER_FREQUENCY[] =
 {
     0.08167, 0.01492, 0.02782, 0.04253, 0.12702, 0.02228, 0.02015, 0.06094,
     0.06966, 0.00153, 0.00772, 0.04025, 0.02406, 0.06749, 0.07507, 0.01929,
@@ -739,11 +739,11 @@ MtUntemper(u32 TemperedState)
 	return Result;
 }
 
-const char PREPEND_STRING[] = "comment1=cooking%20MCs;userdata=";
+internal const char PREPEND_STRING[] = "comment1=cooking%20MCs;userdata=";
 #define PREPEND_LENGTH (sizeof(PREPEND_STRING) - 1)
-const char APPEND_STRING[] = "comment1=cooking%20MCs;userdata=";
+internal const char APPEND_STRING[] = "comment1=cooking%20MCs;userdata=";
 #define APPEND_LENGTH (sizeof(APPEND_STRING) - 1)
-const char ADMIN_TRUE_STRING[] = ";admin=true;";
+internal const char ADMIN_TRUE_STRING[] = ";admin=true;";
 #define ADMIN_TRUE_STR_LENGTH (sizeof(ADMIN_TRUE_STRING) - 1)
 
 CASSERT(ADMIN_TRUE_STR_LENGTH < (PREPEND_LENGTH - AES_128_BLOCK_LENGTH_BYTES), crypt_helper_h);
@@ -801,7 +801,7 @@ Sha1KeyedMac(u8 *KeyedMac, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLengt
 #define HMAC_RET_CODE_LENGTH_BYTES 4
 
 #define PORT 8181
-const char IP_ADDRESS[] = "192.168.1.19";
+internal const char IP_ADDRESS[] = "192.168.0.115";
 
 #define TEST_USER_CMD_LENGTH (STR_LEN(TEST_SRP_PREFIX) +    \
                               STR_LEN(USER_PREFIX) + STR_LEN(SRP_TEST_VEC_EMAIL) + 1)
@@ -810,18 +810,18 @@ typedef struct sockaddr_in sockaddr_in;
 typedef struct sockaddr sockaddr;
 typedef struct timespec timespec;
 
-const char SRP_TEST_VEC_EMAIL[] = "alice";
-const char SRP_TEST_VEC_PASSWORD[] = "password123";
+internal const char SRP_TEST_VEC_EMAIL[] = "alice";
+internal const char SRP_TEST_VEC_PASSWORD[] = "password123";
 
-const char HMAC_VALID_STRING[] = "200";
-const char HMAC_INVALID_STRING[] = "500";
+internal const char HMAC_VALID_STRING[] = "200";
+internal const char HMAC_INVALID_STRING[] = "500";
 
-const char TEST_HMAC_PREFIX[] = "test?";
-const char TEST_SRP_PREFIX[] = "srp?";
-const char FILE_PREFIX[] = "file=";
-const char SIG_PREFIX[] = "signature=";
-const char USER_PREFIX[] = "user=";
-const char TEST_USER_COMMAND[] = "srp?user=alice";
+internal const char TEST_HMAC_PREFIX[] = "test?";
+internal const char TEST_SRP_PREFIX[] = "srp?";
+internal const char FILE_PREFIX[] = "file=";
+internal const char SIG_PREFIX[] = "signature=";
+internal const char USER_PREFIX[] = "user=";
+internal const char TEST_USER_COMMAND[] = "srp?user=alice";
 
 internal void
 OpenSocketAndConnect(i32 *SocketFileDescriptor, sockaddr_in *ServerSocketAddr)
@@ -900,7 +900,7 @@ typedef struct
 } bignum;
 
 // Little-endian
-const bignum NIST_RFC_3526_PRIME_1536 =
+internal const bignum NIST_RFC_3526_PRIME_1536 =
 {
     .Num =
     {
@@ -916,7 +916,7 @@ const bignum NIST_RFC_3526_PRIME_1536 =
 
 #define NIST_RFC_3526_GEN 2
 
-const bignum NIST_RFC_3526_GEN_BIGNUM =
+internal const bignum NIST_RFC_3526_GEN_BIGNUM =
 {
     .Num =
     {
@@ -928,7 +928,7 @@ const bignum NIST_RFC_3526_GEN_BIGNUM =
 
 #define NIST_RFC_5054_GEN 2
 
-const bignum NIST_RFC_5054_GEN_BIGNUM =
+internal const bignum NIST_RFC_5054_GEN_BIGNUM =
 {
     .Num =
     {
@@ -938,7 +938,7 @@ const bignum NIST_RFC_5054_GEN_BIGNUM =
     .Negative = false,
 };
 
-const bignum RFC_5054_NIST_PRIME_1024 =
+internal const bignum RFC_5054_NIST_PRIME_1024 =
 {
     .Num =
     {
@@ -951,7 +951,7 @@ const bignum RFC_5054_NIST_PRIME_1024 =
     .Negative = false,
 };
 
-const bignum RFC_5054_TEST_SALT =
+internal const bignum RFC_5054_TEST_SALT =
 {
     .Num =
     {
@@ -961,7 +961,7 @@ const bignum RFC_5054_TEST_SALT =
     .Negative = false,
 };
 
-const bignum RFC_5054_TEST_K =
+internal const bignum RFC_5054_TEST_K =
 {
     .Num =
     {
@@ -971,7 +971,7 @@ const bignum RFC_5054_TEST_K =
     .Negative = false,
 };
 
-const bignum RFC_5054_TEST_X =
+internal const bignum RFC_5054_TEST_X =
 {
     .Num =
     {
@@ -981,7 +981,7 @@ const bignum RFC_5054_TEST_X =
     .Negative = false,
 };
 
-const bignum RFC_5054_TEST_V =
+internal const bignum RFC_5054_TEST_V =
 {
     .Num =
     {
@@ -994,7 +994,7 @@ const bignum RFC_5054_TEST_V =
     .Negative = false,
 };
 
-const bignum RFC_5054_TEST_LITTLE_A =
+internal const bignum RFC_5054_TEST_LITTLE_A =
 {
     .Num =
     {
@@ -1004,7 +1004,7 @@ const bignum RFC_5054_TEST_LITTLE_A =
     .Negative = false,
 };
 
-const bignum RFC_5054_TEST_LITTLE_B =
+internal const bignum RFC_5054_TEST_LITTLE_B =
 {
     .Num =
     {
@@ -1014,7 +1014,7 @@ const bignum RFC_5054_TEST_LITTLE_B =
     .Negative = false,
 };
 
-const bignum RFC_5054_TEST_BIG_A =
+internal const bignum RFC_5054_TEST_BIG_A =
 {
     .Num =
     {
@@ -1027,7 +1027,7 @@ const bignum RFC_5054_TEST_BIG_A =
     .Negative = false,
 };
 
-const bignum RFC_5054_TEST_BIG_B =
+internal const bignum RFC_5054_TEST_BIG_B =
 {
     .Num =
     {
@@ -1040,7 +1040,7 @@ const bignum RFC_5054_TEST_BIG_B =
     .Negative = false,
 };
 
-const bignum RFC_5054_TEST_U =
+internal const bignum RFC_5054_TEST_U =
 {
     .Num =
     {
@@ -1050,7 +1050,7 @@ const bignum RFC_5054_TEST_U =
     .Negative = false,
 };
 
-const bignum RFC_5054_TEST_PREMASTER_SECRET =
+internal const bignum RFC_5054_TEST_PREMASTER_SECRET =
 {
     .Num =
     {
@@ -1063,10 +1063,36 @@ const bignum RFC_5054_TEST_PREMASTER_SECRET =
     .Negative = false,
 };
 
+internal inline u32
+BigNumSizeBytesUnchecked(bignum *BigNum)
+{
+    u32 Result = BigNum->SizeWords*sizeof(BigNum->Num[0]);
+
+    return Result;
+}
+
+internal inline b32
+AreBigNumsEqualUnchecked(bignum *A, bignum *B)
+{
+    b32 Result = ((A->SizeWords == B->SizeWords) &&
+                  (A->Negative == B->Negative) &&
+                  !memcmp(A->Num, B->Num, BigNumSizeBytesUnchecked(A)));
+
+    return Result;
+}
+
+internal inline b32
+IsEqualToZeroUnchecked(bignum *BigNum)
+{
+    b32 Result = (BigNum->SizeWords == 0);
+
+    return Result;
+}
+
 internal inline b32
 IsEqualToOneUnchecked(bignum *BigNum)
 {
-    b32 Result = (BigNum->SizeWords == 1) && (BigNum->Num[0] == 1) && (BigNum->Negative = false);
+    b32 Result = (BigNum->SizeWords == 1) && (BigNum->Num[0] == 1) && (BigNum->Negative == false);
 
     return Result;
 }
@@ -1074,9 +1100,23 @@ IsEqualToOneUnchecked(bignum *BigNum)
 internal inline b32
 IsEvenUnchecked(bignum *BigNum)
 {
-    b32 Result = (BigNum->Num[0] % 2) == 0;
+    b32 Result = (IsEqualToZeroUnchecked(BigNum) || ((BigNum->Num[0] % 2) == 0));
 
     return Result;
+}
+
+internal inline b32
+IsOddUnchecked(bignum *BigNum)
+{
+    b32 Result = !IsEvenUnchecked(BigNum);
+
+    return Result;
+}
+
+internal inline void
+BigNumSetToZeroUnchecked(bignum *BigNum)
+{
+    BigNum->SizeWords = 0;
 }
 
 internal inline void
@@ -1095,20 +1135,20 @@ InitTinyBigNumUnchecked(bignum *BigNum, u64 Value, b32 Negative)
     BigNum->Negative = Negative;
 }
 
-internal inline u32
-BigNumSizeBytesUnchecked(bignum *BigNum)
-{
-    u32 Result = BigNum->SizeWords*sizeof(BigNum->Num[0]);
-
-    return Result;
-}
-
 internal inline void
 BigNumCopyUnchecked(bignum *Dest, bignum *Source)
 {
     Dest->SizeWords = Source->SizeWords;
     memcpy(Dest->Num, Source->Num, BigNumSizeBytesUnchecked(Source));
     Dest->Negative = Source->Negative;
+}
+
+internal inline void
+BigNumCopyMinusUnchecked(bignum *Dest, bignum *Source)
+{
+    Dest->SizeWords = Source->SizeWords;
+    memcpy(Dest->Num, Source->Num, BigNumSizeBytesUnchecked(Source));
+    Dest->Negative = !Source->Negative;
 }
 
 internal inline u64
@@ -1369,7 +1409,7 @@ BigNumSubtractMaybeNegUnchecked(bignum *AMinusB, bignum *A, bignum *B)
 {
     u32 Borrow;
 
-    if (IsAGreaterThanB(A, B))
+    if (IsAGreaterThanBUnsignedUnchecked(A, B))
     {
         Borrow = BigNumUnsignedSubtractUnchecked(AMinusB, A, B);
         AMinusB->Negative = false;
@@ -1390,42 +1430,55 @@ BigNumAdd(bignum *SumAB, bignum *A, bignum *B)
 {
     Stopif((SumAB == 0) || (A == 0) || (B == 0), "Null input to BigNumAdd!\n");
 
-    /*-
-     *  a +  b      a+b
-     *  a + -b      a-b
-     * -a +  b      b-a
-     * -a + -b      -(a+b)
-     */
-    b32 Subtract = false;
-    if (A->Negative)
+    u32 Carry;
+    if (A->SizeWords == 0)
     {
-        if (B->Negative)
+        BigNumCopyUnchecked(SumAB, B);
+        Carry = 0;
+    }
+    else if (B->SizeWords == 0)
+    {
+        BigNumCopyUnchecked(SumAB, A);
+        Carry = 0;
+    }
+    else
+    {
+        /*-
+         *  a +  b      a+b
+         *  a + -b      a-b
+         * -a +  b      b-a
+         * -a + -b      -(a+b)
+         */
+        b32 Subtract = false;
+        if (A->Negative)
         {
-            SumAB->Negative = true;
+            if (B->Negative)
+            {
+                SumAB->Negative = true;
+            }
+            else
+            {
+                BigNumSwapUnchecked(&A, &B);
+                Subtract = true;
+            }
+        }
+        else if (B->Negative)
+        {
+            Subtract = true;
         }
         else
         {
-            BigNumSwapUnchecked(&A, &B);
-            Subtract = true;
+            SumAB->Negative = false;
         }
-    }
-    else if (B->Negative)
-    {
-        Subtract = true;
-    }
-    else
-    {
-        SumAB->Negative = false;
-    }
 
-    u32 Carry;
-    if (Subtract)
-    {
-        Carry = BigNumSubtractMaybeNegUnchecked(SumAB, A, B);
-    }
-    else
-    {
-        Carry = BigNumUnsignedAddUnchecked(SumAB, A, B);
+        if (Subtract)
+        {
+            Carry = BigNumSubtractMaybeNegUnchecked(SumAB, A, B);
+        }
+        else
+        {
+            Carry = BigNumUnsignedAddUnchecked(SumAB, A, B);
+        }
     }
 
     return Carry;
@@ -1436,43 +1489,60 @@ BigNumSubtract(bignum *AMinusB, bignum *A, bignum *B)
 {
     Stopif((AMinusB == 0) || (A == 0) || (B == 0), "Null input to BigNumSubtract!\n");
 
-    /*-
-     *  a -  b      a-b
-     *  a - -b      a+b
-     * -a -  b      -(a+b)
-     * -a - -b      b-a
-     */
-    b32 Add = false;
-    bignum LocalAMinusB;
-    if (A->Negative)
-    {
-        if (B->Negative)
-        {
-            BigNumSwapUnchecked(&A, &B);
-        }
-        else
-        {
-            Add = true;
-            LocalAMinusB.Negative = true;
-        }
-    }
-    else if (B->Negative)
-    {
-        Add = true;
-        LocalAMinusB.Negative = false;
-    }
-
     u32 Borrow;
-    if (Add)
+    if (A->SizeWords == 0)
     {
-        Borrow = BigNumUnsignedAddUnchecked(&LocalAMinusB, A, B);
+        AMinusB->SizeWords = B->SizeWords;
+        memcpy(AMinusB->Num, B->Num, BigNumSizeBytesUnchecked(B));
+        AMinusB->Negative = !B->Negative;
+
+        Borrow = 0;
+    }
+    else if (B->SizeWords == 0)
+    {
+        BigNumCopyUnchecked(AMinusB, A);
+
+        Borrow = 0;
     }
     else
     {
-        Borrow = BigNumSubtractMaybeNegUnchecked(&LocalAMinusB, A, B);
-    }
+        /*-
+         *  a -  b      a-b
+         *  a - -b      a+b
+         * -a -  b      -(a+b)
+         * -a - -b      b-a
+         */
+        b32 Add = false;
+        bignum LocalAMinusB;
+        if (A->Negative)
+        {
+            if (B->Negative)
+            {
+                BigNumSwapUnchecked(&A, &B);
+            }
+            else
+            {
+                Add = true;
+                LocalAMinusB.Negative = true;
+            }
+        }
+        else if (B->Negative)
+        {
+            Add = true;
+            LocalAMinusB.Negative = false;
+        }
 
-    BigNumCopyUnchecked(AMinusB, &LocalAMinusB);
+        if (Add)
+        {
+            Borrow = BigNumUnsignedAddUnchecked(&LocalAMinusB, A, B);
+        }
+        else
+        {
+            Borrow = BigNumSubtractMaybeNegUnchecked(&LocalAMinusB, A, B);
+        }
+
+        BigNumCopyUnchecked(AMinusB, &LocalAMinusB);
+    }
 
     return Borrow;
 }
@@ -1601,7 +1671,7 @@ MultiplyOperandScanningUnchecked(u64 *ProductAB, u32 ProductABMaxLengthWords,
     return ResultSizeWords;
 }
 
-internal void
+internal u32
 BigNumMultiplyOperandScanning(bignum *ProductAB, bignum *A, bignum *B)
 {
     Stopif((ProductAB == 0) || (A == 0) || (B == 0), "Null input to BigNumMultiplyModNOperandScanning!\n");
@@ -1621,6 +1691,8 @@ BigNumMultiplyOperandScanning(bignum *ProductAB, bignum *A, bignum *B)
                                                             B->Num, B->SizeWords);
 
     memcpy(ProductAB->Num, TempProductAB, BigNumSizeBytesUnchecked(ProductAB));
+
+    return ProductAB->SizeWords;
 }
 
 internal inline b32
@@ -1798,6 +1870,7 @@ GetZRInverseModP(bignum *Output,
     }
 
     bignum LocalOutput;
+    LocalOutput.Negative = false;
     LocalOutput.SizeWords = MultiplyOperandScanningUnchecked(LocalOutput.Num,
                                                              MaxDWordsModR,
                                                              InputZ,
@@ -1864,7 +1937,7 @@ GetZRInverseModP(bignum *Output,
         BigNumSubtract(&LocalOutput, &LocalOutput, ModulusP);
     }
 
-    memcpy(Output, &LocalOutput, sizeof(LocalOutput));
+    BigNumCopyUnchecked(Output, &LocalOutput);
 }
 
 internal void
@@ -2075,8 +2148,9 @@ Sha1PaddedAConcatPaddedB(u8 *OutputHash, u8 *ScratchBuffer, bignum *A, bignum *B
 internal inline void
 HashOutputToBigNumUnchecked(bignum *OutBigNum, u8 *Hash)
 {
-    OutBigNum->SizeWords = SHA_1_HASH_LENGTH_BYTES/sizeof(u64) + 1;
+    OutBigNum->Negative = false;
 
+    OutBigNum->SizeWords = SHA_1_HASH_LENGTH_BYTES/sizeof(u64) + 1;
     memset(OutBigNum->Num, 0, sizeof(u64)*OutBigNum->SizeWords);
 
     CopyByteSwappedUnchecked((u8 *)OutBigNum->Num, Hash, SHA_1_HASH_LENGTH_BYTES);
