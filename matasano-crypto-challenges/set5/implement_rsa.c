@@ -1,7 +1,4 @@
 #include "crypt_helper.h"
-#include <openssl/err.h>
-#include <openssl/rand.h>
-#include <openssl/bn.h>
 
 #define P_Q_SIZE_BITS (MAX_BIGNUM_SIZE_BITS/4)
 
@@ -123,48 +120,6 @@ internal const bignum TEST_NEG_C_PLUS_C =
 };
 
 internal void
-GetRandPrime(bignum *RandPrimeModP)
-{
-    Stopif(RandPrimeModP == 0, "Null input to GetRandPrime!\n");
-
-    RandPrimeModP->SizeWords = P_Q_SIZE_BITS/BITS_IN_DWORD;
-    RandPrimeModP->Negative = false;
-
-    BIGNUM *BN_RandPrime = BN_new();
-    i32 PrimeFound = BN_generate_prime_ex(BN_RandPrime, P_Q_SIZE_BITS, 0, 0, 0, 0);
-
-    Stopif(!PrimeFound, "No prime found in TestImplementRsa!\n");
-
-    Stopif(!BN_is_prime_ex(BN_RandPrime, 64, 0, 0), "Prime check failed in TestImplementRsa!\n");
-
-    Stopif(BN_RandPrime->top != (i32)RandPrimeModP->SizeWords,
-           "Invalid size returned from BN_generate_prime_ex!\n");
-
-    memcpy(RandPrimeModP->Num, BN_RandPrime->d, P_Q_SIZE_BITS/BITS_IN_BYTE);
-
-    BN_free(BN_RandPrime);
-}
-
-internal void
-DivideBignumBy2Unchecked(bignum *BigNum)
-{
-    if (BigNum->SizeWords > 0)
-    {
-        u32 BigNumLastWordIndex = (BigNum->SizeWords - 1);
-        for (u32 BigNumIndex = 0;
-             BigNumIndex < BigNumLastWordIndex;
-             ++BigNumIndex)
-        {
-            BigNum->Num[BigNumIndex] = ((BigNum->Num[BigNumIndex + 1] << (BITS_IN_DWORD - 1)) |
-                                        (BigNum->Num[BigNumIndex] >> 1));
-        }
-
-        BigNum->Num[BigNumLastWordIndex] >>= 1;
-        AdjustSizeWordsDownUnchecked(BigNum);
-    }
-}
-
-internal void
 BinaryInverseInnerLoop(bignum *UOrV, bignum *X1OrX2, bignum *PrimeP)
 {
     while (IsEvenUnchecked(UOrV))
@@ -250,170 +205,6 @@ GetInverseModPPrime(bignum *EInverseModN, bignum *InputA, bignum *PrimeP)
     }
 
     Stopif(IsAGreaterThanOrEqualToB(EInverseModN, PrimeP), "InvModResult not mod P in GetInverseModN!\n");
-}
-
-/*
-   Knuth. TAOCP, Volume 2, Section 4.5.2 #39.
-
-   Y1. [Find power of 2.] Set k <- 0, and then repeatedly set k <- k + 1, u <- u/2, v <- v/2,
-       zero or more times until u and v are not both even.
-   Y2. [Initialize.] Set (u1, u2, u3) <- (1, 0, u) and (v1, v2, v3) <- (v, 1 - u, v).
-       If u is odd, set (t1, t2, t3) <- (0, -1, -v) and go to Y4.
-       Otherwise, set (t1, t2, t3) <- (1, 0, u).
-   Y3. [Halve t3.] If t1 and t2 are both even, set (t1, t2, t3) <- (t1, t2, t3)/2;
-       otherwise set (t1, t2, t3) <- (t1 + v, t2 - u, t3)/2. (In the latter case,
-       t1 + v and t2 - u will both be even).
-   Y4. [Is t3 even?] If t3 is even, go back to Y3.
-   Y5. [Reset max(u3, v3).] If t3 is positive, set (u1, u2, u3) <- (t1, t2, t3);
-       otherwise set (v1, v2, v3) <- (v - t1, -u - t2, -t3).
-   Y6. [Subtract.] Set (t1, t2, t3) <- (u1, u2, u3) - (v1, v2, v3). Then if t1 < 0,
-       set (t1, t2) <- (t1 + v, t2 - u). If t3 != 0, go back to Y3.
-       Otherwise the algorithm terminates with (u1, u2, u3*2^k) as the output.
-*/
-internal b32
-GetInverseModN(bignum *AInverseModN, bignum *InputA, bignum *ModulusN)
-{
-    bignum U;
-    BigNumCopyUnchecked(&U, InputA);
-
-    bignum V;
-    BigNumCopyUnchecked(&V, ModulusN);
-
-    Stopif((InputA->SizeWords == 0) || (ModulusN->SizeWords == 0), "Zero input to GetInverseModN!");
-    Stopif(InputA->Negative || ModulusN->Negative, "Negative input to GetInverseModN!");
-
-    // Y1
-    u32 GcdPowerOf2_K;
-    for (GcdPowerOf2_K = 0;
-         IsEvenUnchecked(&U) && IsEvenUnchecked(&V);
-         ++GcdPowerOf2_K)
-    {
-        DivideBignumBy2Unchecked(&U);
-        DivideBignumBy2Unchecked(&V);
-    }
-
-    b32 InputAInverted;
-    if (GcdPowerOf2_K > 0)
-    {
-        InputAInverted = false;
-    }
-    else
-    {
-        // Y2
-        // We only care about u1 of the output: (u1*a + u2*n == 1) => (u1 == a^-1 mod n)
-        bignum U1;
-        bignum U2;
-        bignum U3;
-        BigNumSetToOneUnchecked(&U1);
-        BigNumSetToZeroUnchecked(&U2);
-        BigNumCopyUnchecked(&U3, &U);
-
-        bignum V1;
-        bignum V2;
-        bignum V3;
-        BigNumCopyUnchecked(&V1, &V);
-        BigNumSubtract(&V2, &U1, &U);
-        BigNumCopyUnchecked(&V3, &V);
-
-        bignum T1;
-        bignum T2;
-        bignum T3;
-        if (IsOddUnchecked(&U))
-        {
-            BigNumSetToZeroUnchecked(&T1);
-
-            InitTinyBigNumUnchecked(&T2, 1, true);
-
-            BigNumCopyMinusUnchecked(&T3, &V);
-        }
-        else
-        {
-            BigNumSetToOneUnchecked(&T1);
-
-            BigNumSetToZeroUnchecked(&T2);
-
-            BigNumCopyUnchecked(&T3, &U);
-        }
-
-        do
-        {
-            // Y3, Y4
-            while (IsEvenUnchecked(&T3))
-            {
-                if (!(IsEvenUnchecked(&T1) && IsEvenUnchecked(&T2)))
-                {
-                    BigNumAdd(&T1, &T1, &V);
-                    BigNumSubtract(&T2, &T2, &U);
-                }
-
-                DivideBignumBy2Unchecked(&T1);
-                DivideBignumBy2Unchecked(&T2);
-                DivideBignumBy2Unchecked(&T3);
-            }
-
-            // Y5
-            if ((T3.SizeWords > 0) && !T3.Negative)
-            {
-                BigNumCopyUnchecked(&U1, &T1);
-                BigNumCopyUnchecked(&U2, &T2);
-                BigNumCopyUnchecked(&U3, &T3);
-            }
-            else
-            {
-                BigNumSubtract(&V1, &V, &T1);
-
-                BigNumAdd(&V2, &U, &T2);
-                V2.Negative = !V2.Negative;
-
-                BigNumCopyMinusUnchecked(&V3, &T3);
-            }
-
-            // Y6
-            BigNumSubtract(&T1, &U1, &V1);
-            BigNumSubtract(&T2, &U2, &V2);
-            BigNumSubtract(&T3, &U3, &V3);
-
-            Stopif(!IsEvenUnchecked(&T3), "Alg. broken!\n");
-
-            if ((T1.SizeWords > 0) && T1.Negative)
-            {
-                BigNumAdd(&T1, &T1, &V);
-                BigNumSubtract(&T2, &T2, &U);
-            }
-        } while (!IsEqualToZeroUnchecked(&T3));
-
-        if (IsEqualToOneUnchecked(&U3))
-        {
-            InputAInverted = true;
-        }
-        else
-        {
-            InputAInverted = false;
-        }
-
-        BigNumCopyUnchecked(AInverseModN, &U1);
-    }
-
-    return InputAInverted;
-}
-
-internal void
-InitOsslBnUnchecked(BIGNUM *OsslBignum, u64 *Array, u32 SizeDWords, u32 ArrayMaxSizeDWords)
-{
-    OsslBignum->d = Array;
-    OsslBignum->top = SizeDWords;
-    OsslBignum->dmax = ArrayMaxSizeDWords;
-    OsslBignum->neg = 0;
-    OsslBignum->flags = BN_FLG_STATIC_DATA;
-}
-
-internal inline void
-GenOsslPseudoRandBn(BIGNUM *OsslBignum, u32 Bits)
-{
-    i32 Status = BN_pseudo_rand(OsslBignum, Bits, -1, false);
-    Stopif(Status != 1,
-           "BN_pseudo_rand failed in GenOsslPseudoRandBn!\nERR_get_error(): 0x%lx\n",
-           ERR_get_error());
 }
 
 internal inline void
@@ -612,8 +403,8 @@ internal MIN_UNIT_TEST_FUNC(TestImplementRsa)
     bignum Totient;
     do
     {
-        GetRandPrime(&PrimeQ);
-        GetRandPrime(&PrimeP);
+        GetRandPrime(&PrimeQ, P_Q_SIZE_BITS);
+        GetRandPrime(&PrimeP, P_Q_SIZE_BITS);
 
         // totient := (p - 1)(q - 1) == pq - p - q + 1
         BigNumMultiplyOperandScanning(&Totient, &PrimeP, &PrimeQ);

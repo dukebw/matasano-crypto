@@ -17,6 +17,9 @@
 #include <arpa/inet.h>
 #include <limits.h>
 #include <pthread.h>
+#include <openssl/err.h>
+#include <openssl/rand.h>
+#include <openssl/bn.h>
 #include "stopif.h"
 
 #define internal static
