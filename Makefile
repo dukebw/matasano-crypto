@@ -9,7 +9,8 @@ P7=matasano-crypto-challenges/set5/offline_dictionary_attack_simplified_srp
 P8=matasano-crypto-challenges/set5/implement_rsa
 P9=matasano-crypto-challenges/set5/big_endian_bignum_to_little_endian_64bit
 P10=matasano-crypto-challenges/set5/implement_rsa_broadcast_attack
-P11=matasano-crypto-challenges/set4/nweb/nweb23
+P11=matasano-crypto-challenges/set5/test_oaep
+P12=matasano-crypto-challenges/set4/nweb/nweb23
 
 OBJECTS=
 STD_FLAGS=gnu11
@@ -21,7 +22,7 @@ LDLIBS=-lm -pthread -lssl -lcrypto
 CC=gcc
 CXX=g++
 
-all: $(P) $(P2) $(P3) $(P4) $(P5) $(P6) $(P7) $(P8) $(P9) $(P10) $(P11)
+all: $(P) $(P2) $(P3) $(P4) $(P5) $(P6) $(P7) $(P8) $(P9) $(P10) $(P11) $(P12)
 
 $(P):$(CRYPTO_IMPL)/crypt_helper.h
 $(P2):$(CRYPTO_IMPL)/crypt_helper.h
@@ -34,3 +35,4 @@ $(P8):$(CRYPTO_IMPL)/crypt_helper.h
 $(P9):$(CRYPTO_IMPL)/crypt_helper.h
 $(P10):$(CRYPTO_IMPL)/crypt_helper.h
 $(P11):$(CRYPTO_IMPL)/crypt_helper.h
+$(P12):$(CRYPTO_IMPL)/crypt_helper.h

@@ -1135,6 +1135,49 @@ InitTinyBigNumUnchecked(bignum *BigNum, u64 Value, b32 Negative)
     BigNum->Negative = Negative;
 }
 
+internal inline u32
+IntegerDivideCeiling(u32 Value, u32 Divisor)
+{
+    u32 Result = (Value + (Divisor - 1))/Divisor;
+
+    return Result;
+}
+
+internal void
+ByteSwap(u8 *Buffer, u32 Length)
+{
+	for (u32 BufferIndex = 0;
+		 BufferIndex < (Length/2);
+		 ++BufferIndex)
+	{
+		u8 Temp = Buffer[Length - 1 - BufferIndex];
+		Buffer[Length - 1 - BufferIndex] = Buffer[BufferIndex];
+		Buffer[BufferIndex] = Temp;
+	}
+}
+
+internal void
+ByteSwapDestSrcDifferUnchecked(u8 *Dest, u8 *Source, u32 SizeBytes)
+{
+    for (u32 DestIndex = 0;
+         DestIndex < SizeBytes;
+         ++DestIndex)
+    {
+        Dest[DestIndex] = Source[(SizeBytes - 1) - DestIndex];
+    }
+}
+
+internal inline void
+BigNumFromBigEndianArrayUnchecked(bignum *BigNum, void *Array, u32 ArraySizeBytes)
+{
+    BigNum->SizeWords = IntegerDivideCeiling(ArraySizeBytes, BYTES_IN_BIGNUM_WORD);
+
+    BigNum->Num[BigNum->SizeWords - 1] = 0;
+    ByteSwapDestSrcDifferUnchecked((u8 *)BigNum->Num, (u8 *)Array, ArraySizeBytes);
+
+    BigNum->Negative = false;
+}
+
 internal inline void
 BigNumCopyUnchecked(bignum *Dest, bignum *Source)
 {
@@ -1607,19 +1650,6 @@ BigNumAddModN(bignum *SumABModN, bignum *A, bignum *B, bignum *N)
     {
         BigNumSubtract(SumABModN, SumABModN, N);
     }
-}
-
-internal void
-ByteSwap(u8 *Buffer, u32 Length)
-{
-	for (u32 BufferIndex = 0;
-		 BufferIndex < (Length/2);
-		 ++BufferIndex)
-	{
-		u8 Temp = Buffer[Length - 1 - BufferIndex];
-		Buffer[Length - 1 - BufferIndex] = Buffer[BufferIndex];
-		Buffer[BufferIndex] = Temp;
-	}
 }
 
 #define INVALID_LENGTH_WORDS(A, ALengthWords) (((ALengthWords) > 0) && ((A)[(ALengthWords) - 1] == 0))
@@ -2563,14 +2593,6 @@ GenOsslPseudoRandBn(BIGNUM *OsslBignum, u32 Bits)
     Stopif(Status != 1,
            "BN_pseudo_rand failed in GenOsslPseudoRandBn!\nERR_get_error(): 0x%lx\n",
            ERR_get_error());
-}
-
-static inline u32
-IntegerDivideCeiling(u32 Value, u32 Divisor)
-{
-    u32 Result = (Value + (Divisor - 1))/Divisor;
-
-    return Result;
 }
 
 internal void
