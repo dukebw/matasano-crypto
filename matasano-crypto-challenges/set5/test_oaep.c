@@ -93,15 +93,17 @@ internal MIN_UNIT_TEST_FUNC(TestOaep)
            memcmp(TEST_OAEP_EXPECTED_PT, RecoveredPt.Num, sizeof(TEST_OAEP_EXPECTED_PT)),
            "Expected/unexpected mismatch in TestOaep!\n");
 
+    Stopif(sizeof(TEST_OAEP_PRIME_P) % sizeof(u64), "Prime length not divisible by word size!\n");
+
     BIGNUM SensitiveTpmPrime;
-    u32 TestOaepPrimePSizeDWords = sizeof(u64)*sizeof(TEST_OAEP_PRIME_P);
+    u32 TestOaepPrimePSizeDWords = sizeof(TEST_OAEP_PRIME_P)/sizeof(u64);
     InitOsslBnUnchecked(&SensitiveTpmPrime,
                         (u64 *)TEST_OAEP_PRIME_P,
                         TestOaepPrimePSizeDWords,
                         TestOaepPrimePSizeDWords);
 
     ByteSwap((u8 *)TEST_OAEP_PRIME_P, sizeof(TEST_OAEP_PRIME_P));
-    i32 Status = BN_is_prime_ex(&SensitiveTpmPrime, 1024, 0, 0);
+    i32 Status = BN_is_prime_ex(&SensitiveTpmPrime, 2048, 0, 0);
     if (Status == -1)
     {
         BIO *BioErr = BIO_new_fp(stderr, BIO_NOCLOSE | BIO_FP_TEXT);
