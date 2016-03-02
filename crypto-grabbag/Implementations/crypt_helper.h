@@ -1299,6 +1299,14 @@ IsAGreaterThanOrEqualToB(bignum *A, bignum *B)
     return Result;
 }
 
+internal b32
+IsALessThanOrEqualToB(bignum *A, bignum *B)
+{
+    b32 Result = !IsAGreaterThanB(A, B);
+
+    return Result;
+}
+
 internal u32
 MultiPrecisionAdd(u64 *SumAB, u32 *SumLengthWords,
                   u64 *A, u32 ALengthWords,
@@ -1637,6 +1645,8 @@ GenRandBigNumModNUnchecked(bignum *A, bignum *N)
     }
 
     Stopif(!IsAGreaterThanB(N, A), "Invalid RandBigNum output in GenRandBigNumModNUnchecked!\n");
+
+    A->Negative = false;
 }
 
 internal void 
@@ -1991,6 +2001,21 @@ FindMinusNInverseModR(bignum *MinusPInverseModR, bignum *ModulusP, u32 RPowerOf2
 }
 
 internal void
+ReduceModP(bignum *AModP, bignum *A, bignum *P)
+{
+    bignum LocalA;
+    BigNumCopyUnchecked(&LocalA, A);
+
+    // Reduce k*g^x mod P to satisfy BigNumSubtract function
+    bignum MinusPInverseModR;
+    FindMinusNInverseModR(&MinusPInverseModR, P, MAX_BIGNUM_SIZE_BITS);
+
+    GetZRInverseModP(&LocalA, LocalA.Num, LocalA.SizeWords, P, &MinusPInverseModR, MAX_BIGNUM_SIZE_BITS);
+
+    MultiplyByRModP(AModP, &LocalA, P, MAX_BIGNUM_SIZE_BITS);
+}
+
+internal void
 BigNumMultiplyModP(bignum *ProductABModP, bignum *A, bignum *B, bignum *P)
 {
     Stopif((ProductABModP == 0) || (A == 0) || (B == 0)|| (P == 0), "Null InputX to BigNumMultiplyModP!\n");
@@ -2005,18 +2030,7 @@ BigNumMultiplyModP(bignum *ProductABModP, bignum *A, bignum *B, bignum *P)
         bignum LocalProductABModP;
         BigNumMultiplyOperandScanning(&LocalProductABModP, A, B);
 
-        // Reduce k*g^x mod P to satisfy BigNumSubtract function
-        bignum MinusPInverseModR;
-        FindMinusNInverseModR(&MinusPInverseModR, P, MAX_BIGNUM_SIZE_BITS);
-
-        GetZRInverseModP(&LocalProductABModP,
-                         LocalProductABModP.Num,
-                         LocalProductABModP.SizeWords,
-                         P,
-                         &MinusPInverseModR,
-                         MAX_BIGNUM_SIZE_BITS);
-
-        MultiplyByRModP(ProductABModP, &LocalProductABModP, P, MAX_BIGNUM_SIZE_BITS);
+        ReduceModP(ProductABModP, &LocalProductABModP, P);
     }
 }
 
@@ -2460,6 +2474,7 @@ GetInverseModN(bignum *AInverseModN, bignum *InputA, bignum *ModulusN)
 
     Stopif((InputA->SizeWords == 0) || (ModulusN->SizeWords == 0), "Zero input to GetInverseModN!");
     Stopif(InputA->Negative || ModulusN->Negative, "Negative input to GetInverseModN!");
+    Stopif(IsAGreaterThanOrEqualToB(InputA, ModulusN), "InputA not mod N in GetInverseModN!");
 
     // Y1
     u32 GcdPowerOf2_K;
