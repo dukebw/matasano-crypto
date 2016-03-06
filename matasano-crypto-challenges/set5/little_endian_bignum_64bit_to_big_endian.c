@@ -18,7 +18,7 @@ int main(int argc, char **argv)
          ;
          BytesRead += BYTES_IN_BIGNUM_WORD)
     {
-        i32 MatchedStringLength = slre_match("0x((\\d|[a-f])+)\\s*}?,",
+        i32 MatchedStringLength = slre_match("0x((\\d|[a-f])+)\\s*}?,?",
                                              InputString,
                                              strlen(argv[1]),
                                              SlreCaps,
@@ -32,16 +32,8 @@ int main(int argc, char **argv)
 
             u8 *NextHexDigit = GlobalInputBuffer + BytesRead;
 
-            u32 ZeroBytes;
-            if ((SlreCaps[0].len % 2) != 0)
-            {
-                ZeroBytes = HexDigitsInBignum - SlreCaps[0].len;
-                memset(TempBuffer, '0', ZeroBytes);
-            }
-            else
-            {
-                ZeroBytes = 0;
-            }
+            u32 ZeroBytes = HexDigitsInBignum - SlreCaps[0].len;
+            memset(TempBuffer, '0', ZeroBytes);
 
             memcpy(TempBuffer + ZeroBytes, SlreCaps[0].ptr, SlreCaps[0].len);
 

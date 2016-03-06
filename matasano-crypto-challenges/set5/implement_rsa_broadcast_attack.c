@@ -1,6 +1,6 @@
 #include "crypt_helper.h"
 
-#define RSA_BROADCAST_PRIME_SIZE_BITS (MAX_BIGNUM_SIZE_BITS/3 - BITS_IN_BIGNUM_WORD)
+#define RSA_BROADCAST_PRIME_SIZE_BITS (MAX_BIGNUM_SIZE_BITS/2)
 
 internal bignum *
 BigNumMinTwoUnchecked(bignum *A, bignum *B)
@@ -37,9 +37,17 @@ internal MIN_UNIT_TEST_FUNC(TestRsaBroadcastAttack)
         &PrimeN2,
         &PrimeN3,
     };
+
+#if 1
     GetRandPrime(&PrimeN1, RSA_BROADCAST_PRIME_SIZE_BITS);
     GetRandPrime(&PrimeN2, RSA_BROADCAST_PRIME_SIZE_BITS);
     GetRandPrime(&PrimeN3, RSA_BROADCAST_PRIME_SIZE_BITS);
+#else
+#define TEST_PRIME_SIZE_BITS 1200
+    GetRandPrime(&PrimeN1, TEST_PRIME_SIZE_BITS);
+    GetRandPrime(&PrimeN2, TEST_PRIME_SIZE_BITS);
+    GetRandPrime(&PrimeN3, TEST_PRIME_SIZE_BITS);
+#endif
 
     bignum N1N2N3;
     BigNumMultiplyOperandScanning(&N1N2N3, &PrimeN1, &PrimeN2);
@@ -56,9 +64,6 @@ internal MIN_UNIT_TEST_FUNC(TestRsaBroadcastAttack)
     InitTinyBigNumUnchecked(&Three, 3, false);
 
     // M1 := N1N2N3/N1
-    bignum Result;
-    BigNumSetToZeroUnchecked(&Result);
-
     u32 NumPrimes = ARRAY_LENGTH(PrimeArray);
     for (u32 PrimeIndex = 0;
          PrimeIndex < NumPrimes;
@@ -72,6 +77,8 @@ internal MIN_UNIT_TEST_FUNC(TestRsaBroadcastAttack)
                                       PrimeArray[(PrimeIndex + 1) % NumPrimes],
                                       PrimeArray[(PrimeIndex + 2) % NumPrimes]);
 
+        Stopif(IsAGreaterThanOrEqualToB(&Mi, &N1N2N3), "Invalid NiNj >= N1N2N3 condition\n");
+
         bignum MiModNi;
         ReduceModP(&MiModNi, &Mi, PrimeArray[PrimeIndex]);
 
@@ -84,15 +91,18 @@ internal MIN_UNIT_TEST_FUNC(TestRsaBroadcastAttack)
 
         bignum ProductMResidueMInv;
         BigNumMultiplyOperandScanning(&ProductMResidueMInv, &Mi, &Residue_i);
-        BigNumMultiplyOperandScanning(&ProductMResidueMInv, &ProductMResidueMInv, &MiInverseModPrimeNi);
 
-        BigNumAdd(&Result, &Result, &ProductMResidueMInv);
+        Stopif(IsAGreaterThanOrEqualToB(&ProductMResidueMInv, &N1N2N3), "Invalid NiNj*c_k >= N1N2N3 condition\n");
+
+        BigNumMultiplyModP(&ProductMResidueMInv, &ProductMResidueMInv, &MiInverseModPrimeNi, &N1N2N3);
+
+        BigNumAddModN(&CrtResult, &CrtResult, &ProductMResidueMInv, &N1N2N3);
     }
 
     bignum ExpectedResult;
     MontModExpRBigNumMax(&ExpectedResult, &Message, &Three, &N1N2N3);
 
-    MinUnitAssert(AreBigNumsEqualUnchecked(&ExpectedResult, &Result), "X^3 mismatch in TestRsaBroadcastAttack!");
+    MinUnitAssert(AreBigNumsEqualUnchecked(&ExpectedResult, &CrtResult), "X^3 mismatch in TestRsaBroadcastAttack!\n");
 }
 
 internal MIN_UNIT_TEST_FUNC(AllTests)

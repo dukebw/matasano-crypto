@@ -801,7 +801,7 @@ Sha1KeyedMac(u8 *KeyedMac, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLengt
 #define HMAC_RET_CODE_LENGTH_BYTES 4
 
 #define PORT 8181
-internal const char IP_ADDRESS[] = "192.168.0.115";
+internal const char IP_ADDRESS[] = "192.168.11.5";
 
 #define TEST_USER_CMD_LENGTH (STR_LEN(TEST_SRP_PREFIX) +    \
                               STR_LEN(USER_PREFIX) + STR_LEN(SRP_TEST_VEC_EMAIL) + 1)
@@ -885,7 +885,7 @@ HmacSha1(u8 *Hmac, u8 *Message, u32 MessageLength, u8 *Key, u32 KeyLength)
 
 #define BITS_IN_BIGNUM_WORD     64
 #define BYTES_IN_BIGNUM_WORD    (BITS_IN_BIGNUM_WORD/BITS_IN_BYTE)
-#define MAX_BIGNUM_SIZE_BITS    4096
+#define MAX_BIGNUM_SIZE_BITS    8192
 #define MAX_BIGNUM_SIZE_BYTES   (MAX_BIGNUM_SIZE_BITS/BITS_IN_BYTE)
 #define MAX_BIGNUM_SIZE_WORDS   (MAX_BIGNUM_SIZE_BYTES/sizeof(u64))
 #define MAX_BIT_IN_BIGNUM_WORD  (BITS_IN_BIGNUM_WORD - 1)
@@ -1639,14 +1639,14 @@ GenRandBigNumModNUnchecked(bignum *A, bignum *N)
     A->SizeWords = N->SizeWords;
     AdjustSizeWordsDownUnchecked(A);
 
+    A->Negative = false;
+
     if (!IsAGreaterThanB(N, A))
     {
         BigNumSubtract(A, A, N);
     }
 
     Stopif(!IsAGreaterThanB(N, A), "Invalid RandBigNum output in GenRandBigNumModNUnchecked!\n");
-
-    A->Negative = false;
 }
 
 internal void 
@@ -2019,6 +2019,8 @@ internal void
 BigNumMultiplyModP(bignum *ProductABModP, bignum *A, bignum *B, bignum *P)
 {
     Stopif((ProductABModP == 0) || (A == 0) || (B == 0)|| (P == 0), "Null InputX to BigNumMultiplyModP!\n");
+    Stopif((A->SizeWords + B->SizeWords + 1) > MAX_BIGNUM_SIZE_WORDS,
+           "Potential overflow in BigNumMultiplyModP!\n");
 
     if ((A->SizeWords == 0) || (B->SizeWords == 0))
     {
@@ -2619,6 +2621,8 @@ GetRandPrime(bignum *RandPrimeModP, u32 PrimeSizeBits)
     RandPrimeModP->SizeWords = IntegerDivideCeiling(PrimeSizeBits, BITS_IN_DWORD);
     RandPrimeModP->Negative = false;
 
+    RandPrimeModP->Num[RandPrimeModP->SizeWords - 1] = 0;
+
     BIGNUM *BN_RandPrime = BN_new();
     i32 PrimeFound = BN_generate_prime_ex(BN_RandPrime, PrimeSizeBits, 0, 0, 0, 0);
 
@@ -2630,6 +2634,8 @@ GetRandPrime(bignum *RandPrimeModP, u32 PrimeSizeBits)
            "Invalid size returned from BN_generate_prime_ex!\n");
 
     memcpy(RandPrimeModP->Num, BN_RandPrime->d, PrimeSizeBits/BITS_IN_BYTE);
+
+    AdjustSizeWordsDownUnchecked(RandPrimeModP);
 
     BN_free(BN_RandPrime);
 }
