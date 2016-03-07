@@ -1300,6 +1300,14 @@ IsAGreaterThanOrEqualToB(bignum *A, bignum *B)
 }
 
 internal b32
+IsALessThan(bignum *A, bignum *B)
+{
+    b32 Result = !IsAGreaterThanOrEqualToB(A, B);
+
+    return Result;
+}
+
+internal b32
 IsALessThanOrEqualToB(bignum *A, bignum *B)
 {
     b32 Result = !IsAGreaterThanB(A, B);
@@ -1898,16 +1906,7 @@ GetZRInverseModP(bignum *Output,
     // c := (z + (z*p' mod R)*p)/R
 
     // Output := (z*p' mod R)
-    u32 MaxDWordsModR;
-    u32 RPowerOf2ModDWord = (RPowerOf2 % BITS_IN_DWORD);
-    if (RPowerOf2ModDWord)
-    {
-        MaxDWordsModR = RPowerOf2/BITS_IN_DWORD + 1;
-    }
-    else
-    {
-        MaxDWordsModR = RPowerOf2/BITS_IN_DWORD;
-    }
+    u32 MaxDWordsModR = IntegerDivideCeiling(RPowerOf2, BITS_IN_DWORD);
 
     bignum LocalOutput;
     LocalOutput.Negative = false;
@@ -1945,6 +1944,7 @@ GetZRInverseModP(bignum *Output,
 
     // Output := (z + (z*p' mod R)*p)/R
     u32 TruncatedStartIndex;
+    u32 RPowerOf2ModDWord = (RPowerOf2 % BITS_IN_DWORD);
     if (RPowerOf2ModDWord)
     {
         TruncatedStartIndex = MaxDWordsModR - 1;
@@ -1961,6 +1961,7 @@ GetZRInverseModP(bignum *Output,
 
     if (RPowerOf2ModDWord)
     {
+        // TODO(bwd): add test case + fix for RPowerOf2ModDWord != 0 case
         for (u32 OutputIndex = 0;
              OutputIndex < LocalOutput.SizeWords;
              ++OutputIndex)
@@ -2063,6 +2064,15 @@ MontInner(bignum *Output,
     GetZRInverseModP(Output, DoubleBignumScratch, ZLengthDWords, ModulusP, MinusPInverseModR, RPowerOf2);
 }
 
+internal inline u32
+BigNumBitCountUnchecked(bignum *BigNum)
+{
+    u32 Result = ((BITS_IN_DWORD*(BigNum->SizeWords - 1)) +
+                  BIT_COUNT_DWORD(BigNum->Num[BigNum->SizeWords - 1]));
+
+    return Result;
+}
+
 internal void
 MontModExp(bignum *OutputA, bignum *InputX, bignum *ExponentE, bignum *ModulusP, u32 RPowerOf2)
 {
@@ -2103,8 +2113,7 @@ MontModExp(bignum *OutputA, bignum *InputX, bignum *ExponentE, bignum *ModulusP,
             BigNumSetToOneUnchecked(&LocalResult);
             MultiplyByRModP(&LocalResult, &LocalResult, ModulusP, RPowerOf2);
 
-            u32 BitCountExponentE = ((BITS_IN_DWORD*(ExponentE->SizeWords - 1)) +
-                                     BIT_COUNT_DWORD(ExponentE->Num[ExponentE->SizeWords - 1]));
+            u32 BitCountExponentE = BigNumBitCountUnchecked(ExponentE);
             for (i32 BitCountEIndex = (BitCountExponentE - 1);
                  BitCountEIndex >= 0;
                  --BitCountEIndex)
