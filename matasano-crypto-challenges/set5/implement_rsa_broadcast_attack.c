@@ -44,64 +44,46 @@ BigNumMinThreeUnchecked(bignum *A, bignum *B, bignum *C)
     5. Return(q, r).
 */
 internal void
-BigNumDivide(bignum *Quotient, bignum *Remainder, bignum *Dividend, bignum *Divisor)
+BigNumDivide(bignum *Quotient, bignum *Remainder, bignum *DividendX, bignum *DivisorY)
 {
-    Stopif((Quotient == 0) || (Remainder == 0) || (Dividend == 0) || (Divisor == 0),
+    Stopif((Quotient == 0) || (Remainder == 0) || (DividendX == 0) || (DivisorY == 0),
            "Null input to BigNumDivide!\n");
 
-    Stopif(IsEqualToZeroUnchecked(Divisor), "Divide by zero in BigNumDivide!\n");
+    Stopif(IsEqualToZeroUnchecked(DivisorY), "Divide by zero in BigNumDivide!\n");
 
-    if (IsALessThan(Dividend, Divisor))
+    if (IsALessThan(DividendX, DivisorY))
     {
         BigNumSetToZeroUnchecked(Quotient);
 
-        BigNumCopyUnchecked(Remainder, Dividend);
+        BigNumCopyUnchecked(Remainder, DividendX);
     }
     else
     {
-        u32 DivisorSizeBits = BigNumBitCountUnchecked(Divisor);
-        u32 QuotientSizeBits = BigNumBitCountUnchecked(Dividend) - DivisorSizeBits;
+        u32 NMinusT = DividendX->SizeWords - DivisorY->SizeWords;
 
         bignum LocalQuotient;
-        LocalQuotient.Negative = false;
-        memset(LocalQuotient.Num, 0, IntegerDivideCeiling(QuotientSizeBits, BITS_IN_BIGNUM_WORD)*BYTES_IN_BIGNUM_WORD);
+        BigNumSetToZeroUnchecked(&LocalQuotient);
+        memset(LocalQuotient.Num, 0, sizeof(u64)*(NMinusT + 1));
 
-        bignum DivisorUpshifted;
-        DivisorUpshifted.Negative = false;
-        u32 FloorQSizeDWords = QuotientSizeBits / BITS_IN_BIGNUM_WORD;
-        u32 QSizeBitsModDWord = QuotientSizeBits % BITS_IN_BIGNUM_WORD;
-        for (u32 DivisorIndex = 0;
-             DivisorIndex < Divisor->SizeWords;
-             ++DivisorIndex)
+        bignum YTimesNMinusT;
+        YTimesNMinusT.Negative = false;
+        for (u32 YIndex = 0;
+             YIndex < DivisorY->SizeWords;
+             ++YIndex)
         {
-            DivisorUpshifted.Num[FloorQSizeDWords + DivisorIndex] = Divisor->Num[DivisorIndex] << QSizeBitsModDWord;
-            DivisorUpshifted.Num[FloorQSizeDWords + DivisorIndex + 1] = (Divisor->Num[DivisorIndex] >>
-                                                                         (BITS_IN_BIGNUM_WORD - QSizeBitsModDWord));
+            YTimesNMinusT.Num[NMinusT + YIndex] = DivisorY->Num[YIndex];
         }
-        DivisorUpshifted.SizeWords = FloorQSizeDWords + Divisor->SizeWords + 1;
-        AdjustSizeWordsDownUnchecked(&DivisorUpshifted);
+        YTimesNMinusT.SizeWords = NMinusT + DivisorY->SizeWords;
 
-        bignum LocalDividend;
-        BigNumCopyUnchecked(&LocalDividend, Dividend);
+        bignum LocalDividendX;
+        BigNumCopyUnchecked(&LocalDividendX, DividendX);
 
-        if (IsAGreaterThanOrEqualToB(&LocalDividend, &DivisorUpshifted))
+        while (IsAGreaterThanOrEqualToB(&LocalDividendX, &YTimesNMinusT))
         {
-            LocalQuotient.Num[FloorQSizeDWords - 1] = 1 << QSizeBitsModDWord;
-
-            BigNumSubtract(&LocalDividend, &LocalDividend, &DivisorUpshifted);
+            BigNumSubtract(&LocalDividendX, &LocalDividendX, &YTimesNMinusT);
         }
 
-        for (u32 QuotientBitIndex = QuotientSizeBits;
-             QuotientBitIndex > DivisorSizeBits;
-             --QuotientBitIndex)
-        {
-            if (!(Dividend->Num[QuotientBitIndex/BITS_IN_BIGNUM_WORD] & (1 << (QuotientBitIndex % BITS_IN_BIGNUM_WORD))))
-            {
-#if 0
-                LocalQuotient.Num[] |= 1 << ;
-#endif
-            }
-        }
+        // TODO(brendan): 3.1
 
         BigNumCopyUnchecked(Quotient, &LocalQuotient);
     }
@@ -176,7 +158,8 @@ internal MIN_UNIT_TEST_FUNC(TestRsaBroadcastAttack)
     bignum ExpectedCubedResult;
     MontModExpRBigNumMax(&ExpectedCubedResult, &Message, &Three, &N1N2N3);
 
-    MinUnitAssert(AreBigNumsEqualUnchecked(&ExpectedCubedResult, &CrtResult), "X^3 mismatch in TestRsaBroadcastAttack!\n");
+    MinUnitAssert(AreBigNumsEqualUnchecked(&ExpectedCubedResult, &CrtResult),
+                  "X^3 mismatch in TestRsaBroadcastAttack!\n");
 
     // Newton's method to get cubed root:
     // f(x) == 0, where f(x) == x^3 - A
