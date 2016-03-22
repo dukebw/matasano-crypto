@@ -26,22 +26,63 @@ BigNumMinThreeUnchecked(bignum *A, bignum *B, bignum *C)
     return Result;
 }
 
+internal u64
+ShiftLeftUnchecked(bignum *BigNum, u32 ShiftAmountBits)
+{
+    u64 PrevWord = 0;
+    u64 NextWord;
+    for (u32 BigNumIndex = 0;
+         BigNumIndex < BigNum->SizeWords;
+         ++BigNumIndex)
+    {
+        NextWord = BigNum->Num[BigNumIndex] >> ShiftAmountBits;
+        BigNum->Num[BigNumIndex] = (BigNum->Num[BigNumIndex] << ShiftAmountBits) | PrevWord;
+        PrevWord = NextWord;
+    }
+
+    return PrevWord;
+}
+
 /*
-    Source: HAC, Section 14.2.5
+    Source: TAOCP 4.3.1 Algorithm D
 
-    INPUT: positive integers x = (x_n ... x_1 x_0)_b , y = (y_t ... y_1 y_0)_b with n ≥ t ≥ 1, y_t != 0.
-    OUTPUT: the quotient q = (q_n−t ... q_1 q_0)_b and remainder r = (r_t ... r_1 r_0)_b such that
-    x = q*y + r, 0 ≤ r < y.
+    D1. [Normalize.] Set d <- floor[(b - l)/v_n-1]. Then set (u_m+n u_m+n-i ... u_1 u_0)_b
+        equal to (u_m+n-1 ... u_1 u_0)_b times d; similarly, set (v_n-1 ... v_1 v_0)_b equal to
+        (v_n-1 ... v_1 v_0)_b times d.
 
-    1. For j from 0 to (n − t) do: q_j ←0.
-    2. While (x ≥ y*b^n−t) do the following: q_n−t ← q_n−t + 1, x ← x − y*b^n−t.
-    3. For i from n down to (t + 1) do the following:
-        3.1 If x_i = y_t then set q_i−t−1 ← b − 1; otherwise set q_i−t−1 ← floor[(x_i*b + x_i−1)/y_t)].
-        3.2 While (q_i−t−1*(y_t*b + y_t−1) > x_i*b^2 + x_i−1*b + x_i−2) do: q_i−t−1 ← q_i−t−1 − 1.
-        3.3 x ← x − q_i−t−1*y*b^i−t−1 .
-        3.4 If x < 0 then set x ← x + y*b^i−t−1 and q_i−t−1 ← q_i−t−1 − 1.
-    4. r ← x.
-    5. Return(q, r).
+    D2. [Initialize j] Set j <- m. (The loop on j, steps D2 through D7, will be
+        essentially a division of (u_j+n ... u_j+1 u_j)_b by (v_n-1 ... v_1 v_0)_b to get a single
+        quotient digit q_j.
+
+    D3. [Calculate q.] Set q <- floor[((u_j+n)*b + u_j+n-1)/v_n-1] and let r' be the remainder,
+        ((u_j+n)*b + u_j+n-1) mod v_n-1. Now test if q' = b or q'*v_n-2 > b*r' + u_j+n-2; if
+        so, decrease q' by 1, increase r' by v_n-1, and repeat this test if r' < b.
+
+    D4. [Multiply and subtract.] Replace (u_j+n u_j+n-1 ... u_j)_b by
+
+            (u_j+n u_j+n-1 ... u_j)_b - q'*(v_n-1 ... v_1 v_0)_b
+
+        This computation (analogous to steps M3, M4, and M5 of Algorithm M)
+        consists of a simple multiplication by a one-place number, combined with
+        a subtraction. The digits (u_j+n, u_j+n-1, ..., u_j) should be kept positive; if
+        the result of this step is actually negative, (u_n+j u_j+n-1 ... u_j)_b should be
+        left as the true value plus b^n+1, namely as the b's complement of the true
+        value, and a "borrow" to the left should be remembered.
+
+    D5. [Test remainder.] Set q_j <- q'. If the result of step D4 was negative, go to
+        step D6; otherwise go on to step D7.
+
+    D6. [Add back.] (The probability that this step is necessary is very small, on
+        the order of only 2/b, as shown in exercise 21; test data to activate this
+        step should therefore be specifically contrived when debugging.) Decrease
+        q_j by 1, and add (0 v_n-1 ... v_1 v_0)_b to (u_n+j u_j+n-1 ... u_j+1 u_j)_b. (A carry
+        will occur to the left of u_j+n, and it should be ignored since it cancels with
+        the borrow that occurred in D4.)
+
+    D7. [Loop on j] Decrease j by one. Now if j >= 0, go back to D3.
+
+    D8. [Unnormalize.] Now (q_m ... q_1 q_0)_b is the desired quotient, and the desired
+        remainder may be obtained by dividing (u_n-1 ... u_1 u_0)_b by d.
 */
 internal void
 BigNumDivide(bignum *Quotient, bignum *Remainder, bignum *DividendX, bignum *DivisorY)
@@ -59,34 +100,45 @@ BigNumDivide(bignum *Quotient, bignum *Remainder, bignum *DividendX, bignum *Div
     }
     else
     {
-        u32 NMinusT = DividendX->SizeWords - DivisorY->SizeWords;
-
-        bignum LocalQuotient;
-        BigNumSetToZeroUnchecked(&LocalQuotient);
-        memset(LocalQuotient.Num, 0, sizeof(u64)*(NMinusT + 1));
-
-        bignum YTimesNMinusT;
-        YTimesNMinusT.Negative = false;
-        for (u32 YIndex = 0;
-             YIndex < DivisorY->SizeWords;
-             ++YIndex)
-        {
-            YTimesNMinusT.Num[NMinusT + YIndex] = DivisorY->Num[YIndex];
-        }
-        YTimesNMinusT.SizeWords = NMinusT + DivisorY->SizeWords;
+        Stopif((DivisorY->Num[DivisorY->SizeWords - 1] == 0) || (DividendX->Num[DividendX->SizeWords - 1] == 0),
+               "Invalid SizeWords input to BigNumDivide!\n");
 
         bignum LocalDividendX;
         BigNumCopyUnchecked(&LocalDividendX, DividendX);
 
-        while (IsAGreaterThanOrEqualToB(&LocalDividendX, &YTimesNMinusT))
+        bignum LocalDivisorY;
+        BigNumCopyUnchecked(&LocalDivisorY, DivisorY);
+
+        u32 DivisorLeadingZeros = __builtin_clzl(DivisorY->Num[DivisorY->SizeWords - 1]);
+
+        u64 DividendShiftCarry = ShiftLeftUnchecked(&LocalDividendX, DivisorLeadingZeros);
+        Stopif(ShiftLeftUnchecked(&LocalDivisorY, DivisorLeadingZeros),
+               "Shift of DivisorY must not cause overflow in BigNumDivide!\n");
+
+        bignum LocalQuotient;
+        for (u32 QuotientIndex = (DividendX->SizeWords - DivisorY->SizeWords);
+             ;
+            )
         {
-            BigNumSubtract(&LocalDividendX, &LocalDividendX, &YTimesNMinusT);
         }
-
-        // TODO(brendan): 3.1
-
-        BigNumCopyUnchecked(Quotient, &LocalQuotient);
     }
+}
+
+internal MIN_UNIT_TEST_FUNC(TestBigNumDivide)
+{
+    bignum Dividend;
+    InitTinyBigNumUnchecked(&Dividend, 721948327, false);
+
+    bignum Divisor;
+    InitTinyBigNumUnchecked(&Divisor, 84461, false);
+
+    bignum Quotient;
+    bignum Remainder;
+    BigNumDivide(&Quotient, &Remainder, &Dividend, &Divisor);
+
+    MinUnitAssert((IsEqualTinyBigNumUnchecked(&Quotient, 8547) &&
+                   IsEqualTinyBigNumUnchecked(&Quotient, 60160)),
+                  "Test 1 failed in TestBigNumDivide!\n");
 }
 
 internal MIN_UNIT_TEST_FUNC(TestRsaBroadcastAttack)
@@ -170,6 +222,7 @@ internal MIN_UNIT_TEST_FUNC(TestRsaBroadcastAttack)
 internal MIN_UNIT_TEST_FUNC(AllTests)
 {
     MinUnitRunTest(TestRsaBroadcastAttack);
+    MinUnitRunTest(TestBigNumDivide);
 }
 
 int main()

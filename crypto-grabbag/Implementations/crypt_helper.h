@@ -1127,6 +1127,14 @@ BigNumSetToOneUnchecked(bignum *BigNum)
     BigNum->Negative = false;
 }
 
+internal inline b32
+IsEqualTinyBigNumUnchecked(bignum *BigNum, u64 Value)
+{
+    b32 Result = (BigNum->SizeWords == 1) && (BigNum->Num[0] == Value) && (BigNum->Negative == false);
+
+    return Result;
+}
+
 internal inline void
 InitTinyBigNumUnchecked(bignum *BigNum, u64 Value, b32 Negative)
 {
