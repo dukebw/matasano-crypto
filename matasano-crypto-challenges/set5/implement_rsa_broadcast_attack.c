@@ -112,15 +112,40 @@ BigNumDivide(bignum *Quotient, bignum *Remainder, bignum *DividendX, bignum *Div
         u32 DivisorLeadingZeros = __builtin_clzl(DivisorY->Num[DivisorY->SizeWords - 1]);
 
         u64 DividendShiftCarry = ShiftLeftUnchecked(&LocalDividendX, DivisorLeadingZeros);
-        Stopif(ShiftLeftUnchecked(&LocalDivisorY, DivisorLeadingZeros),
-               "Shift of DivisorY must not cause overflow in BigNumDivide!\n");
+        LocalDividendX.Num[LocalDividendX.SizeWords] = DividendShiftCarry;
+        ++LocalDividendX.SizeWords;
+        // NOTE(brendan): LocalDividendX.Num[LocalDividendX.SizeWords - 1] == u_m+n may be zero at this point
+
+        u64 DivisorShiftCarry = ShiftLeftUnchecked(&LocalDivisorY, DivisorLeadingZeros);
+        Stopif(DivisorShiftCarry, "DivisorY must shift to 0 in !\n");
+        Stopif(!(LocalDivisorY.Num[LocalDivisorY.SizeWords - 1] & (1ull << 63)),
+               "v_n-1 not >= b/2 in BigNumDivide!\n");
 
         bignum LocalQuotient;
-        for (u32 QuotientIndex = (DividendX->SizeWords - DivisorY->SizeWords);
-             ;
-            )
+        u32 DividendDivisorSizeDiffWords = (DividendX->SizeWords - DivisorY->SizeWords);
+        u64 DivisorY_NMinusOne = LocalDivisorY.Num[LocalDivisorY.SizeWords - 1];
+        /* u64 DivisorY_NMinusTwo = LocalDivisorY.Num[LocalDivisorY.SizeWords - 2]; */
+        for (i32 QuotientIndex = DividendDivisorSizeDiffWords;
+             QuotientIndex >= 0;
+             --QuotientIndex)
         {
+            u32 JPlusN = DividendX->SizeWords + QuotientIndex;
+            u64 DividendX_JPlusN = LocalDividendX.Num[JPlusN];
+            if (DividendX_JPlusN < DivisorY_NMinusOne)
+            {
+                u128 QuotientDigitCandidate = (((u128)DividendX_JPlusN << 64) +
+                                               (u128)LocalDividendX.Num[JPlusN - 1])/(u128)DivisorY_NMinusOne;
+            }
+            else
+            {
+                // q_hat == b
+            }
         }
+
+        LocalQuotient.SizeWords = DividendDivisorSizeDiffWords;
+        AdjustSizeWordsDownUnchecked(&LocalQuotient);
+
+        BigNumCopyUnchecked(Quotient, &LocalQuotient);
     }
 }
 
