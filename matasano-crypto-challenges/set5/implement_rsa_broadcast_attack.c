@@ -1,6 +1,9 @@
 #include "crypt_helper.h"
 
 #define RSA_BROADCAST_PRIME_SIZE_BITS (MAX_BIGNUM_SIZE_BITS/8)
+#define DWORDS_IN_WORD (sizeof(u64)/sizeof(u32))
+#define RARE_U_LENGTH_DWORDS 4
+#define RARE_V_LENGTH_DWORDS 3
 
 internal bignum *
 BigNumMinTwoUnchecked(bignum *A, bignum *B)
@@ -131,10 +134,17 @@ BigNumDivide(bignum *Quotient, bignum *Remainder, bignum *DividendX, bignum *Div
         {
             u32 JPlusN = DividendX->SizeWords + QuotientIndex;
             u64 DividendX_JPlusN = LocalDividendX.Num[JPlusN];
+            u64 NextRemainderRHat;
+            (void)NextRemainderRHat;
+            u128 QuotientDigitCandidateQHat;
             if (DividendX_JPlusN < DivisorY_NMinusOne)
             {
-                u128 QuotientDigitCandidate = (((u128)DividendX_JPlusN << 64) +
-                                               (u128)LocalDividendX.Num[JPlusN - 1])/(u128)DivisorY_NMinusOne;
+                u128 NextDoubleWordDividend = (((u128)DividendX_JPlusN << 64) +
+                                               (u128)LocalDividendX.Num[JPlusN - 1]);
+                QuotientDigitCandidateQHat = NextDoubleWordDividend/(u128)DivisorY_NMinusOne;
+                (void)QuotientDigitCandidateQHat;
+
+                NextRemainderRHat = NextDoubleWordDividend % DivisorY_NMinusOne;
             }
             else
             {
@@ -149,8 +159,113 @@ BigNumDivide(bignum *Quotient, bignum *Remainder, bignum *DividendX, bignum *Div
     }
 }
 
+internal void
+OsslLeftShiftUnchecked(BIGNUM *OsslBigNum, u32 BitsToShift)
+{
+    i32 Status = BN_lshift(OsslBigNum, OsslBigNum, BitsToShift);
+    if (Status == 0)
+    {
+        OsslPrintErrors();
+        Stopif(true, "BN_lshift failed in OsslLeftShiftUnchecked!\n");
+    }
+}
+
+internal void
+OsslDivide(BIGNUM *Quotient, BIGNUM *Remainder, BIGNUM *Dividend, BIGNUM *Divisor, BN_CTX *Context)
+{
+    i32 Status = BN_div(Quotient, Remainder, Dividend, Divisor, Context);
+    if (Status == 0)
+    {
+        OsslPrintErrors();
+        Stopif(true, "BN div failed in OsslDivide!\n");
+    }
+}
+
 internal MIN_UNIT_TEST_FUNC(TestBigNumDivide)
 {
+    // Find an example four digit number u (base 2^64) and three digit number v such that:
+    // 1. v_n-1 >= floor(b/2)
+    // 2. q_hat*v_n-2 <= b*r_hat + u_n-2
+    // 3. q_hat != q
+    // Then should have (u mod v ) >= (1 - 2/b)*v
+    u64 RareUArray[16];
+    BIGNUM OsslU;
+    InitOsslBnUnchecked(&OsslU, RareUArray, 0, ARRAY_LENGTH(RareUArray));
+
+    u64 RareVArray[16];
+    BIGNUM OsslV;
+    InitOsslBnUnchecked(&OsslV, RareVArray, 0, ARRAY_LENGTH(RareVArray));
+
+    u64 UDivVArray[4];
+    BIGNUM UDivV;
+    InitOsslBnUnchecked(&UDivV, UDivVArray, 0, ARRAY_LENGTH(UDivVArray));
+
+    u64 UDivVRemainderArray[4];
+    BIGNUM UDivVRemainder;
+    InitOsslBnUnchecked(&UDivVRemainder, UDivVRemainderArray, 0, ARRAY_LENGTH(UDivVRemainderArray));
+
+    BN_CTX *OsslContext = BN_CTX_new();
+    b32 WereRareInputsFound = false;
+    do
+    {
+        GenOsslPseudoRandBn(&OsslU, BITS_IN_DWORD*RARE_U_LENGTH_DWORDS);
+        GenOsslPseudoRandBn(&OsslV, BITS_IN_DWORD*RARE_V_LENGTH_DWORDS);
+        u32 OsslVLeadingZeros = __builtin_clzl(OsslV.d[OsslV.top - 1]);
+        OsslLeftShiftUnchecked(&OsslV, OsslVLeadingZeros);
+        OsslLeftShiftUnchecked(&OsslU, OsslVLeadingZeros);
+
+        OsslDivide(&UDivV, &UDivVRemainder, &OsslU, &OsslV, OsslContext);
+
+        // q < b requirement
+        if (UDivV.top == 1)
+        {
+            u64 V_NMinusOne = OsslV.d[OsslV.top - 1];
+            u128 TempDividend = (((u128)OsslU.d[OsslU.top - 1] << 64) + (u128)OsslU.d[OsslU.top - 2]);
+            u128 QHat = TempDividend/(u128)V_NMinusOne;
+            // One in 2^64 likelihood?
+            u64 QHatUpper64 = QHat >> 64;
+            u64 QHatLower64 = (u64)QHat;
+            if (QHatUpper64)
+            {
+                printf("QHat = b found!\n");
+                Stopif((QHatUpper64 != 1) || QHatLower64,
+                       "QHat <= b -- invariant broken in TestBigNumDivide!\n");
+            }
+
+            // q != q_hat requirement
+            if ((u64)QHat != UDivV.d[0])
+            {
+                Stopif((u64)QHat > (UDivV.d[0] + 2), "QHat > (q + 2) in TestBigNumDivide!\n");
+
+                // q_hat*v_n-2 <= (b*r_hat + u_n-2) requirement
+                u64 RHat = TempDividend % V_NMinusOne;
+                while (((u128)QHat*OsslV.d[OsslV.top - 2]) > (((u128)RHat << 64) | OsslU.d[OsslU.top - 2]) &&
+                       (OsslV.d[OsslV.top - 2] != 0))
+                {
+                    OsslV.d[OsslV.top - 2] >>= 1;
+                }
+
+                if (OsslV.d[OsslV.top - 2] > 0)
+                {
+                    do
+                    {
+                        OsslDivide(&UDivV, 0, &OsslU, &OsslV, OsslContext);
+                        ++OsslV.d[OsslV.top - 2];
+                    } while ((u64)QHat != UDivV.d[0]);
+                    Stopif(OsslV.d[OsslV.top - 2] == 0, "Overflow in TestBigNumDivide!\n");
+
+                    WereRareInputsFound = true;
+                    printf("Rare Inputs found!\n");
+
+                    // TODO(brendan):
+                    // Test assertion that now (u mod v) >= (1 - 2/b)*v
+                    // -> b*(u mod v) >= (b - 2)*v
+                }
+            }
+        }
+    } while (!WereRareInputsFound);
+
+    // Single-word test case
     bignum Dividend;
     InitTinyBigNumUnchecked(&Dividend, 721948327, false);
 
@@ -246,8 +361,8 @@ internal MIN_UNIT_TEST_FUNC(TestRsaBroadcastAttack)
 
 internal MIN_UNIT_TEST_FUNC(AllTests)
 {
-    MinUnitRunTest(TestRsaBroadcastAttack);
     MinUnitRunTest(TestBigNumDivide);
+    MinUnitRunTest(TestRsaBroadcastAttack);
 }
 
 int main()

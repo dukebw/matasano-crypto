@@ -106,8 +106,7 @@ internal MIN_UNIT_TEST_FUNC(TestOaep)
     i32 Status = BN_is_prime_ex(&SensitiveTpmPrime, 2048, 0, 0);
     if (Status == -1)
     {
-        BIO *BioErr = BIO_new_fp(stderr, BIO_NOCLOSE | BIO_FP_TEXT);
-        ERR_print_errors(BioErr);
+        OsslPrintErrors();
         Stopif(true, "BN_is_prime_ex failed in TestOaep!\n");
     }
     Stopif(Status == 0, "Test \"prime\" is composite in TestOaep!\n");

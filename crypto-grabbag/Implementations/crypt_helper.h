@@ -2657,4 +2657,11 @@ GetRandPrime(bignum *RandPrimeModP, u32 PrimeSizeBits)
     BN_free(BN_RandPrime);
 }
 
+internal void
+OsslPrintErrors(void)
+{
+    BIO *BioErr = BIO_new_fp(stderr, BIO_NOCLOSE | BIO_FP_TEXT);
+    ERR_print_errors(BioErr);
+}
+
 #endif /* CRYPT_HELPER_H */
