@@ -247,19 +247,25 @@ internal MIN_UNIT_TEST_FUNC(TestBigNumDivide)
 
                 if (OsslV.d[OsslV.top - 2] > 0)
                 {
+                    BIGNUM OsslUModV;
                     do
                     {
-                        OsslDivide(&UDivV, 0, &OsslU, &OsslV, OsslContext);
+                        OsslDivide(&UDivV, &OsslUModV, &OsslU, &OsslV, OsslContext);
                         ++OsslV.d[OsslV.top - 2];
+                        // TODO(bwd): loop until q_hat*v_n-2 <= (b*r_hat + u_n-2)
                     } while ((u64)QHat != UDivV.d[0]);
                     Stopif(OsslV.d[OsslV.top - 2] == 0, "Overflow in TestBigNumDivide!\n");
 
                     WereRareInputsFound = true;
                     printf("Rare Inputs found!\n");
 
-                    // TODO(brendan):
                     // Test assertion that now (u mod v) >= (1 - 2/b)*v
                     // -> b*(u mod v) >= (b - 2)*v
+                    OsslLeftShiftUnchecked(&OsslUModV, BITS_IN_DWORD);
+                    OsslLeftShiftUnchecked(&OsslV, BITS_IN_DWORD - 2);
+
+                    MinUnitAssert(!(BN_cmp(&OsslUModV, &OsslV) < 0),
+                                  "u mod v < (1 - 2/b)*v in TestBigNumDivide!\n");
                 }
             }
         }
