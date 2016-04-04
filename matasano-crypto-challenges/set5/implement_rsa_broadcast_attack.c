@@ -34,16 +34,49 @@ ShiftLeftUnchecked(bignum *BigNum, u32 ShiftAmountBits)
 {
     u64 PrevWord = 0;
     u64 NextWord;
-    for (u32 BigNumIndex = 0;
-         BigNumIndex < BigNum->SizeWords;
-         ++BigNumIndex)
+
+    Stopif(ShiftAmountBits > BITS_IN_BIGNUM_WORD, "Invalid ShiftAmountBits input to ShiftLeftUnchecked!\n");
+
+    if (ShiftAmountBits > BITS_IN_BIGNUM_WORD)
     {
-        NextWord = BigNum->Num[BigNumIndex] >> ShiftAmountBits;
-        BigNum->Num[BigNumIndex] = (BigNum->Num[BigNumIndex] << ShiftAmountBits) | PrevWord;
-        PrevWord = NextWord;
+        for (u32 BigNumIndex = 0;
+             BigNumIndex < BigNum->SizeWords;
+             ++BigNumIndex)
+        {
+            NextWord = BigNum->Num[BigNumIndex] >> (BITS_IN_BIGNUM_WORD - ShiftAmountBits);
+            BigNum->Num[BigNumIndex] = (BigNum->Num[BigNumIndex] << ShiftAmountBits) | PrevWord;
+            PrevWord = NextWord;
+        }
     }
 
     return PrevWord;
+}
+
+internal b32
+IsD3ConditionMet(u128 QHat, u64 RHat, u64 V_NMinusTwo, bignum *DividendU, u32 JPlusN)
+{
+    b32 Result;
+
+    u128 QHatTimesV_NMinusTwo = QHat*V_NMinusTwo;
+    u64 QHatTimesV_N2Upper64 = GET_UPPER_64(QHatTimesV_NMinusTwo);
+    if (QHatTimesV_N2Upper64 > RHat)
+    {
+        Result = true;
+    }
+    else if (QHatTimesV_N2Upper64 < RHat)
+    {
+        Result = false;
+    }
+    else if (GET_LOWER_64(QHatTimesV_NMinusTwo) > DividendU->Num[JPlusN - 2])
+    {
+        Result = true;
+    }
+    else
+    {
+        Result = false;
+    }
+
+    return Result;
 }
 
 /*
@@ -88,74 +121,124 @@ ShiftLeftUnchecked(bignum *BigNum, u32 ShiftAmountBits)
         remainder may be obtained by dividing (u_n-1 ... u_1 u_0)_b by d.
 */
 internal void
-BigNumDivide(bignum *Quotient, bignum *Remainder, bignum *DividendX, bignum *DivisorY)
+BigNumDivide(bignum *QuotientQ, bignum *Remainder, bignum *DividendU, bignum *DivisorV)
 {
-    Stopif((Quotient == 0) || (Remainder == 0) || (DividendX == 0) || (DivisorY == 0),
+    Stopif((QuotientQ == 0) || (Remainder == 0) || (DividendU == 0) || (DivisorV == 0),
            "Null input to BigNumDivide!\n");
 
-    Stopif(IsEqualToZeroUnchecked(DivisorY), "Divide by zero in BigNumDivide!\n");
+    Stopif(IsEqualToZeroUnchecked(DivisorV), "Divide by zero in BigNumDivide!\n");
 
-    if (IsALessThan(DividendX, DivisorY))
+    Stopif(DivisorV->SizeWords == 1, "Need different routine to divide by one word!\n");
+
+    if (IsALessThan(DividendU, DivisorV))
     {
-        BigNumSetToZeroUnchecked(Quotient);
+        BigNumSetToZeroUnchecked(QuotientQ);
 
-        BigNumCopyUnchecked(Remainder, DividendX);
+        BigNumCopyUnchecked(Remainder, DividendU);
     }
     else
     {
-        Stopif((DivisorY->Num[DivisorY->SizeWords - 1] == 0) || (DividendX->Num[DividendX->SizeWords - 1] == 0),
+        Stopif((DivisorV->Num[DivisorV->SizeWords - 1] == 0) || (DividendU->Num[DividendU->SizeWords - 1] == 0),
                "Invalid SizeWords input to BigNumDivide!\n");
 
-        bignum LocalDividendX;
-        BigNumCopyUnchecked(&LocalDividendX, DividendX);
+        bignum LocalDividendU;
+        BigNumCopyUnchecked(&LocalDividendU, DividendU);
 
-        bignum LocalDivisorY;
-        BigNumCopyUnchecked(&LocalDivisorY, DivisorY);
+        u32 DivisorLeadingZeros = __builtin_clzl(DivisorV->Num[DivisorV->SizeWords - 1]);
 
-        u32 DivisorLeadingZeros = __builtin_clzl(DivisorY->Num[DivisorY->SizeWords - 1]);
+        u64 Carry = ShiftLeftUnchecked(&LocalDividendU, DivisorLeadingZeros);
+        LocalDividendU.Num[LocalDividendU.SizeWords] = Carry;
+        ++LocalDividendU.SizeWords;
+        // NOTE(brendan): LocalDividendU.Num[LocalDividendU.SizeWords - 1] == u_m+n may be zero at this point
 
-        u64 DividendShiftCarry = ShiftLeftUnchecked(&LocalDividendX, DivisorLeadingZeros);
-        LocalDividendX.Num[LocalDividendX.SizeWords] = DividendShiftCarry;
-        ++LocalDividendX.SizeWords;
-        // NOTE(brendan): LocalDividendX.Num[LocalDividendX.SizeWords - 1] == u_m+n may be zero at this point
-
-        u64 DivisorShiftCarry = ShiftLeftUnchecked(&LocalDivisorY, DivisorLeadingZeros);
-        Stopif(DivisorShiftCarry, "DivisorY must shift to 0 in !\n");
-        Stopif(!(LocalDivisorY.Num[LocalDivisorY.SizeWords - 1] & (1ull << 63)),
+        Carry = ShiftLeftUnchecked(DivisorV, DivisorLeadingZeros);
+        Stopif(Carry, "DivisorV must shift to 0 in BigNumDivide!\n");
+        Stopif(!(DivisorV->Num[DivisorV->SizeWords - 1] & (1ull << 63)),
                "v_n-1 not >= b/2 in BigNumDivide!\n");
 
-        bignum LocalQuotient;
-        u32 DividendDivisorSizeDiffWords = (DividendX->SizeWords - DivisorY->SizeWords);
-        u64 DivisorY_NMinusOne = LocalDivisorY.Num[LocalDivisorY.SizeWords - 1];
-        /* u64 DivisorY_NMinusTwo = LocalDivisorY.Num[LocalDivisorY.SizeWords - 2]; */
-        for (i32 QuotientIndex = DividendDivisorSizeDiffWords;
+        bignum LocalQuotientQ;
+        u32 DividendDivisorSizeDiffWords = (LocalDividendU.SizeWords - DivisorV->SizeWords);
+        u64 DivisorV_NMinusOne = DivisorV->Num[DivisorV->SizeWords - 1];
+        u64 DivisorV_NMinusTwo = DivisorV->Num[DivisorV->SizeWords - 2];
+        for (i32 QuotientIndex = (DividendDivisorSizeDiffWords - 1);
              QuotientIndex >= 0;
              --QuotientIndex)
         {
-            u32 JPlusN = DividendX->SizeWords + QuotientIndex;
-            u64 DividendX_JPlusN = LocalDividendX.Num[JPlusN];
+            u32 JPlusN = DivisorV->SizeWords + QuotientIndex;
+            u64 DividendU_JPlusN = LocalDividendU.Num[JPlusN];
             u64 NextRemainderRHat;
-            (void)NextRemainderRHat;
             u128 QuotientDigitCandidateQHat;
-            if (DividendX_JPlusN < DivisorY_NMinusOne)
+            b32 ShouldDecrementQHat;
+            if (DividendU_JPlusN < DivisorV_NMinusOne)
             {
-                u128 NextDoubleWordDividend = (((u128)DividendX_JPlusN << 64) +
-                                               (u128)LocalDividendX.Num[JPlusN - 1]);
-                QuotientDigitCandidateQHat = NextDoubleWordDividend/(u128)DivisorY_NMinusOne;
-                (void)QuotientDigitCandidateQHat;
+                u128 NextDoubleWordDividend = (((u128)DividendU_JPlusN << 64) +
+                                               (u128)LocalDividendU.Num[JPlusN - 1]);
+                QuotientDigitCandidateQHat = NextDoubleWordDividend/(u128)DivisorV_NMinusOne;
 
-                NextRemainderRHat = NextDoubleWordDividend % DivisorY_NMinusOne;
+                NextRemainderRHat = NextDoubleWordDividend % DivisorV_NMinusOne;
+
+                ShouldDecrementQHat = IsD3ConditionMet(QuotientDigitCandidateQHat,
+                                                       NextRemainderRHat,
+                                                       DivisorV_NMinusTwo,
+                                                       &LocalDividendU,
+                                                       JPlusN);
             }
             else
             {
-                // q_hat == b
+                QuotientDigitCandidateQHat = (u128)1 << BITS_IN_DWORD;
+                NextRemainderRHat = DivisorV_NMinusOne;
+
+                ShouldDecrementQHat = true;
             }
+
+            while (ShouldDecrementQHat)
+            {
+                --QuotientDigitCandidateQHat;
+                NextRemainderRHat += DivisorV_NMinusOne;
+
+                if (!CheckForCarry(NextRemainderRHat, DivisorV_NMinusOne))
+                {
+                    ShouldDecrementQHat = IsD3ConditionMet(QuotientDigitCandidateQHat,
+                                                           NextRemainderRHat,
+                                                           DivisorV_NMinusTwo,
+                                                           &LocalDividendU,
+                                                           JPlusN);
+                }
+                else
+                {
+                    ShouldDecrementQHat = false;
+                }
+            }
+
+            Carry = 0;
+            for (u32 DivisorVIndex = 0;
+                 DivisorVIndex < DivisorV->SizeWords;
+                 ++DivisorVIndex)
+            {
+                u128 V_iTimesQHat = DivisorV->Num[DivisorVIndex]*QuotientDigitCandidateQHat + Carry;
+                Stopif(V_iTimesQHat < Carry, "Overflow during D4 in BigNumDivide!\n");
+
+                u64 V_iTimesQHatLower64 = GET_LOWER_64(V_iTimesQHat);
+                Carry = ZeroOrSetIfLessThan(LocalDividendU.Num[QuotientIndex + DivisorVIndex],
+                                            V_iTimesQHatLower64);
+
+                LocalDividendU.Num[QuotientIndex + DivisorVIndex] -= V_iTimesQHatLower64;
+
+                Carry += GET_UPPER_64(V_iTimesQHat);
+            }
+
+            u64 PrevU_JPlusN = LocalDividendU.Num[QuotientIndex + DivisorV->SizeWords];
+            LocalDividendU.Num[QuotientIndex + DivisorV->SizeWords] = PrevU_JPlusN - Carry;
+
+            Carry = ZeroOrSetIfLessThan(PrevU_JPlusN, Carry);
+
+            // TODO(bwd): D5, D6
         }
 
-        LocalQuotient.SizeWords = DividendDivisorSizeDiffWords;
-        AdjustSizeWordsDownUnchecked(&LocalQuotient);
+        LocalQuotientQ.SizeWords = DividendDivisorSizeDiffWords;
+        AdjustSizeWordsDownUnchecked(&LocalQuotientQ);
 
-        BigNumCopyUnchecked(Quotient, &LocalQuotient);
+        BigNumCopyUnchecked(QuotientQ, &LocalQuotientQ);
     }
 }
 
@@ -179,6 +262,22 @@ OsslDivide(BIGNUM *Quotient, BIGNUM *Remainder, BIGNUM *Dividend, BIGNUM *Diviso
         OsslPrintErrors();
         Stopif(true, "BN div failed in OsslDivide!\n");
     }
+}
+
+internal inline b32
+IsRareCaseSecondRequirementMet(u128 QHat, u64 V_NMinusTwo, u64 RHat, u64 U_NMinusTwo)
+{
+    b32 Result = ((QHat*(u128)V_NMinusTwo) <= (((u128)RHat << 64) | U_NMinusTwo));
+
+    return Result;
+}
+
+internal inline void
+InitBignumFromOsslBnUnchecked(bignum *BigNum, BIGNUM *OsslBigNum)
+{
+    memcpy(BigNum->Num, OsslBigNum->d, OsslBigNum->top*BYTES_IN_BIGNUM_WORD);
+    BigNum->SizeWords = OsslBigNum->top;
+    BigNum->Negative = !!OsslBigNum->neg;
 }
 
 internal MIN_UNIT_TEST_FUNC(TestBigNumDivide)
@@ -239,33 +338,80 @@ internal MIN_UNIT_TEST_FUNC(TestBigNumDivide)
 
                 // q_hat*v_n-2 <= (b*r_hat + u_n-2) requirement
                 u64 RHat = TempDividend % V_NMinusOne;
-                while (((u128)QHat*OsslV.d[OsslV.top - 2]) > (((u128)RHat << 64) | OsslU.d[OsslU.top - 2]) &&
+                
+                while (!IsRareCaseSecondRequirementMet(QHat,
+                                                       OsslV.d[OsslV.top - 2],
+                                                       RHat,
+                                                       OsslU.d[OsslU.top - 2]) &&
                        (OsslV.d[OsslV.top - 2] != 0))
                 {
                     OsslV.d[OsslV.top - 2] >>= 1;
                 }
 
+                // binary search for a matching candidate
                 if (OsslV.d[OsslV.top - 2] > 0)
                 {
+                    u64 UModVArray[8];
                     BIGNUM OsslUModV;
-                    do
-                    {
-                        OsslDivide(&UDivV, &OsslUModV, &OsslU, &OsslV, OsslContext);
-                        ++OsslV.d[OsslV.top - 2];
-                        // TODO(bwd): loop until q_hat*v_n-2 <= (b*r_hat + u_n-2)
-                    } while ((u64)QHat != UDivV.d[0]);
-                    Stopif(OsslV.d[OsslV.top - 2] == 0, "Overflow in TestBigNumDivide!\n");
+                    InitOsslBnUnchecked(&OsslUModV, UModVArray, 0, ARRAY_LENGTH(UModVArray));
 
-                    WereRareInputsFound = true;
-                    printf("Rare Inputs found!\n");
+                    b32 IsRareCaseSecondReqStillMet = IsRareCaseSecondRequirementMet(QHat,
+                                                                                     OsslV.d[OsslV.top - 2],
+                                                                                     RHat,
+                                                                                     OsslU.d[OsslU.top - 2]);
+                    OsslDivide(&UDivV, &OsslUModV, &OsslU, &OsslV, OsslContext);
+                    u64 V_NMinusTwoUpperBound = OsslV.d[OsslV.top - 2] << 1;
+                    u64 V_NMinusTwoLowerBound = OsslV.d[OsslV.top - 2];
+                    while ((((u64)QHat == UDivV.d[0]) || !IsRareCaseSecondReqStillMet) &&
+                           (V_NMinusTwoUpperBound > V_NMinusTwoLowerBound) &&
+                           ((V_NMinusTwoUpperBound - V_NMinusTwoLowerBound) > 1))
+                    {
+                        OsslV.d[OsslV.top - 2] = (u64)(((u128)V_NMinusTwoUpperBound +
+                                                        (u128)V_NMinusTwoLowerBound)/2);
+
+                        OsslDivide(&UDivV, &OsslUModV, &OsslU, &OsslV, OsslContext);
+                        IsRareCaseSecondReqStillMet = IsRareCaseSecondRequirementMet(QHat,
+                                                                                     OsslV.d[OsslV.top - 2],
+                                                                                     RHat,
+                                                                                     OsslU.d[OsslU.top - 2]);
+
+                        if (IsRareCaseSecondReqStillMet)
+                        {
+                            V_NMinusTwoLowerBound = OsslV.d[OsslV.top - 2];
+                        }
+                        else
+                        {
+                            V_NMinusTwoUpperBound = OsslV.d[OsslV.top - 2];
+                        }
+                    }
+                    Stopif((V_NMinusTwoUpperBound <= V_NMinusTwoLowerBound),
+                           "No rare case candidate found!\n");
+                    Stopif(OsslV.d[OsslV.top - 2] == 0, "Overflow in TestBigNumDivide!\n");
 
                     // Test assertion that now (u mod v) >= (1 - 2/b)*v
                     // -> b*(u mod v) >= (b - 2)*v
-                    OsslLeftShiftUnchecked(&OsslUModV, BITS_IN_DWORD);
-                    OsslLeftShiftUnchecked(&OsslV, BITS_IN_DWORD - 2);
+                    u64 TwoTimesVArray[8];
+                    BIGNUM OsslTwoTimesV;
+                    InitOsslBnUnchecked(&OsslTwoTimesV, TwoTimesVArray, 0, ARRAY_LENGTH(TwoTimesVArray));
 
-                    MinUnitAssert(!(BN_cmp(&OsslUModV, &OsslV) < 0),
-                                  "u mod v < (1 - 2/b)*v in TestBigNumDivide!\n");
+                    Stopif(!BN_lshift(&OsslTwoTimesV, &OsslV, 1), "BN_lshift failed in TestBigNumDivide!\n");
+
+                    OsslLeftShiftUnchecked(&OsslUModV, BITS_IN_DWORD);
+                    OsslLeftShiftUnchecked(&OsslV, BITS_IN_DWORD);
+
+                    Stopif(!BN_sub(&OsslV, &OsslV, &OsslTwoTimesV), "BN_sub failed in TestBigNumDivide!\n");
+
+                    if (BN_cmp(&OsslUModV, &OsslV) >= 0)
+                    {
+                        WereRareInputsFound = true;
+                        printf("Rare Inputs found!\n");
+
+                        // Restore OsslV for input to test case
+                        Stopif(!BN_add(&OsslV, &OsslV, &OsslTwoTimesV),
+                               "BN_add failed in TestBigNumDivide!\n");
+                        Stopif(!BN_rshift(&OsslV, &OsslV, BITS_IN_DWORD),
+                               "BN_rshift failed in TestBigNumDivide!\n");
+                    }
                 }
             }
         }
@@ -273,17 +419,17 @@ internal MIN_UNIT_TEST_FUNC(TestBigNumDivide)
 
     // Single-word test case
     bignum Dividend;
-    InitTinyBigNumUnchecked(&Dividend, 721948327, false);
+    InitBignumFromOsslBnUnchecked(&Dividend, &OsslU);
 
     bignum Divisor;
-    InitTinyBigNumUnchecked(&Divisor, 84461, false);
+    InitBignumFromOsslBnUnchecked(&Divisor, &OsslV);
 
     bignum Quotient;
     bignum Remainder;
     BigNumDivide(&Quotient, &Remainder, &Dividend, &Divisor);
 
-    MinUnitAssert((IsEqualTinyBigNumUnchecked(&Quotient, 8547) &&
-                   IsEqualTinyBigNumUnchecked(&Quotient, 60160)),
+    MinUnitAssert((DoesBigNumEqualOsslBigNum(&Quotient, &UDivV) &&
+                   DoesBigNumEqualOsslBigNum(&Remainder, &UDivVRemainder)),
                   "Test 1 failed in TestBigNumDivide!\n");
 }
 
@@ -346,7 +492,8 @@ internal MIN_UNIT_TEST_FUNC(TestRsaBroadcastAttack)
         bignum ProductMResidueMInv;
         BigNumMultiplyOperandScanning(&ProductMResidueMInv, &Mi, &Residue_i);
 
-        Stopif(IsAGreaterThanOrEqualToB(&ProductMResidueMInv, &N1N2N3), "Invalid NiNj*c_k >= N1N2N3 condition\n");
+        Stopif(IsAGreaterThanOrEqualToB(&ProductMResidueMInv, &N1N2N3),
+               "Invalid NiNj*c_k >= N1N2N3 condition\n");
 
         BigNumMultiplyModP(&ProductMResidueMInv, &ProductMResidueMInv, &MiInverseModPrimeNi, &N1N2N3);
 

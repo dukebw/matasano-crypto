@@ -232,18 +232,6 @@ OsslMultiplyBn(BIGNUM *ATimesB, BIGNUM *A, BIGNUM *B)
     BN_CTX_free(Context);
 }
 
-internal inline b32
-BigNumEqualsOsslBn(bignum *BigNum, BIGNUM *OsslBignum)
-{
-    b32 Result;
-
-    Result = (!memcmp(BigNum->Num, OsslBignum->d, BYTES_IN_BIGNUM_WORD*OsslBignum->top) &&
-              ((i32)BigNum->SizeWords == OsslBignum->top) &&
-              (BigNum->Negative == OsslBignum->neg));
-
-    return Result;
-}
-
 internal void
 BinaryOpAndAssertEqual(bignum_binary_operands *Ops,
                        ossl_binary_operands *OsslOps,
@@ -262,7 +250,8 @@ BinaryOpAndAssertEqual(bignum_binary_operands *Ops,
     OsslBnBinaryOpFn(&OsslOps->Result, &OsslOps->LeftOp, &OsslOps->RightOp);
     BigNumBinaryOpFn(&Ops->Result, &Ops->LeftOp, &Ops->RightOp);
 
-    MinUnitAssert(BigNumEqualsOsslBn(&Ops->Result, &OsslOps->Result), "BigNum/OsslBignum mismatch in TestBigNumNegative!\n");
+    MinUnitAssert(DoesBigNumEqualOsslBigNum(&Ops->Result, &OsslOps->Result),
+                  "BigNum/OsslBignum mismatch in TestBigNumNegative!\n");
 }
 
 internal void
@@ -374,7 +363,7 @@ internal MIN_UNIT_TEST_FUNC(TestBinaryInverse)
 
     GetInverseModN(&InvModResult, (bignum *)&TEST_INV_MOD_INPUT, (bignum *)&RFC_5054_NIST_PRIME_2048);
 
-    MinUnitAssert(BigNumEqualsOsslBn(&InvModResult, &ExpectedModInv),
+    MinUnitAssert(DoesBigNumEqualOsslBigNum(&InvModResult, &ExpectedModInv),
                   "InvModResult mismatch in TestBinaryInverse!\n");
 }
 

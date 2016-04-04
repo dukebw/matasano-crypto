@@ -43,6 +43,9 @@ typedef struct timespec timespec;
 
 #define MEMBER_SIZE(type, Member) sizeof(((type *)0)->Member)
 
+#define GET_UPPER_64(Value128) ((u64)((Value128) >> 64))
+#define GET_LOWER_64(Value128) ((u64)((Value128) & MASK_64BIT))
+
 internal const r32 EXPECTED_LETTER_FREQUENCY[] =
 {
     0.08167, 0.01492, 0.02782, 0.04253, 0.12702, 0.02228, 0.02015, 0.06094,
@@ -1203,18 +1206,26 @@ BigNumCopyMinusUnchecked(bignum *Dest, bignum *Source)
 }
 
 internal inline u64
-CheckForCarry(u64 Sum, u64 AdditionOperand)
+ZeroOrSetIfLessThan(u64 LeftVal, u64 RightVal)
 {
-    u64 Carry;
+    u64 Result;
 
-    if (Sum < AdditionOperand)
+    if (LeftVal < RightVal)
     {
-        Carry = 1;
+        Result = 1;
     }
     else
     {
-        Carry = 0;
+        Result = 0;
     }
+
+    return Result;
+}
+
+internal inline u64
+CheckForCarry(u64 Sum, u64 AdditionOperand)
+{
+    u64 Carry = ZeroOrSetIfLessThan(Sum, AdditionOperand);
 
     return Carry;
 }
@@ -1711,9 +1722,7 @@ MultiplyOperandScanningUnchecked(u64 *ProductAB, u32 ProductABMaxLengthWords,
         }
     }
 
-    // Extra word is because
-    // (a_31*2^31 + ... + a_0*2^0)*(b_31*2^31 + ... + b_0*2^0) == c_62*2^62 + ... + c_0*2^0
-    u32 ResultSizeWords = (ALengthWords + BLengthWords + 1);
+    u32 ResultSizeWords = (ALengthWords + BLengthWords);
     if (ResultSizeWords > ProductABMaxLengthWords)
     {
         ResultSizeWords = ProductABMaxLengthWords;
@@ -2662,6 +2671,18 @@ OsslPrintErrors(void)
 {
     BIO *BioErr = BIO_new_fp(stderr, BIO_NOCLOSE | BIO_FP_TEXT);
     ERR_print_errors(BioErr);
+}
+
+internal inline b32
+DoesBigNumEqualOsslBigNum(bignum *BigNum, BIGNUM *OsslBignum)
+{
+    b32 Result;
+
+    Result = (!memcmp(BigNum->Num, OsslBignum->d, BYTES_IN_BIGNUM_WORD*OsslBignum->top) &&
+              ((i32)BigNum->SizeWords == OsslBignum->top) &&
+              (BigNum->Negative == OsslBignum->neg));
+
+    return Result;
 }
 
 #endif /* CRYPT_HELPER_H */
