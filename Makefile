@@ -10,19 +10,20 @@ P8=matasano-crypto-challenges/set5/implement_rsa
 P9=matasano-crypto-challenges/set5/big_endian_bignum_to_little_endian_64bit
 P10=matasano-crypto-challenges/set5/implement_rsa_broadcast_attack
 P11=matasano-crypto-challenges/set5/test_oaep
-P12=matasano-crypto-challenges/set4/nweb/nweb23
+P12=matasano-crypto-challenges/set6/unpadded_msg_recovery_oracle
+P13=matasano-crypto-challenges/set4/nweb/nweb23
 
 OBJECTS=
 STD_FLAGS=gnu11
 MORE_FLAGS=#-DSHA1TEST
 CRYPTO_IMPL=crypto-grabbag/Implementations
 SLRE=slre
-CFLAGS=-ggdb3 -std=$(STD_FLAGS) -Wall -Wextra -Werror -O3 -I$(CRYPTO_IMPL) -I$(SLRE)
+CFLAGS=-ggdb3 -std=$(STD_FLAGS) -Wall -Wextra -Werror -O0 -I$(CRYPTO_IMPL) -I$(SLRE)
 LDLIBS=-lm -pthread -lssl -lcrypto
 CC=gcc
 CXX=g++
 
-all: $(P) $(P2) $(P3) $(P4) $(P5) $(P6) $(P7) $(P8) $(P9) $(P10) $(P11) $(P12)
+all: $(P) $(P2) $(P3) $(P4) $(P5) $(P6) $(P7) $(P8) $(P9) $(P10) $(P11) $(P12) $(P13)
 
 $(P):$(CRYPTO_IMPL)/crypt_helper.h
 $(P2):$(CRYPTO_IMPL)/crypt_helper.h
@@ -36,3 +37,4 @@ $(P9):$(CRYPTO_IMPL)/crypt_helper.h
 $(P10):$(CRYPTO_IMPL)/crypt_helper.h
 $(P11):$(CRYPTO_IMPL)/crypt_helper.h
 $(P12):$(CRYPTO_IMPL)/crypt_helper.h
+$(P13):$(CRYPTO_IMPL)/crypt_helper.h

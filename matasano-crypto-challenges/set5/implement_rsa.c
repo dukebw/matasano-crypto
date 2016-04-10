@@ -1,7 +1,5 @@
 #include "crypt_helper.h"
 
-#define P_Q_SIZE_BITS (MAX_BIGNUM_SIZE_BITS/4)
-
 #define BIGNUM_BINARY_OP_FN(Name) u32 Name(bignum *SumAB, bignum *A, bignum *B)
 typedef BIGNUM_BINARY_OP_FN(bignum_binary_op_fn);
 
@@ -383,27 +381,12 @@ internal MIN_UNIT_TEST_FUNC(TestImplementRsa)
           integer d, 1 < d < φ, such that ed ≡ 1 (mod φ).
        5. A’s public key is (n, e); A’s private key is d.
     */
-    bignum PrivateKeyD;
     bignum PublicExponentE;
     InitTinyBigNumUnchecked(&PublicExponentE, 3, false);
 
-    bignum PrimeQ;
-    bignum PrimeP;
-    bignum Totient;
-    do
-    {
-        GetRandPrime(&PrimeQ, P_Q_SIZE_BITS);
-        GetRandPrime(&PrimeP, P_Q_SIZE_BITS);
-
-        // totient := (p - 1)(q - 1) == pq - p - q + 1
-        BigNumMultiplyOperandScanning(&Totient, &PrimeP, &PrimeQ);
-        BigNumSubtract(&Totient, &Totient, &PrimeP);
-        BigNumSubtract(&Totient, &Totient, &PrimeQ);
-
-        bignum One;
-        BigNumSetToOneUnchecked(&One);
-        BigNumAdd(&Totient, &Totient, &One);
-    } while (!GetInverseModN(&PrivateKeyD, &PublicExponentE, &Totient));
+    bignum ModulusN;
+    bignum PrivateKeyD;
+    GenerateRsaKeyPair(&PrivateKeyD, &ModulusN, &PublicExponentE, MAX_BIGNUM_SIZE_BITS/4);
 
     char Message[] = "When we are born, we cry that we are come to this great stage of fools.";
 
@@ -413,10 +396,6 @@ internal MIN_UNIT_TEST_FUNC(TestImplementRsa)
     BigNumScratch.Num[BigNumScratch.SizeWords - 1] = 0;
     BigNumScratch.Negative = false;
     memcpy(BigNumScratch.Num, Message, STR_LEN(Message));
-
-    // n := pq
-    bignum ModulusN;
-    BigNumMultiplyOperandScanning(&ModulusN, &PrimeP, &PrimeQ);
 
     // To encrypt: c = m**e % n.
     MontModExpRBigNumMax(&BigNumScratch, &BigNumScratch, &PublicExponentE, &ModulusN);

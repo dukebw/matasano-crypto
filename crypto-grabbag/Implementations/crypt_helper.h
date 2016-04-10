@@ -2685,4 +2685,29 @@ DoesBigNumEqualOsslBigNum(bignum *BigNum, BIGNUM *OsslBignum)
     return Result;
 }
 
+internal void
+GenerateRsaKeyPair(bignum *PrivateKeyD, bignum *ModulusN, bignum *PublicExponentE, u32 PrimeSizeBits)
+{
+    Stopif((PrivateKeyD == 0) || (ModulusN == 0) || (PublicExponentE == 0),
+           "Null input to GenerateRsaKeyPair!\n");
+
+    bignum PrimeQ;
+    bignum PrimeP;
+    bignum Totient;
+    bignum One;
+    do
+    {
+        GetRandPrime(&PrimeQ, PrimeSizeBits);
+        GetRandPrime(&PrimeP, PrimeSizeBits);
+
+        // totient := (p - 1)(q - 1) == pq - p - q + 1
+        BigNumMultiplyOperandScanning(ModulusN, &PrimeP, &PrimeQ);
+        BigNumSubtract(&Totient, ModulusN, &PrimeP);
+        BigNumSubtract(&Totient, &Totient, &PrimeQ);
+
+        BigNumSetToOneUnchecked(&One);
+        BigNumAdd(&Totient, &Totient, &One);
+    } while (!GetInverseModN(PrivateKeyD, PublicExponentE, &Totient));
+}
+
 #endif /* CRYPT_HELPER_H */
